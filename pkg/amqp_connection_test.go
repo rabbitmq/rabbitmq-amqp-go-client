@@ -20,11 +20,9 @@ var _ = Describe("Connection Test", func() {
 	})
 
 	It("AMQP Connection should fail due of wrong port", func() {
-
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
-
 		connectionSettings := NewConnectionSettings()
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
@@ -46,5 +44,21 @@ var _ = Describe("Connection Test", func() {
 		err := amqpConnection.Open(context.TODO(), connectionSettings)
 		Expect(err).NotTo(BeNil())
 	})
+
+	//It("AMQP TLS Connection should success with SASLTypeAnonymous ", func() {
+	//	amqpConnection := NewAmqpConnection()
+	//	Expect(amqpConnection).NotTo(BeNil())
+	//	Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
+	//
+	//	connectionSettings := NewConnectionSettings().
+	//		UseSsl(true).Port(5671).TlsConfig(&tls.Config{
+	//		ServerName:         "localhost",
+	//		InsecureSkipVerify: true,
+	//	})
+	//	Expect(connectionSettings).NotTo(BeNil())
+	//	Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
+	//	err := amqpConnection.Open(context.TODO(), connectionSettings)
+	//	Expect(err).To(BeNil())
+	//})
 
 })

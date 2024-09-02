@@ -1,6 +1,9 @@
 package pkg
 
-import "context"
+import (
+	"context"
+	"crypto/tls"
+)
 
 type IConnectionSettings interface {
 	GetHost() string
@@ -14,10 +17,13 @@ type IConnectionSettings interface {
 	GetVirtualHost() string
 	VirtualHost(virtualHost string) IConnectionSettings
 	GetScheme() string
-	Scheme(scheme string) IConnectionSettings
 	GetContainerId() string
 	ContainerId(containerId string) IConnectionSettings
+	UseSsl(value bool) IConnectionSettings
+	GetSsl() bool
 	BuildAddress() string
+	TlsConfig(config *tls.Config) IConnectionSettings
+	GetTlsConfig() *tls.Config
 }
 
 type IConnection interface {
