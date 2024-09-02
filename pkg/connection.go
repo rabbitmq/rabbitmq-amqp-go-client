@@ -29,4 +29,5 @@ type IConnectionSettings interface {
 type IConnection interface {
 	Open(ctx context.Context, connectionSettings IConnectionSettings) error
 	Close() error
+	Management() IManagement
 }

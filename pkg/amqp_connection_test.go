@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Connection Test", func() {
+var _ = Describe("AMQP Connection Test", func() {
 	It("AMQP Connection should success", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())

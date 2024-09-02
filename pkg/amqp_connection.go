@@ -122,11 +122,17 @@ func NewConnectionSettings() IConnectionSettings {
 
 type AmqpConnection struct {
 	Connection *amqp.Conn
-	Session    *amqp.Session
+	management IManagement
+}
+
+func (a *AmqpConnection) Management() IManagement {
+	return a.management
 }
 
 func NewAmqpConnection() IConnection {
-	return &AmqpConnection{}
+	return &AmqpConnection{
+		management: NewAmqpManagement(),
+	}
 }
 
 func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectionSettings) error {
@@ -146,9 +152,17 @@ func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectio
 		return err
 	}
 	a.Connection = conn
+	err = a.Management().Open(ctx, a)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (a *AmqpConnection) Close() error {
+	err := a.Management().Close(context.Background())
+	if err != nil {
+		return err
+	}
 	return a.Connection.Close()
 }
