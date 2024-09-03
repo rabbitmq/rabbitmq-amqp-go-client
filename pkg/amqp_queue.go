@@ -27,7 +27,7 @@ func (a *AmqpQueue) Declare(ctx context.Context) (error, IQueueInfo) {
 	_queueArguments := make(map[string]any)
 	_queueArguments["x-queue-type"] = "quorum"
 	kv["arguments"] = _queueArguments
-	err := a.management.Request(ctx, "id", kv, path, commandPut, []int{200})
+	_, err := a.management.Request(ctx, "id", kv, path, commandPut, []int{200})
 	if err != nil {
 		return err, nil
 	}

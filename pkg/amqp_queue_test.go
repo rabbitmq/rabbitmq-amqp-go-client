@@ -28,7 +28,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	})
 
 	It("AMQP Queue should success with default creation", func() {
-		const queueName = "AMQPQueueShouldSuccessWithDefaultCreation"
+		const queueName = "AMQP Queue Should Success With Default Creation"
 		queueSpec := management.Queue(queueName)
 		err, i := queueSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())

@@ -46,27 +46,27 @@ func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
 	return nil
 }
 
-func (a *AmqpManagement) processMessages(ctx context.Context) error {
+//func (a *AmqpManagement) processMessages(ctx context.Context) error {
+//
+//	go func() {
+//
+//		for a.GetStatus() == Open {
+//			msg, err := a.receiver.Receive(ctx, nil) // blocking call
+//			if err != nil {
+//				fmt.Printf("Exiting processMessages %s\n", err)
+//				return
+//			}
+//
+//			if msg != nil {
+//				a.receiver.AcceptMessage(ctx, msg)
+//			}
+//		}
+//
+//		fmt.Printf("Exiting processMessages\n")
+//	}()
 
-	go func() {
-
-		for a.GetStatus() == Open {
-			msg, err := a.receiver.Receive(ctx, nil) // blocking call
-			if err != nil {
-				fmt.Printf("Exiting processMessages %s\n", err)
-				return
-			}
-
-			if msg != nil {
-				a.receiver.AcceptMessage(ctx, msg)
-			}
-		}
-
-		fmt.Printf("Exiting processMessages\n")
-	}()
-
-	return nil
-}
+//return nil
+//}
 
 func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	if a.sender == nil {
@@ -117,10 +117,10 @@ func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error
 		// we won't expose to the user since the user will call Close
 		// and the processing _must_ be running in the background
 		// for the management session life.
-		err = a.processMessages(context.Background())
-		if err != nil {
-			return err
-		}
+		//err = a.processMessages(context.Background())
+		//if err != nil {
+		//	return err
+		//}
 		a.lifeCycle.SetStatus(Open)
 	}
 	return ctx.Err()
@@ -134,12 +134,8 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	return err
 }
 
-func (a *AmqpManagement) Queue(queueName string) IQueueSpecification {
-	return newAmqpQueue(a, queueName)
-}
-
 func (a *AmqpManagement) Request(ctx context.Context, id string, body any, path string, method string,
-	expectedResponseCodes []int) error {
+	expectedResponseCodes []int) (map[string]any, error) {
 	amqpMessage := amqp.NewMessage(nil)
 	amqpMessage.Value = body
 	s := commandReplyTo
@@ -152,9 +148,36 @@ func (a *AmqpManagement) Request(ctx context.Context, id string, body any, path 
 	opts := &amqp.SendOptions{Settled: true}
 	err := a.sender.Send(ctx, amqpMessage, opts)
 	if err != nil {
-		return err
+		return make(map[string]any), err
 	}
-	return nil
+	msg, err := a.receiver.Receive(ctx, nil)
+	if err != nil {
+		return make(map[string]any), err
+	}
+	err = a.receiver.AcceptMessage(ctx, msg)
+	if err != nil {
+		return nil, err
+	}
+	if msg.Properties == nil {
+		return make(map[string]any), fmt.Errorf("expected properties in the message")
+	}
+
+	if msg.Properties.CorrelationID == nil {
+		return make(map[string]any), fmt.Errorf("expected correlation id in the message")
+	}
+
+	if msg.Properties.CorrelationID != id {
+		return make(map[string]any), fmt.Errorf("expected correlation id %s got %s", id, msg.Properties.CorrelationID)
+	}
+	switch msg.Value.(type) {
+	case map[string]interface{}:
+		return msg.Value.(map[string]any), nil
+	}
+	return make(map[string]any), nil
+}
+
+func (a *AmqpManagement) Queue(queueName string) IQueueSpecification {
+	return newAmqpQueue(a, queueName)
 }
 
 func (a *AmqpManagement) NotifyStatusChange(channel chan *StatusChanged) {

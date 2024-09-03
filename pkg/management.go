@@ -11,5 +11,5 @@ type IManagement interface {
 	GetStatus() int
 	NotifyStatusChange(channel chan *StatusChanged)
 	Request(ctx context.Context, id string, body any, path string, method string,
-		expectedResponseCodes []int) error
+		expectedResponseCodes []int) (map[string]any, error)
 }
