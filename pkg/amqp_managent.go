@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"fmt"
 	"github.com/Azure/go-amqp"
 	"time"
 )
@@ -11,6 +12,7 @@ type AmqpManagement struct {
 	sender    *amqp.Sender
 	receiver  *amqp.Receiver
 	lifeCycle *LifeCycle
+	cancel    context.CancelFunc
 }
 
 func NewAmqpManagement() *AmqpManagement {
@@ -47,14 +49,20 @@ func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
 func (a *AmqpManagement) processMessages(ctx context.Context) error {
 
 	go func() {
-		msg, err := a.receiver.Receive(ctx, nil)
-		if err != nil {
-			return
+
+		for a.GetStatus() == Open {
+			msg, err := a.receiver.Receive(ctx, nil) // blocking call
+			if err != nil {
+				fmt.Printf("Exiting processMessages %s\n", err)
+				return
+			}
+
+			if msg != nil {
+				a.receiver.AcceptMessage(ctx, msg)
+			}
 		}
 
-		if msg != nil {
-			a.receiver.AcceptMessage(ctx, msg)
-		}
+		fmt.Printf("Exiting processMessages\n")
 	}()
 
 	return nil
@@ -103,25 +111,31 @@ func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error
 	if err != nil {
 		return err
 	}
-
-	err = a.processMessages(ctx)
-
-	if err != nil {
-		return err
+	if ctx.Err() != nil {
+		// start processing messages. Here we pass a context that will be closed
+		// when the receiver session is closed.
+		// we won't expose to the user since the user will call Close
+		// and the processing _must_ be running in the background
+		// for the management session life.
+		err = a.processMessages(context.Background())
+		if err != nil {
+			return err
+		}
+		a.lifeCycle.SetStatus(Open)
 	}
-	a.lifeCycle.SetStatus(Open)
-	return err
+	return ctx.Err()
 }
 
 func (a *AmqpManagement) Close(ctx context.Context) error {
+	_ = a.sender.Close(ctx)
+	_ = a.receiver.Close(ctx)
 	err := a.session.Close(ctx)
 	a.lifeCycle.SetStatus(Closed)
 	return err
 }
 
 func (a *AmqpManagement) Queue(queueName string) IQueueSpecification {
-	//TODO implement me
-	panic("implement me")
+	return newAmqpQueue(a, queueName)
 }
 
 func (a *AmqpManagement) Request(ctx context.Context, id string, body any, path string, method string,
@@ -140,7 +154,6 @@ func (a *AmqpManagement) Request(ctx context.Context, id string, body any, path 
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 

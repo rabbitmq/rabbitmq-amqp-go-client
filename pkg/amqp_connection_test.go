@@ -4,6 +4,7 @@ import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"time"
 )
 
 var _ = Describe("AMQP Connection Test", func() {
@@ -43,6 +44,16 @@ var _ = Describe("AMQP Connection Test", func() {
 		connectionSettings.Host("wronghost").Port(5672)
 		err := amqpConnection.Open(context.TODO(), connectionSettings)
 		Expect(err).NotTo(BeNil())
+	})
+
+	It("AMQP Connection should fail due of context cancelled", func() {
+		amqpConnection := NewAmqpConnection()
+		Expect(amqpConnection).NotTo(BeNil())
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		cancel()
+		err := amqpConnection.Open(ctx, NewConnectionSettings())
+		Expect(err).NotTo(BeNil())
+
 	})
 
 	//It("AMQP TLS Connection should success with SASLTypeAnonymous ", func() {

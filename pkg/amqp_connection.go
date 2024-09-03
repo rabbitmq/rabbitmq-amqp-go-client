@@ -159,8 +159,8 @@ func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectio
 	return nil
 }
 
-func (a *AmqpConnection) Close() error {
-	err := a.Management().Close(context.Background())
+func (a *AmqpConnection) Close(ctx context.Context) error {
+	err := a.Management().Close(ctx)
 	if err != nil {
 		return err
 	}

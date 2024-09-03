@@ -28,6 +28,6 @@ type IConnectionSettings interface {
 
 type IConnection interface {
 	Open(ctx context.Context, connectionSettings IConnectionSettings) error
-	Close() error
+	Close(ctx context.Context) error
 	Management() IManagement
 }

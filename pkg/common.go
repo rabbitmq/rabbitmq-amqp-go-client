@@ -20,3 +20,12 @@ const (
 	Queues    = "queues"
 	Bindings  = "bindings"
 )
+
+func encodePathSegments(pathSegments string) string {
+	//TODO: implement me
+	return pathSegments
+}
+
+func queuePath(queueName string) string {
+	return "/" + Queues + "/" + encodePathSegments(queueName)
+}

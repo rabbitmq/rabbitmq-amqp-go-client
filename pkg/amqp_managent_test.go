@@ -4,9 +4,23 @@ import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"time"
 )
 
 var _ = Describe("Management tests", func() {
+
+	It("AMQP Management should fail due of context cancelled", func() {
+		amqpConnection := NewAmqpConnection()
+		Expect(amqpConnection).NotTo(BeNil())
+		err := amqpConnection.Open(context.Background(), NewConnectionSettings())
+		Expect(err).To(BeNil())
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		cancel()
+		err = amqpConnection.Management().Open(ctx, amqpConnection)
+		Expect(err).NotTo(BeNil())
+	})
+
 	It("Request", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
@@ -28,5 +42,7 @@ var _ = Describe("Management tests", func() {
 		path := "/queues/test"
 		err = management.Request(context.TODO(), "id", kv, path, "PUT", []int{200})
 		Expect(err).To(BeNil())
+		time.Sleep(1 * time.Second)
+		Expect(management.Close(context.TODO())).To(BeNil())
 	})
 })
