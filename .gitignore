@@ -26,4 +26,3 @@ go.work.sum
 .idea/
 coverage.txt
 .DS_Store
-.ci/ubuntu/log
