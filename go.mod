@@ -1,4 +1,4 @@
-module github.com/rabbitmq/rabbitmq-amqp-dotnet-client
+module github.com/rabbitmq/rabbitmq-amqp-go-client
 
 go 1.22.0
 
