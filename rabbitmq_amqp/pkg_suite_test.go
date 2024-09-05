@@ -1,4 +1,4 @@
-package pkg_test
+package rabbitmq_amqp_test
 
 import (
 	"testing"

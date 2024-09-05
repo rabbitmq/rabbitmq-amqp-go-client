@@ -1,4 +1,4 @@
-package pkg
+package rabbitmq_amqp
 
 import (
 	"context"
@@ -136,8 +136,7 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 
 func (a *AmqpManagement) Request(ctx context.Context, id string, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
-	amqpMessage := amqp.NewMessage(nil)
-	amqpMessage.Value = body
+	amqpMessage := amqp.NewMessageWithValue(body)
 	s := commandReplyTo
 	amqpMessage.Properties = &amqp.MessageProperties{
 		ReplyTo:   &s,

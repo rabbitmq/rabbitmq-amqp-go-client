@@ -1,4 +1,4 @@
-package pkg
+package rabbitmq_amqp
 
 import "context"
 
@@ -6,8 +6,7 @@ type AmqpQueueInfo struct {
 }
 
 func (a *AmqpQueueInfo) GetName() string {
-	//TODO implement me
-	panic("implement me")
+	return ""
 }
 
 type AmqpQueue struct {
@@ -35,8 +34,13 @@ func (a *AmqpQueue) Declare(ctx context.Context) (error, IQueueInfo) {
 }
 
 func (a *AmqpQueue) Delete(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	path := queuePath(a.name)
+	_, err := a.management.Request(ctx, "id1", nil, path, commandDelete, []int{200})
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func (a *AmqpQueue) Name(queueName string) IQueueSpecification {

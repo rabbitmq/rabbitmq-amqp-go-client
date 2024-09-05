@@ -1,4 +1,4 @@
-package pkg
+package rabbitmq_amqp
 
 import (
 	"context"
@@ -27,11 +27,16 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Queue should success with default creation", func() {
-		const queueName = "AMQP Queue Should Success With Default Creation"
+	It("AMQP Queue Declare and Delete should success ", func() {
+		//const queueName = "AMQP Queue Declare and Delete Should Success "
+		const queueName = "myQueue"
 		queueSpec := management.Queue(queueName)
 		err, i := queueSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
 		Expect(i).NotTo(BeNil())
+
+		err = queueSpec.Delete(context.TODO())
+		Expect(err).To(BeNil())
+
 	})
 })

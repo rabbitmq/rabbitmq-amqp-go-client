@@ -1,4 +1,4 @@
-package pkg
+package rabbitmq_amqp
 
 import "context"
 
