@@ -1,0 +1,33 @@
+name: Test against supported go-version
+
+on:
+  - workflow_call
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        go: [ '1.22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        id: setup_go
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - name: Start RabbitMQ
+        id: start-rabbitmq
+        run: ${{ github.workspace }}/.ci/ubuntu/gha-setup.sh
+      - name: Test
+        timeout-minutes: 15
+        run: make test
+      - name: Check for errors in RabbitMQ logs
+        run: ${{ github.workspace}}/.ci/ubuntu/gha-log-check.sh
+      - name: Maybe upload RabbitMQ logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rabbitmq-logs-integration-ubuntu
+          path: ${{ github.workspace }}/.ci/ubuntu/log/

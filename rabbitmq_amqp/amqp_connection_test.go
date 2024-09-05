@@ -63,7 +63,7 @@ var _ = Describe("AMQP Connection Test", func() {
 	//
 	//	connectionSettings := NewConnectionSettings().
 	//		UseSsl(true).Port(5671).TlsConfig(&tls.Config{
-	//		ServerName:         "localhost",
+	//		//ServerName:         "localhost",
 	//		InsecureSkipVerify: true,
 	//	})
 	//	Expect(connectionSettings).NotTo(BeNil())

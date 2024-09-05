@@ -7,7 +7,6 @@ import (
 )
 
 func main() {
-
 	amqpConnection := rabbitmq_amqp.NewAmqpConnection()
 	err := amqpConnection.Open(context.Background(), rabbitmq_amqp.NewConnectionSettings())
 	if err != nil {
@@ -20,14 +19,10 @@ func main() {
 	if err != nil {
 		return
 	}
-	//time.Sleep(3 * time.Second)
-
 	err = queueSpec.Delete(context.Background())
 	if err != nil {
 		return
 	}
-
-	//time.Sleep(1 * time.Second)
 	fmt.Printf("Queue name: %s\n", queueInfo.GetName())
 	err = amqpConnection.Close(context.Background())
 	if err != nil {
