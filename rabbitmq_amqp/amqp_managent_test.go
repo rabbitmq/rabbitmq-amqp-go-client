@@ -40,10 +40,9 @@ var _ = Describe("Management tests", func() {
 		_queueArguments["x-queue-type"] = "quorum"
 		kv["arguments"] = _queueArguments
 		path := "/queues/test"
-		result, err := management.Request(context.TODO(), "id", kv, path, "PUT", []int{200})
+		result, err := management.Request(context.TODO(), kv, path, "PUT", []int{200})
 		Expect(err).To(BeNil())
 		Expect(result).NotTo(BeNil())
-		time.Sleep(1 * time.Second)
 		Expect(management.Close(context.TODO())).To(BeNil())
 	})
 })

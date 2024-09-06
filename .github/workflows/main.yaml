@@ -1,4 +1,4 @@
-name: rabbitmq-amqp-dotnet-client
+name: rabbitmq-amqp-go-client
 
 on:
   push:

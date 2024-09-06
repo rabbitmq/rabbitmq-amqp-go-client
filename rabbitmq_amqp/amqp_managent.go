@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -134,7 +135,14 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	return err
 }
 
-func (a *AmqpManagement) Request(ctx context.Context, id string, body any, path string, method string,
+func (a *AmqpManagement) Request(ctx context.Context, body any, path string, method string,
+	expectedResponseCodes []int) (map[string]any, error) {
+
+	return a.request(ctx, uuid.New().String(), body, path, method, expectedResponseCodes)
+
+}
+
+func (a *AmqpManagement) request(ctx context.Context, id string, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
 	amqpMessage := amqp.NewMessageWithValue(body)
 	s := commandReplyTo
