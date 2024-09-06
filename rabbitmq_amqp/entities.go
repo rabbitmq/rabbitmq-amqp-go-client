@@ -1,12 +1,24 @@
 package rabbitmq_amqp
 
-import "context"
+import (
+	"context"
+)
+
+type TQueueType string
 
 const (
-	Quorum  = "quorum"
-	Classic = "classic"
-	Stream  = "stream"
+	Quorum  TQueueType = "quorum"
+	Classic TQueueType = "classic"
+	Stream  TQueueType = "stream"
 )
+
+type QueueType struct {
+	Type TQueueType
+}
+
+func (e QueueType) String() string {
+	return string(e.Type)
+}
 
 type IEntityInfoSpecification[T any] interface {
 	Declare(ctx context.Context) (T, error)
@@ -20,8 +32,8 @@ type IQueueSpecification interface {
 	AutoDelete(isAutoDelete bool) IQueueSpecification
 	IsAutoDelete() bool
 	IEntityInfoSpecification[IQueueInfo]
-	QueueType(queueType string) IQueueSpecification
-	GetQueueType() string
+	QueueType(queueType QueueType) IQueueSpecification
+	GetQueueType() TQueueType
 }
 
 type IQueueInfo interface {
@@ -29,5 +41,7 @@ type IQueueInfo interface {
 	IsDurable() bool
 	IsAutoDelete() bool
 	Exclusive() bool
-	Type() string
+	Type() TQueueType
+	GetLeader() string
+	GetReplicas() []string
 }

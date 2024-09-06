@@ -2,11 +2,15 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
+	"strconv"
 	"time"
 )
+
+var PreconditionFailed = errors.New("precondition Failed")
 
 type AmqpManagement struct {
 	session   *amqp.Session
@@ -142,6 +146,16 @@ func (a *AmqpManagement) Request(ctx context.Context, body any, path string, met
 
 }
 
+func (a *AmqpManagement) validateResponseCode(responseCode int, expectedResponseCodes []int) error {
+
+	for _, code := range expectedResponseCodes {
+		if code == responseCode {
+			return nil
+		}
+	}
+	return PreconditionFailed
+}
+
 func (a *AmqpManagement) request(ctx context.Context, id string, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
 	amqpMessage := amqp.NewMessageWithValue(body)
@@ -180,6 +194,14 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	case map[string]interface{}:
 		return msg.Value.(map[string]any), nil
 	}
+
+	i, _ := strconv.Atoi(*msg.Properties.Subject)
+
+	err = a.validateResponseCode(i, expectedResponseCodes)
+	if err != nil {
+		return nil, err
+	}
+
 	return make(map[string]any), nil
 }
 

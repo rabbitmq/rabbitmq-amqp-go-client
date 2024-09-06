@@ -3,19 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
+	mq "github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
 )
 
 func main() {
-	amqpConnection := rabbitmq_amqp.NewAmqpConnection()
-	err := amqpConnection.Open(context.Background(), rabbitmq_amqp.NewConnectionSettings())
+	amqpConnection := mq.NewAmqpConnection()
+	err := amqpConnection.Open(context.Background(), mq.NewConnectionSettings())
 	if err != nil {
 		return
 	}
 
 	management := amqpConnection.Management()
-	queueSpec := management.Queue("getting_started_queue")
-	err, queueInfo := queueSpec.Declare(context.Background())
+	queueSpec := management.Queue("getting_started_queue").
+		QueueType(mq.QueueType{Type: mq.Quorum})
+	queueInfo, err := queueSpec.Declare(context.Background())
 	if err != nil {
 		return
 	}

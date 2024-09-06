@@ -2,7 +2,6 @@ package rabbitmq_amqp
 
 import (
 	"context"
-	"strings"
 )
 
 type AmqpQueueInfo struct {
@@ -10,7 +9,17 @@ type AmqpQueueInfo struct {
 	isDurable    bool
 	isAutoDelete bool
 	isExclusive  bool
-	queueType    string
+	leader       string
+	replicas     []string
+	queueType    TQueueType
+}
+
+func (a *AmqpQueueInfo) GetLeader() string {
+	return a.leader
+}
+
+func (a *AmqpQueueInfo) GetReplicas() []string {
+	return a.replicas
 }
 
 func newAmqpQueueInfo(response map[string]any) IQueueInfo {
@@ -19,7 +28,9 @@ func newAmqpQueueInfo(response map[string]any) IQueueInfo {
 		isDurable:    response["durable"].(bool),
 		isAutoDelete: response["auto_delete"].(bool),
 		isExclusive:  response["exclusive"].(bool),
-		queueType:    response["type"].(string),
+		queueType:    TQueueType(response["type"].(string)),
+		leader:       response["leader"].(string),
+		replicas:     response["replicas"].([]string),
 	}
 }
 
@@ -35,7 +46,7 @@ func (a *AmqpQueueInfo) Exclusive() bool {
 	return a.isExclusive
 }
 
-func (a *AmqpQueueInfo) Type() string {
+func (a *AmqpQueueInfo) Type() TQueueType {
 	return a.queueType
 }
 
@@ -51,17 +62,16 @@ type AmqpQueue struct {
 	name           string
 }
 
-func (a *AmqpQueue) QueueType(queueType string) IQueueSpecification {
-	a.queueArguments["x-queue-type"] = queueType
+func (a *AmqpQueue) QueueType(queueType QueueType) IQueueSpecification {
+	a.queueArguments["x-queue-type"] = queueType.String()
 	return a
 }
 
-func (a *AmqpQueue) GetQueueType() string {
+func (a *AmqpQueue) GetQueueType() TQueueType {
 	if a.queueArguments["x-queue-type"] == nil {
 		return Classic
 	}
-
-	return a.queueArguments["x-queue-type"].(string)
+	return TQueueType(a.queueArguments["x-queue-type"].(string))
 }
 
 func (a *AmqpQueue) Exclusive(isExclusive bool) IQueueSpecification {
@@ -90,9 +100,9 @@ func newAmqpQueue(management *AmqpManagement, queueName string) IQueueSpecificat
 
 func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 
-	if Quorum == strings.ToLower(a.GetQueueType()) ||
+	if Quorum == a.GetQueueType() ||
+		Stream == a.GetQueueType() {
 		// mandatory arguments for quorum queues and streams
-		Stream == strings.ToLower(a.GetQueueType()) {
 		a.Exclusive(false).AutoDelete(false)
 	}
 
