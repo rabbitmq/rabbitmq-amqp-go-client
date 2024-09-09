@@ -8,8 +8,8 @@ const (
 )
 
 type StatusChanged struct {
-	from int
-	to   int
+	From int
+	To   int
 }
 
 type LifeCycle struct {
@@ -40,7 +40,7 @@ func (l *LifeCycle) SetStatus(value int) {
 		return
 	}
 	l.chStatusChanged <- &StatusChanged{
-		from: oldState,
-		to:   value,
+		From: oldState,
+		To:   value,
 	}
 }

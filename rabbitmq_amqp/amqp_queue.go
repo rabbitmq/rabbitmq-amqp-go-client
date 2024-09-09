@@ -126,7 +126,6 @@ func (a *AmqpQueue) Delete(ctx context.Context) error {
 		return err
 	}
 	return nil
-
 }
 
 func (a *AmqpQueue) Name(queueName string) IQueueSpecification {

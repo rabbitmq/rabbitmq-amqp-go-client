@@ -30,4 +30,6 @@ type IConnection interface {
 	Open(ctx context.Context, connectionSettings IConnectionSettings) error
 	Close(ctx context.Context) error
 	Management() IManagement
+	NotifyStatusChange(channel chan *StatusChanged)
+	GetStatus() int
 }

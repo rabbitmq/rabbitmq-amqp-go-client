@@ -116,18 +116,18 @@ func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error
 	if err != nil {
 		return err
 	}
-	if ctx.Err() != nil {
-		// start processing messages. Here we pass a context that will be closed
-		// when the receiver session is closed.
-		// we won't expose to the user since the user will call Close
-		// and the processing _must_ be running in the background
-		// for the management session life.
-		//err = a.processMessages(context.Background())
-		//if err != nil {
-		//	return err
-		//}
-		a.lifeCycle.SetStatus(Open)
-	}
+	//if ctx.Err() != nil {
+	//	// start processing messages. Here we pass a context that will be closed
+	//	// when the receiver session is closed.
+	//	// we won't expose To the user since the user will call Close
+	//	// and the processing _must_ be running in the background
+	//	// for the management session life.
+	//	//err = a.processMessages(context.Background())
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//}
+	a.lifeCycle.SetStatus(Open)
 	return ctx.Err()
 }
 

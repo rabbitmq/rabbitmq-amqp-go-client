@@ -18,7 +18,7 @@ func (pc *PercentCodec) Encode(input string) string {
 		if isUnreserved(char) {
 			encoded.WriteRune(char) // Append as is
 		} else {
-			// Encode character to %HH format
+			// Encode character To %HH format
 			encoded.WriteString(fmt.Sprintf("%%%02X", char))
 		}
 	}

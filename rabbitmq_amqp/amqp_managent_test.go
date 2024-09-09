@@ -21,6 +21,28 @@ var _ = Describe("Management tests", func() {
 		Expect(err).NotTo(BeNil())
 	})
 
+	It("AMQP Management should receive events ", func() {
+		amqpConnection := NewAmqpConnection()
+		Expect(amqpConnection).NotTo(BeNil())
+		ch := make(chan *StatusChanged, 1)
+		amqpConnection.Management().NotifyStatusChange(ch)
+		err := amqpConnection.Open(context.TODO(), NewConnectionSettings())
+		Expect(err).To(BeNil())
+		recv := <-ch
+		Expect(recv).NotTo(BeNil())
+		Expect(recv.From).To(Equal(Closed))
+		Expect(recv.To).To(Equal(Open))
+
+		err = amqpConnection.Close(context.Background())
+		Expect(err).To(BeNil())
+		recv = <-ch
+		Expect(recv).NotTo(BeNil())
+
+		Expect(recv.From).To(Equal(Open))
+		Expect(recv.To).To(Equal(Closed))
+
+	})
+
 	It("Request", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())

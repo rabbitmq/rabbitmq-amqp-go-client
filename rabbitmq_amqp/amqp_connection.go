@@ -123,6 +123,7 @@ func NewConnectionSettings() IConnectionSettings {
 type AmqpConnection struct {
 	Connection *amqp.Conn
 	management IManagement
+	lifeCycle  *LifeCycle
 }
 
 func (a *AmqpConnection) Management() IManagement {
@@ -132,6 +133,7 @@ func (a *AmqpConnection) Management() IManagement {
 func NewAmqpConnection() IConnection {
 	return &AmqpConnection{
 		management: NewAmqpManagement(),
+		lifeCycle:  NewLifeCycle(),
 	}
 }
 
@@ -152,6 +154,8 @@ func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectio
 		return err
 	}
 	a.Connection = conn
+	a.lifeCycle.SetStatus(Open)
+
 	err = a.Management().Open(ctx, a)
 	if err != nil {
 		return err
@@ -164,5 +168,15 @@ func (a *AmqpConnection) Close(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return a.Connection.Close()
+	err = a.Connection.Close()
+	a.lifeCycle.SetStatus(Closed)
+	return err
+}
+
+func (a *AmqpConnection) NotifyStatusChange(channel chan *StatusChanged) {
+	a.lifeCycle.chStatusChanged = channel
+}
+
+func (a *AmqpConnection) GetStatus() int {
+	return a.lifeCycle.Status()
 }
