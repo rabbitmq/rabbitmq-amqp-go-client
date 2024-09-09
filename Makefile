@@ -1,6 +1,10 @@
-all: format test
+all: format vet test
 
 format:
+	go fmt ./...
+
+vet:
+	go vet ./rabbitmq_amqp
 
 test:
 	cd rabbitmq_amqp && go run -mod=mod github.com/onsi/ginkgo/v2/ginkgo  \

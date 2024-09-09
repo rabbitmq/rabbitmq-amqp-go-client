@@ -34,6 +34,10 @@ type IQueueSpecification interface {
 	IEntityInfoSpecification[IQueueInfo]
 	QueueType(queueType QueueType) IQueueSpecification
 	GetQueueType() TQueueType
+
+	MaxLengthBytes(length int64) IQueueSpecification
+	DeadLetterExchange(dlx string) IQueueSpecification
+	DeadLetterRoutingKey(dlrk string) IQueueSpecification
 }
 
 type IQueueInfo interface {
@@ -44,4 +48,5 @@ type IQueueInfo interface {
 	Type() TQueueType
 	GetLeader() string
 	GetReplicas() []string
+	GetArguments() map[string]any
 }

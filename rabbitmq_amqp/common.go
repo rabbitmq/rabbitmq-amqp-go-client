@@ -74,3 +74,10 @@ func encodePathSegments(pathSegments string) string {
 func queuePath(queueName string) string {
 	return "/" + Queues + "/" + encodePathSegments(queueName)
 }
+
+func validatePositive(label string, value int64) error {
+	if value < 0 {
+		return fmt.Errorf("value for %s must be positive, got %d", label, value)
+	}
+	return nil
+}

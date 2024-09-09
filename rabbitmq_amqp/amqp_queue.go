@@ -11,6 +11,7 @@ type AmqpQueueInfo struct {
 	isExclusive  bool
 	leader       string
 	replicas     []string
+	arguments    map[string]any
 	queueType    TQueueType
 }
 
@@ -31,6 +32,7 @@ func newAmqpQueueInfo(response map[string]any) IQueueInfo {
 		queueType:    TQueueType(response["type"].(string)),
 		leader:       response["leader"].(string),
 		replicas:     response["replicas"].([]string),
+		arguments:    response["arguments"].(map[string]any),
 	}
 }
 
@@ -54,12 +56,31 @@ func (a *AmqpQueueInfo) GetName() string {
 	return a.name
 }
 
+func (a *AmqpQueueInfo) GetArguments() map[string]any {
+	return a.arguments
+}
+
 type AmqpQueue struct {
 	management     *AmqpManagement
 	queueArguments map[string]any
 	isExclusive    bool
 	isAutoDelete   bool
 	name           string
+}
+
+func (a *AmqpQueue) DeadLetterExchange(dlx string) IQueueSpecification {
+	a.queueArguments["x-dead-letter-exchange"] = dlx
+	return a
+}
+
+func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) IQueueSpecification {
+	a.queueArguments["x-dead-letter-routing-key"] = dlrk
+	return a
+}
+
+func (a *AmqpQueue) MaxLengthBytes(length int64) IQueueSpecification {
+	a.queueArguments["max-length-bytes"] = length
+	return a
 }
 
 func (a *AmqpQueue) QueueType(queueType QueueType) IQueueSpecification {
@@ -98,12 +119,27 @@ func newAmqpQueue(management *AmqpManagement, queueName string) IQueueSpecificat
 		queueArguments: make(map[string]any)}
 }
 
+func (a *AmqpQueue) validate() error {
+
+	if a.queueArguments["max-length-bytes"] != nil {
+
+		err := validatePositive("max length", a.queueArguments["max-length-bytes"].(int64))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 
 	if Quorum == a.GetQueueType() ||
 		Stream == a.GetQueueType() {
 		// mandatory arguments for quorum queues and streams
 		a.Exclusive(false).AutoDelete(false)
+	}
+	if err := a.validate(); err != nil {
+		return nil, err
 	}
 
 	path := queuePath(a.name)

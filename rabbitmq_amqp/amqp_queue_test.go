@@ -46,7 +46,10 @@ var _ = Describe("AMQP Queue test ", func() {
 		const queueName = "AMQP Queue Declare With Parameters and Delete should success"
 		queueSpec := management.Queue(queueName).Exclusive(true).
 			AutoDelete(true).
-			QueueType(QueueType{Classic})
+			QueueType(QueueType{Classic}).
+			MaxLengthBytes(CapacityGB(1)).
+			DeadLetterExchange("dead-letter-exchange").
+			DeadLetterRoutingKey("dead-letter-routing-key")
 		queueInfo, err := queueSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
@@ -57,6 +60,11 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.Type()).To(Equal(Classic))
 		Expect(queueInfo.GetLeader()).To(ContainSubstring("rabbitmq"))
 		Expect(len(queueInfo.GetReplicas())).To(BeNumerically(">", 0))
+
+		Expect(queueInfo.GetArguments()).To(HaveKeyWithValue("x-dead-letter-exchange", "dead-letter-exchange"))
+		Expect(queueInfo.GetArguments()).To(HaveKeyWithValue("x-dead-letter-routing-key", "dead-letter-routing-key"))
+		Expect(queueInfo.GetArguments()).To(HaveKeyWithValue("max-length-bytes", int64(1000000000)))
+
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
@@ -121,6 +129,15 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(err).To(Equal(PreconditionFailed))
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
+	})
+
+	It("AMQP Declare Queue should fail during validation", func() {
+
+		const queueName = "AMQP Declare Queue should fail during validation"
+		queueSpec := management.Queue(queueName).MaxLengthBytes(-1)
+		_, err := queueSpec.Declare(context.TODO())
+		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 
 })

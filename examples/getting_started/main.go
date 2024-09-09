@@ -30,7 +30,10 @@ func main() {
 	fmt.Printf("AMQP Connection opened.\n")
 	management := amqpConnection.Management()
 	queueSpec := management.Queue("getting_started_queue").
-		QueueType(mq.QueueType{Type: mq.Quorum})
+		QueueType(mq.QueueType{Type: mq.Quorum}).
+		MaxLengthBytes(mq.CapacityGB(1)).
+		DeadLetterExchange("dead-letter-exchange").
+		DeadLetterRoutingKey("dead-letter-routing-key")
 	queueInfo, err := queueSpec.Declare(context.Background())
 	if err != nil {
 		return
