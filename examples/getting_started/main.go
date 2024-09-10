@@ -14,7 +14,6 @@ func main() {
 	chStatusChanged := make(chan *mq.StatusChanged, 1)
 
 	go func(ch chan *mq.StatusChanged) {
-
 		for statusChanged := range ch {
 			fmt.Printf("Status changed from %d to %d\n", statusChanged.From, statusChanged.To)
 		}
@@ -45,14 +44,14 @@ func main() {
 	}
 	fmt.Printf("Queue %s deleted.\n", queueInfo.GetName())
 
+	fmt.Println("Press any key to stop ")
+	reader := bufio.NewReader(os.Stdin)
+	_, _ = reader.ReadString('\n')
+
 	err = amqpConnection.Close(context.Background())
 	if err != nil {
 		return
 	}
 	fmt.Printf("AMQP Connection closed.\n")
-	fmt.Println("Press any key to stop ")
-	reader := bufio.NewReader(os.Stdin)
-	_, _ = reader.ReadString('\n')
 	close(chStatusChanged)
-
 }

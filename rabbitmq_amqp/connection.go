@@ -20,7 +20,7 @@ type IConnectionSettings interface {
 	GetContainerId() string
 	ContainerId(containerId string) IConnectionSettings
 	UseSsl(value bool) IConnectionSettings
-	GetSsl() bool
+	IsSsl() bool
 	BuildAddress() string
 	TlsConfig(config *tls.Config) IConnectionSettings
 	GetTlsConfig() *tls.Config

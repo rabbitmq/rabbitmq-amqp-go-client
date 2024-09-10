@@ -98,7 +98,7 @@ func (c *ConnectionSettings) UseSsl(value bool) IConnectionSettings {
 	return c
 }
 
-func (c *ConnectionSettings) GetSsl() bool {
+func (c *ConnectionSettings) IsSsl() bool {
 	return c.useSsl
 }
 
@@ -138,11 +138,8 @@ func NewAmqpConnection() IConnection {
 }
 
 func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectionSettings) error {
-	sASLType := amqp.SASLTypePlain(connectionSettings.GetUser(), connectionSettings.GetPassword())
-
-	if connectionSettings.GetSsl() {
-		sASLType = amqp.SASLTypeExternal("")
-	}
+	// TODO: add support for other SASL types
+	sASLType := amqp.SASLTypeAnonymous()
 
 	conn, err := amqp.Dial(ctx, connectionSettings.BuildAddress(), &amqp.ConnOptions{
 		ContainerID: connectionSettings.GetContainerId(),

@@ -142,6 +142,10 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 		return nil, err
 	}
 
+	if a.name == "" {
+		a.name = GenerateNameWithDefaultPrefix()
+	}
+
 	path := queuePath(a.name)
 	kv := make(map[string]any)
 	kv["durable"] = true

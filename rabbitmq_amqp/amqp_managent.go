@@ -209,6 +209,10 @@ func (a *AmqpManagement) Queue(queueName string) IQueueSpecification {
 	return newAmqpQueue(a, queueName)
 }
 
+func (a *AmqpManagement) QueueClientName() IQueueSpecification {
+	return newAmqpQueue(a, "")
+}
+
 func (a *AmqpManagement) NotifyStatusChange(channel chan *StatusChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }

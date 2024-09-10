@@ -1,7 +1,10 @@
 package rabbitmq_amqp
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"fmt"
+	"github.com/google/uuid"
 	"net/url"
 	"strings"
 )
@@ -80,4 +83,35 @@ func validatePositive(label string, value int64) error {
 		return fmt.Errorf("value for %s must be positive, got %d", label, value)
 	}
 	return nil
+}
+
+//internal static string GenerateName(string prefix)
+//{
+//string uuidStr = Guid.NewGuid().ToString();
+//byte[] uuidBytes = Encoding.ASCII.GetBytes(uuidStr);
+//var md5 = MD5.Create();
+//byte[] digest = md5.ComputeHash(uuidBytes);
+//return prefix + Convert.ToBase64String(digest)
+//.Replace('+', '-')
+//.Replace('/', '_')
+//.Replace("=", "");
+//}
+
+func GenerateNameWithDefaultPrefix() string {
+	return GenerateName("client.gen-")
+}
+
+// GenerateName generates a unique name with the given prefix
+func GenerateName(prefix string) string {
+
+	var uid = uuid.New()
+	var uuidBytes = []byte(uid.String())
+	var _md5 = md5.New()
+	var digest = _md5.Sum(uuidBytes)
+	result := base64.StdEncoding.EncodeToString(digest)
+	result = strings.ReplaceAll(result, "+", "-")
+	result = strings.ReplaceAll(result, "/", "_")
+	result = strings.ReplaceAll(result, "=", "")
+	return prefix + result
+
 }

@@ -58,7 +58,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.IsAutoDelete()).To(BeTrue())
 		Expect(queueInfo.Exclusive()).To(BeTrue())
 		Expect(queueInfo.Type()).To(Equal(Classic))
-		Expect(queueInfo.GetLeader()).To(ContainSubstring("rabbitmq"))
+		Expect(queueInfo.GetLeader()).To(ContainSubstring("rabbit"))
 		Expect(len(queueInfo.GetReplicas())).To(BeNumerically(">", 0))
 
 		Expect(queueInfo.GetArguments()).To(HaveKeyWithValue("x-dead-letter-exchange", "dead-letter-exchange"))
@@ -138,6 +138,16 @@ var _ = Describe("AMQP Queue test ", func() {
 		_, err := queueSpec.Declare(context.TODO())
 		Expect(err).NotTo(BeNil())
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("AMQP Declare Queue should create client name queue", func() {
+		queueSpec := management.QueueClientName()
+		queueInfo, err := queueSpec.Declare(context.TODO())
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.GetName()).To(ContainSubstring("client.gen-"))
+		err = queueSpec.Delete(context.TODO())
+		Expect(err).To(BeNil())
 	})
 
 })

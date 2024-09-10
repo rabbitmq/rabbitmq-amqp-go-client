@@ -1,5 +1,7 @@
 package rabbitmq_amqp
 
+import "sync"
+
 const (
 	Open         = iota
 	Reconnecting = iota
@@ -15,20 +17,25 @@ type StatusChanged struct {
 type LifeCycle struct {
 	status          int
 	chStatusChanged chan *StatusChanged
+	mutex           *sync.Mutex
 }
 
 func NewLifeCycle() *LifeCycle {
 	return &LifeCycle{
 		status: Closed,
+		mutex:  &sync.Mutex{},
 	}
 }
 
 func (l *LifeCycle) Status() int {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 	return l.status
 }
 
 func (l *LifeCycle) SetStatus(value int) {
-
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 	if l.status == value {
 		return
 	}
