@@ -20,11 +20,18 @@ type AmqpManagement struct {
 	cancel    context.CancelFunc
 }
 
+func (a *AmqpManagement) Binding() IBindingSpecification {
+	return newAMQPBinding(a)
+}
+
+func (a *AmqpManagement) Exchange(exchangeName string) IExchangeSpecification {
+	return newAmqpExchange(a, exchangeName)
+}
+
 func NewAmqpManagement() *AmqpManagement {
 	return &AmqpManagement{
 		lifeCycle: NewLifeCycle(),
 	}
-
 }
 
 func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
@@ -116,17 +123,6 @@ func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error
 	if err != nil {
 		return err
 	}
-	//if ctx.Err() != nil {
-	//	// start processing messages. Here we pass a context that will be closed
-	//	// when the receiver session is closed.
-	//	// we won't expose To the user since the user will call Close
-	//	// and the processing _must_ be running in the background
-	//	// for the management session life.
-	//	//err = a.processMessages(context.Background())
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//}
 	a.lifeCycle.SetStatus(Open)
 	return ctx.Err()
 }
@@ -148,11 +144,16 @@ func (a *AmqpManagement) Request(ctx context.Context, body any, path string, met
 
 func (a *AmqpManagement) validateResponseCode(responseCode int, expectedResponseCodes []int) error {
 
+	if responseCode == responseCode409 {
+		return PreconditionFailed
+	}
+
 	for _, code := range expectedResponseCodes {
 		if code == responseCode {
 			return nil
 		}
 	}
+
 	return PreconditionFailed
 }
 

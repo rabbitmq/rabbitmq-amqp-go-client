@@ -8,15 +8,25 @@ import (
 )
 
 type ConnectionSettings struct {
-	host        string
-	port        int
-	user        string
-	password    string
-	virtualHost string
-	scheme      string
-	containerId string
-	useSsl      bool
-	tlsConfig   *tls.Config
+	host          string
+	port          int
+	user          string
+	password      string
+	virtualHost   string
+	scheme        string
+	containerId   string
+	useSsl        bool
+	tlsConfig     *tls.Config
+	saslMechanism TSaslMechanism
+}
+
+func (c *ConnectionSettings) GetSaslMechanism() TSaslMechanism {
+	return c.saslMechanism
+}
+
+func (c *ConnectionSettings) SaslMechanism(mechanism SaslMechanism) IConnectionSettings {
+	c.saslMechanism = mechanism.Type
+	return c
 }
 
 func (c *ConnectionSettings) TlsConfig(config *tls.Config) IConnectionSettings {
@@ -138,8 +148,13 @@ func NewAmqpConnection() IConnection {
 }
 
 func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectionSettings) error {
-	// TODO: add support for other SASL types
 	sASLType := amqp.SASLTypeAnonymous()
+	switch connectionSettings.GetSaslMechanism() {
+	case Plain:
+		sASLType = amqp.SASLTypePlain(connectionSettings.GetUser(), connectionSettings.GetPassword())
+	case External:
+		sASLType = amqp.SASLTypeExternal("")
+	}
 
 	conn, err := amqp.Dial(ctx, connectionSettings.BuildAddress(), &amqp.ConnOptions{
 		ContainerID: connectionSettings.GetContainerId(),

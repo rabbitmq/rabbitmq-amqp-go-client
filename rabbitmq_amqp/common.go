@@ -78,24 +78,28 @@ func queuePath(queueName string) string {
 	return "/" + Queues + "/" + encodePathSegments(queueName)
 }
 
+func exchangePath(exchangeName string) string {
+	return "/" + Exchanges + "/" + encodePathSegments(exchangeName)
+}
+
+func bindingPath() string {
+	return "/" + Bindings
+}
+
+func bindingPathWithExchangeQueueKey(exchangeName, queueName, key string) string {
+	//string path =
+	//$"/{Consts.Bindings}/src={Utils.EncodePathSegment(_sourceName)};{($"{destinationCharacter}={Utils.EncodePathSegment(_destinationName)};key={Utils.EncodePathSegment(_routingKey)};args=")}";
+
+	return fmt.Sprintf("/%s/src=%s;dstq=%s;key=%s;args=", Bindings, encodePathSegments(exchangeName), encodePathSegments(queueName), encodePathSegments(key))
+
+}
+
 func validatePositive(label string, value int64) error {
 	if value < 0 {
 		return fmt.Errorf("value for %s must be positive, got %d", label, value)
 	}
 	return nil
 }
-
-//internal static string GenerateName(string prefix)
-//{
-//string uuidStr = Guid.NewGuid().ToString();
-//byte[] uuidBytes = Encoding.ASCII.GetBytes(uuidStr);
-//var md5 = MD5.Create();
-//byte[] digest = md5.ComputeHash(uuidBytes);
-//return prefix + Convert.ToBase64String(digest)
-//.Replace('+', '-')
-//.Replace('/', '_')
-//.Replace("=", "");
-//}
 
 func GenerateNameWithDefaultPrefix() string {
 	return GenerateName("client.gen-")

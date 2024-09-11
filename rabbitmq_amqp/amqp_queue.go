@@ -61,38 +61,38 @@ func (a *AmqpQueueInfo) GetArguments() map[string]any {
 }
 
 type AmqpQueue struct {
-	management     *AmqpManagement
-	queueArguments map[string]any
-	isExclusive    bool
-	isAutoDelete   bool
-	name           string
+	management   *AmqpManagement
+	arguments    map[string]any
+	isExclusive  bool
+	isAutoDelete bool
+	name         string
 }
 
 func (a *AmqpQueue) DeadLetterExchange(dlx string) IQueueSpecification {
-	a.queueArguments["x-dead-letter-exchange"] = dlx
+	a.arguments["x-dead-letter-exchange"] = dlx
 	return a
 }
 
 func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) IQueueSpecification {
-	a.queueArguments["x-dead-letter-routing-key"] = dlrk
+	a.arguments["x-dead-letter-routing-key"] = dlrk
 	return a
 }
 
 func (a *AmqpQueue) MaxLengthBytes(length int64) IQueueSpecification {
-	a.queueArguments["max-length-bytes"] = length
+	a.arguments["max-length-bytes"] = length
 	return a
 }
 
 func (a *AmqpQueue) QueueType(queueType QueueType) IQueueSpecification {
-	a.queueArguments["x-queue-type"] = queueType.String()
+	a.arguments["x-queue-type"] = queueType.String()
 	return a
 }
 
 func (a *AmqpQueue) GetQueueType() TQueueType {
-	if a.queueArguments["x-queue-type"] == nil {
+	if a.arguments["x-queue-type"] == nil {
 		return Classic
 	}
-	return TQueueType(a.queueArguments["x-queue-type"].(string))
+	return TQueueType(a.arguments["x-queue-type"].(string))
 }
 
 func (a *AmqpQueue) Exclusive(isExclusive bool) IQueueSpecification {
@@ -115,15 +115,15 @@ func (a *AmqpQueue) IsAutoDelete() bool {
 
 func newAmqpQueue(management *AmqpManagement, queueName string) IQueueSpecification {
 	return &AmqpQueue{management: management,
-		name:           queueName,
-		queueArguments: make(map[string]any)}
+		name:      queueName,
+		arguments: make(map[string]any)}
 }
 
 func (a *AmqpQueue) validate() error {
 
-	if a.queueArguments["max-length-bytes"] != nil {
+	if a.arguments["max-length-bytes"] != nil {
 
-		err := validatePositive("max length", a.queueArguments["max-length-bytes"].(int64))
+		err := validatePositive("max length", a.arguments["max-length-bytes"].(int64))
 		if err != nil {
 			return err
 		}
@@ -151,8 +151,8 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 	kv["durable"] = true
 	kv["auto_delete"] = a.isAutoDelete
 	kv["exclusive"] = a.isExclusive
-	kv["arguments"] = a.queueArguments
-	response, err := a.management.Request(ctx, kv, path, commandPut, []int{200})
+	kv["arguments"] = a.arguments
+	response, err := a.management.Request(ctx, kv, path, commandPut, []int{responseCode200, responseCode409})
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +161,8 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 
 func (a *AmqpQueue) Delete(ctx context.Context) error {
 	path := queuePath(a.name)
-	_, err := a.management.Request(ctx, nil, path, commandDelete, []int{200})
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := a.management.Request(ctx, nil, path, commandDelete, []int{responseCode200})
+	return err
 }
 
 func (a *AmqpQueue) Name(queueName string) IQueueSpecification {
