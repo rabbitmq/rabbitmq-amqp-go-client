@@ -5,6 +5,18 @@ import (
 	"crypto/tls"
 )
 
+type TSaslMechanism string
+
+const (
+	Plain     TSaslMechanism = "plain"
+	External  TSaslMechanism = "external"
+	Anonymous TSaslMechanism = "anonymous"
+)
+
+type SaslMechanism struct {
+	Type TSaslMechanism
+}
+
 type IConnectionSettings interface {
 	GetHost() string
 	Host(hostName string) IConnectionSettings
@@ -24,6 +36,8 @@ type IConnectionSettings interface {
 	BuildAddress() string
 	TlsConfig(config *tls.Config) IConnectionSettings
 	GetTlsConfig() *tls.Config
+	GetSaslMechanism() TSaslMechanism
+	SaslMechanism(mechanism SaslMechanism) IConnectionSettings
 }
 
 type IConnection interface {
