@@ -20,6 +20,10 @@ type AmqpManagement struct {
 	cancel    context.CancelFunc
 }
 
+func (a *AmqpManagement) Binding() IBindingSpecification {
+	return newAMQPBinding(a)
+}
+
 func (a *AmqpManagement) Exchange(exchangeName string) IExchangeSpecification {
 	return newAmqpExchange(a, exchangeName)
 }

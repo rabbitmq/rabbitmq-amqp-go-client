@@ -20,7 +20,6 @@ var _ = Describe("AMQP Exchange test ", func() {
 		err := connection.Open(context.TODO(), connectionSettings)
 		Expect(err).To(BeNil())
 		management = connection.Management()
-
 	})
 
 	AfterEach(func() {

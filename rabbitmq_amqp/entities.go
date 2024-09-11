@@ -84,3 +84,11 @@ type IExchangeSpecification interface {
 	ExchangeType(exchangeType ExchangeType) IExchangeSpecification
 	GetExchangeType() TExchangeType
 }
+
+type IBindingSpecification interface {
+	SourceExchange(exchangeName string) IBindingSpecification
+	DestinationQueue(queueName string) IBindingSpecification
+	Key(bindingKey string) IBindingSpecification
+	Bind(ctx context.Context) error
+	Unbind(ctx context.Context) error
+}
