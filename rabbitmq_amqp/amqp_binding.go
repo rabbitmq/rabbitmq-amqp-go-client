@@ -1,6 +1,9 @@
 package rabbitmq_amqp
 
-import "context"
+import (
+	"context"
+	"github.com/Azure/go-amqp"
+)
 
 type AMQPBindingInfo struct {
 }
@@ -46,6 +49,6 @@ func (b *AMQPBinding) Bind(ctx context.Context) error {
 
 func (b *AMQPBinding) Unbind(ctx context.Context) error {
 	bindingPathWithExchangeQueueKey := bindingPathWithExchangeQueueKey(b.sourceExchangeName, b.destinationQueue, b.bindingKey)
-	_, err := b.management.Request(ctx, nil, bindingPathWithExchangeQueueKey, commandDelete, []int{responseCode204})
+	_, err := b.management.Request(ctx, amqp.Null{}, bindingPathWithExchangeQueueKey, commandDelete, []int{responseCode204})
 	return err
 }

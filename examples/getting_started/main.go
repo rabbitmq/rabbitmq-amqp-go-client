@@ -11,7 +11,6 @@ import (
 
 func main() {
 	fmt.Printf("Getting started with AMQP Go AMQP 1.0 Client\n")
-
 	chStatusChanged := make(chan *mq.StatusChanged, 1)
 
 	go func(ch chan *mq.StatusChanged) {

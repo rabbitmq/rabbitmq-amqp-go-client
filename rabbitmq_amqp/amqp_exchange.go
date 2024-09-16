@@ -1,6 +1,9 @@
 package rabbitmq_amqp
 
-import "context"
+import (
+	"context"
+	"github.com/Azure/go-amqp"
+)
 
 type AmqpExchangeInfo struct {
 	name string
@@ -56,7 +59,7 @@ func (e *AmqpExchange) IsAutoDelete() bool {
 
 func (e *AmqpExchange) Delete(ctx context.Context) error {
 	path := exchangePath(e.name)
-	_, err := e.management.Request(ctx, nil, path, commandDelete, []int{responseCode204})
+	_, err := e.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode204})
 	return err
 }
 
