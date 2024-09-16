@@ -154,12 +154,14 @@ func (a *AmqpManagement) validateResponseCode(responseCode int, expectedResponse
 		}
 	}
 
-	return PreconditionFailed
+	return errors.New(fmt.Sprintf("expected response code %d got %d", expectedResponseCodes, responseCode))
 }
 
 func (a *AmqpManagement) request(ctx context.Context, id string, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
-	amqpMessage := amqp.NewMessageWithValue(body)
+	amqpMessage := &amqp.Message{
+		Value: body,
+	}
 	s := commandReplyTo
 	amqpMessage.Properties = &amqp.MessageProperties{
 		ReplyTo:   &s,
