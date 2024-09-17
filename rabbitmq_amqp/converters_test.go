@@ -7,8 +7,7 @@ import (
 )
 
 var _ = Describe("Converters", func() {
-
-	It("Converter from number", func() {
+	It("Converts from number", func() {
 		Expect(CapacityBytes(100)).To(Equal(int64(100)))
 		Expect(CapacityKB(1)).To(Equal(int64(1000)))
 		Expect(CapacityMB(1)).To(Equal(int64(1000 * 1000)))
@@ -16,7 +15,7 @@ var _ = Describe("Converters", func() {
 		Expect(CapacityTB(1)).To(Equal(int64(1000 * 1000 * 1000 * 1000)))
 	})
 
-	It("Converter from string", func() {
+	It("Converts from string", func() {
 		v, err := CapacityFrom("1KB")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(v).To(Equal(int64(1000)))
@@ -34,7 +33,7 @@ var _ = Describe("Converters", func() {
 		Expect(v).To(Equal(int64(1000 * 1000 * 1000 * 1000)))
 	})
 
-	It("Converter from string logError", func() {
+	It("Converts from string logError", func() {
 		v, err := CapacityFrom("10LL")
 		Expect(fmt.Sprintf("%s", err)).
 			To(ContainSubstring("Invalid unit size format"))
@@ -51,5 +50,4 @@ var _ = Describe("Converters", func() {
 		Expect(v).To(Equal(int64(0)))
 		Expect(err).To(BeNil())
 	})
-
 })

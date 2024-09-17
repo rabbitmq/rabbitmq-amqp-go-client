@@ -7,7 +7,6 @@ import (
 )
 
 var _ = Describe("AMQP Queue test ", func() {
-
 	var connection IConnection
 	var management IManagement
 	BeforeEach(func() {
@@ -27,8 +26,8 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Queue Declare With Response and Delete should success ", func() {
-		const queueName = "AMQP Queue Declare With Response and Delete should success"
+	It("AMQP Queue Declare With Response and Delete should succeed", func() {
+		const queueName = "AMQP Queue Declare With Response and Delete should succeed"
 		queueSpec := management.Queue(queueName)
 		queueInfo, err := queueSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
@@ -36,14 +35,14 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.GetName()).To(Equal(queueName))
 		Expect(queueInfo.IsDurable()).To(BeTrue())
 		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
-		Expect(queueInfo.Exclusive()).To(BeFalse())
+		Expect(queueInfo.IsExclusive()).To(BeFalse())
 		Expect(queueInfo.Type()).To(Equal(Classic))
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Queue Declare With Parameters and Delete should success ", func() {
-		const queueName = "AMQP Queue Declare With Parameters and Delete should success"
+	It("AMQP Queue Declare With Parameters and Delete should succeed", func() {
+		const queueName = "AMQP Queue Declare With Parameters and Delete should succeed"
 		queueSpec := management.Queue(queueName).Exclusive(true).
 			AutoDelete(true).
 			QueueType(QueueType{Classic}).
@@ -56,7 +55,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.GetName()).To(Equal(queueName))
 		Expect(queueInfo.IsDurable()).To(BeTrue())
 		Expect(queueInfo.IsAutoDelete()).To(BeTrue())
-		Expect(queueInfo.Exclusive()).To(BeTrue())
+		Expect(queueInfo.IsExclusive()).To(BeTrue())
 		Expect(queueInfo.Type()).To(Equal(Classic))
 		Expect(queueInfo.GetLeader()).To(ContainSubstring("rabbit"))
 		Expect(len(queueInfo.GetReplicas())).To(BeNumerically(">", 0))
@@ -69,8 +68,8 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Declare Quorum Queue and Delete should success ", func() {
-		const queueName = "AMQP Declare Quorum Queue and Delete should success"
+	It("AMQP Declare Quorum Queue and Delete should succeed", func() {
+		const queueName = "AMQP Declare Quorum Queue and Delete should succeed"
 		// Quorum queue will ignore Exclusive and AutoDelete settings
 		// since they are not supported by quorum queues
 		queueSpec := management.Queue(queueName).
@@ -82,14 +81,14 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.GetName()).To(Equal(queueName))
 		Expect(queueInfo.IsDurable()).To(BeTrue())
 		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
-		Expect(queueInfo.Exclusive()).To(BeFalse())
+		Expect(queueInfo.IsExclusive()).To(BeFalse())
 		Expect(queueInfo.Type()).To(Equal(Quorum))
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Declare Stream Queue and Delete should success ", func() {
-		const queueName = "AMQP Declare Stream Queue and Delete should success"
+	It("AMQP Declare Stream Queue and Delete should succeed", func() {
+		const queueName = "AMQP Declare Stream Queue and Delete should succeed"
 		// Stream queue will ignore Exclusive and AutoDelete settings
 		// since they are not supported by quorum queues
 		queueSpec := management.Queue(queueName).
@@ -101,13 +100,13 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.GetName()).To(Equal(queueName))
 		Expect(queueInfo.IsDurable()).To(BeTrue())
 		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
-		Expect(queueInfo.Exclusive()).To(BeFalse())
+		Expect(queueInfo.IsExclusive()).To(BeFalse())
 		Expect(queueInfo.Type()).To(Equal(Stream))
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Declare Queue with invalid type should fail ", func() {
+	It("AMQP Declare Queue with invalid type should fail", func() {
 		const queueName = "AMQP Declare Queue with invalid type should fail"
 		queueSpec := management.Queue(queueName).
 			QueueType(QueueType{Type: "invalid"})
@@ -115,8 +114,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Declare Queue should fail with Precondition fail ", func() {
-
+	It("AMQP Declare Queue should fail with Precondition fail", func() {
 		// The first queue is declared as Classic and it should succeed
 		// The second queue is declared as Quorum and it should fail since it is already declared as Classic
 		const queueName = "AMQP Declare Queue should fail with Precondition fail"
@@ -126,13 +124,12 @@ var _ = Describe("AMQP Queue test ", func() {
 		queueSpecFail := management.Queue(queueName).QueueType(QueueType{Quorum})
 		_, err = queueSpecFail.Declare(context.TODO())
 		Expect(err).NotTo(BeNil())
-		Expect(err).To(Equal(PreconditionFailed))
+		Expect(err).To(Equal(ErrPreconditionFailed))
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
 	It("AMQP Declare Queue should fail during validation", func() {
-
 		const queueName = "AMQP Declare Queue should fail during validation"
 		queueSpec := management.Queue(queueName).MaxLengthBytes(-1)
 		_, err := queueSpec.Declare(context.TODO())
@@ -149,5 +146,4 @@ var _ = Describe("AMQP Queue test ", func() {
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
-
 })

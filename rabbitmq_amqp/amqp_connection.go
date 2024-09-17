@@ -44,7 +44,6 @@ func (c *ConnectionSettings) Port(port int) IConnectionSettings {
 }
 
 func (c *ConnectionSettings) User(userName string) IConnectionSettings {
-
 	c.user = userName
 	return c
 }
@@ -71,7 +70,6 @@ func (c *ConnectionSettings) GetHost() string {
 func (c *ConnectionSettings) Host(hostName string) IConnectionSettings {
 	c.host = hostName
 	return c
-
 }
 
 func (c *ConnectionSettings) GetPort() int {
@@ -170,6 +168,7 @@ func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectio
 
 	err = a.Management().Open(ctx, a)
 	if err != nil {
+		// TODO close connection?
 		return err
 	}
 	return nil

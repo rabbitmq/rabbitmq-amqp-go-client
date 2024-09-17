@@ -7,7 +7,6 @@ import (
 )
 
 var _ = Describe("AMQP Bindings test ", func() {
-
 	var connection IConnection
 	var management IManagement
 	BeforeEach(func() {
@@ -26,9 +25,9 @@ var _ = Describe("AMQP Bindings test ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Bindings between Exchange and Queue Should success ", func() {
-		const exchangeName = "Exchange_AMQP Bindings between Exchange and Queue Should success"
-		const queueName = "Queue_AMQP Bindings between Exchange and Queue Should success"
+	It("AMQP Bindings between Exchange and Queue Should succeed", func() {
+		const exchangeName = "Exchange_AMQP Bindings between Exchange and Queue should uccess"
+		const queueName = "Queue_AMQP Bindings between Exchange and Queue should succeed"
 		exchangeSpec := management.Exchange(exchangeName)
 		exchangeInfo, err := exchangeSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
@@ -41,9 +40,7 @@ var _ = Describe("AMQP Bindings test ", func() {
 		Expect(queueInfo).NotTo(BeNil())
 		Expect(queueInfo.GetName()).To(Equal(queueName))
 
-		bindingSpec := management.Binding().SourceExchange(exchangeName).
-			DestinationQueue(queueName).
-			Key("routing-key")
+		bindingSpec := management.Binding().SourceExchange(exchangeSpec).DestinationQueue(queueSpec).Key("routing-key")
 		err = bindingSpec.Bind(context.TODO())
 		Expect(err).To(BeNil())
 		err = bindingSpec.Unbind(context.TODO())
@@ -52,7 +49,5 @@ var _ = Describe("AMQP Bindings test ", func() {
 		Expect(err).To(BeNil())
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
-
 	})
-
 })
