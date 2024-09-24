@@ -45,7 +45,7 @@ func (a *AmqpQueueInfo) IsAutoDelete() bool {
 	return a.isAutoDelete
 }
 
-func (a *AmqpQueueInfo) Exclusive() bool {
+func (a *AmqpQueueInfo) IsExclusive() bool {
 	return a.isExclusive
 }
 
@@ -121,9 +121,7 @@ func newAmqpQueue(management *AmqpManagement, queueName string) IQueueSpecificat
 }
 
 func (a *AmqpQueue) validate() error {
-
 	if a.arguments["max-length-bytes"] != nil {
-
 		err := validatePositive("max length", a.arguments["max-length-bytes"].(int64))
 		if err != nil {
 			return err
@@ -133,18 +131,18 @@ func (a *AmqpQueue) validate() error {
 }
 
 func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
-
 	if Quorum == a.GetQueueType() ||
 		Stream == a.GetQueueType() {
 		// mandatory arguments for quorum queues and streams
 		a.Exclusive(false).AutoDelete(false)
 	}
+
 	if err := a.validate(); err != nil {
 		return nil, err
 	}
 
 	if a.name == "" {
-		a.name = GenerateNameWithDefaultPrefix()
+		a.name = generateNameWithDefaultPrefix()
 	}
 
 	path := queuePath(a.name)

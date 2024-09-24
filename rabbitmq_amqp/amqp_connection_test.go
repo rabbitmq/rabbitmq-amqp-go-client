@@ -8,7 +8,7 @@ import (
 )
 
 var _ = Describe("AMQP Connection Test", func() {
-	It("AMQP SASLTypeAnonymous Connection should success", func() {
+	It("AMQP SASLTypeAnonymous Connection should succeed", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
@@ -17,11 +17,14 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(connectionSettings).NotTo(BeNil())
 		connectionSettings.SaslMechanism(SaslMechanism{Type: Anonymous})
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		err := amqpConnection.Open(context.TODO(), connectionSettings)
+
+		err := amqpConnection.Open(context.Background(), connectionSettings)
+		Expect(err).To(BeNil())
+		err = amqpConnection.Close(context.Background())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP SASLTypePlain Connection should success", func() {
+	It("AMQP SASLTypePlain Connection should succeed", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
@@ -30,7 +33,10 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
 		connectionSettings.SaslMechanism(SaslMechanism{Type: Plain})
-		err := amqpConnection.Open(context.TODO(), connectionSettings)
+
+		err := amqpConnection.Open(context.Background(), connectionSettings)
+		Expect(err).To(BeNil())
+		err = amqpConnection.Close(context.Background())
 		Expect(err).To(BeNil())
 	})
 
@@ -42,12 +48,12 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
 		connectionSettings.Host("localhost").Port(1234)
-		err := amqpConnection.Open(context.TODO(), connectionSettings)
+
+		err := amqpConnection.Open(context.Background(), connectionSettings)
 		Expect(err).NotTo(BeNil())
 	})
 
 	It("AMQP Connection should fail due of wrong host", func() {
-
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
@@ -56,11 +62,12 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
 		connectionSettings.Host("wronghost").Port(5672)
-		err := amqpConnection.Open(context.TODO(), connectionSettings)
+
+		err := amqpConnection.Open(context.Background(), connectionSettings)
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should fail due of context cancelled", func() {
+	It("AMQP Connection should fail due to context cancellation", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -69,12 +76,12 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should receive events ", func() {
+	It("AMQP Connection should receive events", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		ch := make(chan *StatusChanged, 1)
 		amqpConnection.NotifyStatusChange(ch)
-		err := amqpConnection.Open(context.TODO(), NewConnectionSettings())
+		err := amqpConnection.Open(context.Background(), NewConnectionSettings())
 		Expect(err).To(BeNil())
 		recv := <-ch
 		Expect(recv).NotTo(BeNil())
@@ -88,7 +95,6 @@ var _ = Describe("AMQP Connection Test", func() {
 
 		Expect(recv.From).To(Equal(Open))
 		Expect(recv.To).To(Equal(Closed))
-
 	})
 
 	//It("AMQP TLS Connection should success with SASLTypeAnonymous ", func() {
@@ -103,8 +109,7 @@ var _ = Describe("AMQP Connection Test", func() {
 	//	})
 	//	Expect(connectionSettings).NotTo(BeNil())
 	//	Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-	//	err := amqpConnection.Open(context.TODO(), connectionSettings)
+	//	err := amqpConnection.Open(context.Background(), connectionSettings)
 	//	Expect(err).To(BeNil())
 	//})
-
 })

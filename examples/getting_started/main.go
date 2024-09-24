@@ -48,7 +48,7 @@ func main() {
 	}
 	fmt.Printf("Exchange %s created.\n", exchangeInfo.GetName())
 
-	bindingSpec := management.Binding().SourceExchange(exchangeInfo.GetName()).DestinationQueue(queueInfo.GetName()).Key("routing-key")
+	bindingSpec := management.Binding().SourceExchange(exchangeSpec).DestinationQueue(queueSpec).Key("routing-key")
 
 	err = bindingSpec.Bind(context.Background())
 	if err != nil {

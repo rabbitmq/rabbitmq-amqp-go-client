@@ -46,7 +46,7 @@ type IQueueInfo interface {
 	GetName() string
 	IsDurable() bool
 	IsAutoDelete() bool
-	Exclusive() bool
+	IsExclusive() bool
 	Type() TQueueType
 	GetLeader() string
 	GetReplicas() []string
@@ -86,8 +86,10 @@ type IExchangeSpecification interface {
 }
 
 type IBindingSpecification interface {
-	SourceExchange(exchangeName string) IBindingSpecification
-	DestinationQueue(queueName string) IBindingSpecification
+	SourceExchange(exchangeSpec IExchangeSpecification) IBindingSpecification
+	SourceExchangeName(exchangeName string) IBindingSpecification
+	DestinationQueue(queueSpec IQueueSpecification) IBindingSpecification
+	DestinationQueueName(queueName string) IBindingSpecification
 	Key(bindingKey string) IBindingSpecification
 	Bind(ctx context.Context) error
 	Unbind(ctx context.Context) error

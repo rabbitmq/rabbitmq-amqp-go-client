@@ -7,7 +7,6 @@ import (
 )
 
 var _ = Describe("AMQP Exchange test ", func() {
-
 	var connection IConnection
 	var management IManagement
 	BeforeEach(func() {
@@ -26,8 +25,8 @@ var _ = Describe("AMQP Exchange test ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Exchange Declare with Default and Delete should success ", func() {
-		const exchangeName = "AMQP Exchange Declare and Delete  with Default should success"
+	It("AMQP Exchange Declare with Default and Delete should succeed", func() {
+		const exchangeName = "AMQP Exchange Declare and Delete with Default should succeed"
 		exchangeSpec := management.Exchange(exchangeName)
 		exchangeInfo, err := exchangeSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
@@ -37,8 +36,8 @@ var _ = Describe("AMQP Exchange test ", func() {
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Exchange Declare with Topic and Delete should success ", func() {
-		const exchangeName = "AMQP Exchange Declare with Topic and Delete should success"
+	It("AMQP Exchange Declare with Topic and Delete should succeed", func() {
+		const exchangeName = "AMQP Exchange Declare with Topic and Delete should succeed"
 		exchangeSpec := management.Exchange(exchangeName).ExchangeType(ExchangeType{Topic})
 		exchangeInfo, err := exchangeSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
@@ -48,8 +47,8 @@ var _ = Describe("AMQP Exchange test ", func() {
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Exchange Declare with FanOut and Delete should success ", func() {
-		const exchangeName = "AMQP Exchange Declare with FanOut and Delete should success"
+	It("AMQP Exchange Declare with FanOut and Delete should succeed", func() {
+		const exchangeName = "AMQP Exchange Declare with FanOut and Delete should succeed"
 		exchangeSpec := management.Exchange(exchangeName).ExchangeType(ExchangeType{FanOut})
 		exchangeInfo, err := exchangeSpec.Declare(context.TODO())
 		Expect(err).To(BeNil())
@@ -58,5 +57,4 @@ var _ = Describe("AMQP Exchange test ", func() {
 		err = exchangeSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
-
 })

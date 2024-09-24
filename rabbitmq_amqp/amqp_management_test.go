@@ -8,8 +8,7 @@ import (
 )
 
 var _ = Describe("Management tests", func() {
-
-	It("AMQP Management should fail due of context cancelled", func() {
+	It("AMQP Management should fail due to context cancellation", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		err := amqpConnection.Open(context.Background(), NewConnectionSettings())
@@ -19,14 +18,15 @@ var _ = Describe("Management tests", func() {
 		cancel()
 		err = amqpConnection.Management().Open(ctx, amqpConnection)
 		Expect(err).NotTo(BeNil())
+		amqpConnection.Close(context.Background())
 	})
 
-	It("AMQP Management should receive events ", func() {
+	It("AMQP Management should receive events", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		ch := make(chan *StatusChanged, 1)
 		amqpConnection.Management().NotifyStatusChange(ch)
-		err := amqpConnection.Open(context.TODO(), NewConnectionSettings())
+		err := amqpConnection.Open(context.Background(), NewConnectionSettings())
 		Expect(err).To(BeNil())
 		recv := <-ch
 		Expect(recv).NotTo(BeNil())
@@ -40,7 +40,7 @@ var _ = Describe("Management tests", func() {
 
 		Expect(recv.From).To(Equal(Open))
 		Expect(recv.To).To(Equal(Closed))
-
+		amqpConnection.Close(context.Background())
 	})
 
 	It("Request", func() {
@@ -51,7 +51,7 @@ var _ = Describe("Management tests", func() {
 		connectionSettings := NewConnectionSettings()
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		err := amqpConnection.Open(context.TODO(), connectionSettings)
+		err := amqpConnection.Open(context.Background(), connectionSettings)
 		Expect(err).To(BeNil())
 
 		management := amqpConnection.Management()
@@ -62,9 +62,10 @@ var _ = Describe("Management tests", func() {
 		_queueArguments["x-queue-type"] = "quorum"
 		kv["arguments"] = _queueArguments
 		path := "/queues/test"
-		result, err := management.Request(context.TODO(), kv, path, "PUT", []int{200})
+		result, err := management.Request(context.Background(), kv, path, "PUT", []int{200})
 		Expect(err).To(BeNil())
 		Expect(result).NotTo(BeNil())
-		Expect(management.Close(context.TODO())).To(BeNil())
+		Expect(management.Close(context.Background())).To(BeNil())
+		amqpConnection.Close(context.Background())
 	})
 })

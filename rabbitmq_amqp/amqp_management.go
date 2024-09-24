@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var PreconditionFailed = errors.New("precondition Failed")
+var ErrPreconditionFailed = errors.New("precondition Failed")
 
 type AmqpManagement struct {
 	session   *amqp.Session
@@ -58,28 +58,6 @@ func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
 	return nil
 }
 
-//func (a *AmqpManagement) processMessages(ctx context.Context) error {
-//
-//	go func() {
-//
-//		for a.GetStatus() == Open {
-//			msg, err := a.receiver.Receive(ctx, nil) // blocking call
-//			if err != nil {
-//				fmt.Printf("Exiting processMessages %s\n", err)
-//				return
-//			}
-//
-//			if msg != nil {
-//				a.receiver.AcceptMessage(ctx, msg)
-//			}
-//		}
-//
-//		fmt.Printf("Exiting processMessages\n")
-//	}()
-
-//return nil
-//}
-
 func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	if a.sender == nil {
 		prop := make(map[string]any)
@@ -110,19 +88,24 @@ func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error
 	if err != nil {
 		return err
 	}
+
 	a.session = session
 	err = a.ensureSenderLink(ctx)
-
 	if err != nil {
 		return err
 	}
 
-	time.Sleep(500 * time.Millisecond)
 	err = a.ensureReceiverLink(ctx)
-	time.Sleep(500 * time.Millisecond)
 	if err != nil {
 		return err
 	}
+
+	// TODO
+	// Even 10ms is enough to allow the links to establish,
+	// which tells me it allows the golang runtime to process
+	// some channels or I/O or something elsewhere
+	time.Sleep(time.Millisecond * 10)
+
 	a.lifeCycle.SetStatus(Open)
 	return ctx.Err()
 }
@@ -137,15 +120,12 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 
 func (a *AmqpManagement) Request(ctx context.Context, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
-
 	return a.request(ctx, uuid.New().String(), body, path, method, expectedResponseCodes)
-
 }
 
 func (a *AmqpManagement) validateResponseCode(responseCode int, expectedResponseCodes []int) error {
-
 	if responseCode == responseCode409 {
-		return PreconditionFailed
+		return ErrPreconditionFailed
 	}
 
 	for _, code := range expectedResponseCodes {
@@ -154,7 +134,7 @@ func (a *AmqpManagement) validateResponseCode(responseCode int, expectedResponse
 		}
 	}
 
-	return errors.New(fmt.Sprintf("expected response code %d got %d", expectedResponseCodes, responseCode))
+	return fmt.Errorf("expected response code %d got %d", expectedResponseCodes, responseCode)
 }
 
 func (a *AmqpManagement) request(ctx context.Context, id string, body any, path string, method string,
@@ -162,6 +142,7 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	amqpMessage := &amqp.Message{
 		Value: body,
 	}
+
 	s := commandReplyTo
 	amqpMessage.Properties = &amqp.MessageProperties{
 		ReplyTo:   &s,
@@ -169,19 +150,24 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 		Subject:   &method,
 		MessageID: &id,
 	}
+
 	opts := &amqp.SendOptions{Settled: true}
+
 	err := a.sender.Send(ctx, amqpMessage, opts)
 	if err != nil {
 		return make(map[string]any), err
 	}
+
 	msg, err := a.receiver.Receive(ctx, nil)
 	if err != nil {
 		return make(map[string]any), err
 	}
+
 	err = a.receiver.AcceptMessage(ctx, msg)
 	if err != nil {
 		return nil, err
 	}
+
 	if msg.Properties == nil {
 		return make(map[string]any), fmt.Errorf("expected properties in the message")
 	}
@@ -193,6 +179,7 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	if msg.Properties.CorrelationID != id {
 		return make(map[string]any), fmt.Errorf("expected correlation id %s got %s", id, msg.Properties.CorrelationID)
 	}
+
 	switch msg.Value.(type) {
 	case map[string]interface{}:
 		return msg.Value.(map[string]any), nil

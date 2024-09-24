@@ -34,7 +34,6 @@ func newAmqpExchange(management *AmqpManagement, name string) *AmqpExchange {
 }
 
 func (e *AmqpExchange) Declare(ctx context.Context) (IExchangeInfo, error) {
-
 	path := exchangePath(e.name)
 	kv := make(map[string]any)
 	kv["auto_delete"] = e.isAutoDelete
