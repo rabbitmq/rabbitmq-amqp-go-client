@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 	"strconv"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
 
 var ErrPreconditionFailed = errors.New("precondition Failed")
+var ErrDoesNotExist = errors.New("does not exist")
 
 type AmqpManagement struct {
 	session   *amqp.Session
@@ -185,11 +187,15 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 		return msg.Value.(map[string]any), nil
 	}
 
-	i, _ := strconv.Atoi(*msg.Properties.Subject)
+	responseCode, _ := strconv.Atoi(*msg.Properties.Subject)
 
-	err = a.validateResponseCode(i, expectedResponseCodes)
+	err = a.validateResponseCode(responseCode, expectedResponseCodes)
 	if err != nil {
 		return nil, err
+	}
+
+	if responseCode == responseCode404 {
+		return nil, ErrDoesNotExist
 	}
 
 	return make(map[string]any), nil
@@ -197,6 +203,15 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 
 func (a *AmqpManagement) Queue(queueName string) IQueueSpecification {
 	return newAmqpQueue(a, queueName)
+}
+
+func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error) {
+	path := queuePath(queueName)
+	result, err := a.Request(ctx, amqp.Null{}, path, commandGet, []int{responseCode200, responseCode404})
+	if err != nil {
+		return nil, err
+	}
+	return newAmqpQueueInfo(result), nil
 }
 
 func (a *AmqpManagement) QueueClientName() IQueueSpecification {

@@ -8,6 +8,7 @@ type IManagement interface {
 	Open(ctx context.Context, connection IConnection) error
 	Close(ctx context.Context) error
 	Queue(queueName string) IQueueSpecification
+	QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error)
 	Exchange(exchangeName string) IExchangeSpecification
 	Binding() IBindingSpecification
 	QueueClientName() IQueueSpecification
