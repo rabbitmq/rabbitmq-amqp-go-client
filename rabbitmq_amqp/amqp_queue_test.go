@@ -2,6 +2,9 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"strconv"
+
+	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -146,4 +149,40 @@ var _ = Describe("AMQP Queue test ", func() {
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
+
+	It("AMQP Purge Queue should succeed and return the number of messages purged", func() {
+		const queueName = "AMQP Purge Queue should succeed and return the number of messages purged"
+		queueSpec := management.Queue(queueName)
+		_, err := queueSpec.Declare(context.TODO())
+		Expect(err).To(BeNil())
+		publishMessages(queueName, 10)
+		purged, err := queueSpec.Purge(context.TODO())
+		Expect(err).To(BeNil())
+		Expect(purged).To(Equal(10))
+	})
 })
+
+// TODO: This should be replaced with this library's publish function
+// but for the time being, we need a way to publish messages or test purposes
+func publishMessages(queueName string, count int) {
+	conn, err := amqp.Dial(context.TODO(), "amqp://guest:guest@localhost", nil)
+	if err != nil {
+		Fail(err.Error())
+	}
+	session, err := conn.NewSession(context.TODO(), nil)
+	if err != nil {
+		Fail(err.Error())
+	}
+	sender, err := session.NewSender(context.TODO(), queuePath(queueName), nil)
+	if err != nil {
+		Fail(err.Error())
+	}
+
+	for i := 0; i < count; i++ {
+		err = sender.Send(context.TODO(), amqp.NewMessage([]byte("Message #"+strconv.Itoa(i))), nil)
+		if err != nil {
+			Fail(err.Error())
+		}
+	}
+
+}

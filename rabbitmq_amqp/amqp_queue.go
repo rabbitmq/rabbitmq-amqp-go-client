@@ -2,6 +2,7 @@ package rabbitmq_amqp
 
 import (
 	"context"
+
 	"github.com/Azure/go-amqp"
 )
 
@@ -162,6 +163,12 @@ func (a *AmqpQueue) Delete(ctx context.Context) error {
 	path := queuePath(a.name)
 	_, err := a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
 	return err
+}
+
+func (a *AmqpQueue) Purge(ctx context.Context) (int, error) {
+	path := queuePurgePath(a.name)
+	response, err := a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
+	return int(response["message_count"].(uint64)), err
 }
 
 func (a *AmqpQueue) Name(queueName string) IQueueSpecification {
