@@ -37,6 +37,7 @@ type IQueueSpecification interface {
 	MaxLengthBytes(length int64) IQueueSpecification
 	DeadLetterExchange(dlx string) IQueueSpecification
 	DeadLetterRoutingKey(dlrk string) IQueueSpecification
+	Purge(ctx context.Context) (int, error)
 }
 
 // IQueueInfo represents the information of a queue

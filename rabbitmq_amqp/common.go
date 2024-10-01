@@ -4,9 +4,10 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"github.com/google/uuid"
 	"net/url"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -67,6 +68,10 @@ func isUnreserved(char rune) bool {
 
 func queuePath(queueName string) string {
 	return "/" + queues + "/" + encodePathSegments(queueName)
+}
+
+func queuePurgePath(queueName string) string {
+	return "/" + queues + "/" + encodePathSegments(queueName) + "/messages"
 }
 
 func exchangePath(exchangeName string) string {
