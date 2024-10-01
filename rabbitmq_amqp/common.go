@@ -14,6 +14,7 @@ const (
 	responseCode200       = 200
 	responseCode201       = 201
 	responseCode204       = 204
+	responseCode404       = 404
 	responseCode409       = 409
 	commandPut            = "PUT"
 	commandGet            = "GET"

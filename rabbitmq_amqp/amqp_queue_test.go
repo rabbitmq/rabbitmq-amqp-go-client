@@ -29,7 +29,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Queue Declare With Response and Delete should succeed", func() {
+	It("AMQP Queue Declare With Response and Get/Delete should succeed", func() {
 		const queueName = "AMQP Queue Declare With Response and Delete should succeed"
 		queueSpec := management.Queue(queueName)
 		queueInfo, err := queueSpec.Declare(context.TODO())
@@ -40,11 +40,16 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
 		Expect(queueInfo.IsExclusive()).To(BeFalse())
 		Expect(queueInfo.Type()).To(Equal(Classic))
+
+		// validate GET (query queue info)
+		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(queueInfoReceived).To(Equal(queueInfo))
+
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Queue Declare With Parameters and Delete should succeed", func() {
+	It("AMQP Queue Declare With Parameters and Get/Delete should succeed", func() {
 		const queueName = "AMQP Queue Declare With Parameters and Delete should succeed"
 		queueSpec := management.Queue(queueName).Exclusive(true).
 			AutoDelete(true).
@@ -67,11 +72,15 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.GetArguments()).To(HaveKeyWithValue("x-dead-letter-routing-key", "dead-letter-routing-key"))
 		Expect(queueInfo.GetArguments()).To(HaveKeyWithValue("max-length-bytes", int64(1000000000)))
 
+		// validate GET (query queue info)
+		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(queueInfoReceived).To(Equal(queueInfo))
+
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Declare Quorum Queue and Delete should succeed", func() {
+	It("AMQP Declare Quorum Queue and Get/Delete should succeed", func() {
 		const queueName = "AMQP Declare Quorum Queue and Delete should succeed"
 		// Quorum queue will ignore Exclusive and AutoDelete settings
 		// since they are not supported by quorum queues
@@ -86,11 +95,16 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
 		Expect(queueInfo.IsExclusive()).To(BeFalse())
 		Expect(queueInfo.Type()).To(Equal(Quorum))
+
+		// validate GET (query queue info)
+		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(queueInfoReceived).To(Equal(queueInfo))
+
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Declare Stream Queue and Delete should succeed", func() {
+	It("AMQP Declare Stream Queue and Get/Delete should succeed", func() {
 		const queueName = "AMQP Declare Stream Queue and Delete should succeed"
 		// Stream queue will ignore Exclusive and AutoDelete settings
 		// since they are not supported by quorum queues
@@ -105,6 +119,11 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
 		Expect(queueInfo.IsExclusive()).To(BeFalse())
 		Expect(queueInfo.Type()).To(Equal(Stream))
+
+		// validate GET (query queue info)
+		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(queueInfoReceived).To(Equal(queueInfo))
+
 		err = queueSpec.Delete(context.TODO())
 		Expect(err).To(BeNil())
 	})
@@ -159,6 +178,13 @@ var _ = Describe("AMQP Queue test ", func() {
 		purged, err := queueSpec.Purge(context.TODO())
 		Expect(err).To(BeNil())
 		Expect(purged).To(Equal(10))
+	})
+
+	It("AMQP GET on non-existing queue should return ErrDoesNotExist", func() {
+		const queueName = "This queue does not exist"
+		result, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(err).To(Equal(ErrDoesNotExist))
+		Expect(result).To(BeNil())
 	})
 })
 
