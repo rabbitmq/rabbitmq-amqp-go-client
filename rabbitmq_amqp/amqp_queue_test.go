@@ -46,20 +46,12 @@ var _ = Describe("AMQP Queue test ", func() {
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
 		Expect(queueInfoReceived).To(Equal(queueInfo))
 
-		//err = queueSpec.Delete(context.TODO())
 		err = management.DeleteQueue(context.TODO(), queueName)
 		Expect(err).To(BeNil())
 	})
 
 	It("AMQP Queue Declare With Parameters and Get/Delete should succeed", func() {
 		const queueName = "AMQP Queue Declare With Parameters and Delete should succeed"
-		//queueSpec := management.Queue(queueName).Exclusive(true).
-		//	AutoDelete(true).
-		//	QueueType(QueueType{Classic}).
-		//	MaxLengthBytes(CapacityGB(1)).
-		//	DeadLetterExchange("dead-letter-exchange").
-		//	DeadLetterRoutingKey("dead-letter-routing-key")
-		//queueInfo, err := queueSpec.Declare(context.TODO())
 
 		queueInfo, err := management.DeclareQueue(context.TODO(), &QueueSpecification{
 			Name:                 queueName,
