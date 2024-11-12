@@ -28,26 +28,30 @@ var _ = Describe("AMQP Bindings test ", func() {
 	It("AMQP Bindings between Exchange and Queue Should succeed", func() {
 		const exchangeName = "Exchange_AMQP Bindings between Exchange and Queue should uccess"
 		const queueName = "Queue_AMQP Bindings between Exchange and Queue should succeed"
-		exchangeSpec := management.Exchange(exchangeName)
-		exchangeInfo, err := exchangeSpec.Declare(context.TODO())
+		exchangeInfo, err := management.DeclareExchange(context.TODO(), &ExchangeSpecification{
+			Name: exchangeName,
+		})
 		Expect(err).To(BeNil())
 		Expect(exchangeInfo).NotTo(BeNil())
 		Expect(exchangeInfo.GetName()).To(Equal(exchangeName))
 
-		queueSpec := management.Queue(queueName)
-		queueInfo, err := queueSpec.Declare(context.TODO())
+		queueInfo, err := management.DeclareQueue(context.TODO(), &QueueSpecification{
+			Name: queueName,
+		})
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
 		Expect(queueInfo.GetName()).To(Equal(queueName))
-
-		bindingSpec := management.Binding().SourceExchange(exchangeSpec).DestinationQueue(queueSpec).Key("routing-key")
-		err = bindingSpec.Bind(context.TODO())
+		bindingPath, err := management.Bind(context.TODO(), &BindingSpecification{
+			SourceExchange:   exchangeName,
+			DestinationQueue: queueName,
+			BindingKey:       "routing-key",
+		})
 		Expect(err).To(BeNil())
-		err = bindingSpec.Unbind(context.TODO())
+		err = management.Unbind(context.TODO(), bindingPath)
 		Expect(err).To(BeNil())
-		err = exchangeSpec.Delete(context.TODO())
+		err = management.DeleteExchange(context.TODO(), exchangeName)
 		Expect(err).To(BeNil())
-		err = queueSpec.Delete(context.TODO())
+		err = management.DeleteQueue(context.TODO(), queueName)
 		Expect(err).To(BeNil())
 	})
 })

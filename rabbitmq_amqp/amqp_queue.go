@@ -69,24 +69,28 @@ type AmqpQueue struct {
 	name         string
 }
 
-func (a *AmqpQueue) DeadLetterExchange(dlx string) IQueueSpecification {
-	a.arguments["x-dead-letter-exchange"] = dlx
-	return a
+func (a *AmqpQueue) DeadLetterExchange(dlx string) {
+	if len(dlx) != 0 {
+		a.arguments["x-dead-letter-exchange"] = dlx
+	}
 }
 
-func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) IQueueSpecification {
-	a.arguments["x-dead-letter-routing-key"] = dlrk
-	return a
+func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) {
+	if len(dlrk) != 0 {
+		a.arguments["x-dead-letter-routing-key"] = dlrk
+	}
 }
 
-func (a *AmqpQueue) MaxLengthBytes(length int64) IQueueSpecification {
-	a.arguments["max-length-bytes"] = length
-	return a
+func (a *AmqpQueue) MaxLengthBytes(length int64) {
+	if length != 0 {
+		a.arguments["max-length-bytes"] = length
+	}
 }
 
-func (a *AmqpQueue) QueueType(queueType QueueType) IQueueSpecification {
-	a.arguments["x-queue-type"] = queueType.String()
-	return a
+func (a *AmqpQueue) QueueType(queueType QueueType) {
+	if len(queueType.String()) != 0 {
+		a.arguments["x-queue-type"] = queueType.String()
+	}
 }
 
 func (a *AmqpQueue) GetQueueType() TQueueType {
@@ -96,25 +100,23 @@ func (a *AmqpQueue) GetQueueType() TQueueType {
 	return TQueueType(a.arguments["x-queue-type"].(string))
 }
 
-func (a *AmqpQueue) Exclusive(isExclusive bool) IQueueSpecification {
+func (a *AmqpQueue) Exclusive(isExclusive bool) {
 	a.isExclusive = isExclusive
-	return a
 }
 
 func (a *AmqpQueue) IsExclusive() bool {
 	return a.isExclusive
 }
 
-func (a *AmqpQueue) AutoDelete(isAutoDelete bool) IQueueSpecification {
+func (a *AmqpQueue) AutoDelete(isAutoDelete bool) {
 	a.isAutoDelete = isAutoDelete
-	return a
 }
 
 func (a *AmqpQueue) IsAutoDelete() bool {
 	return a.isAutoDelete
 }
 
-func newAmqpQueue(management *AmqpManagement, queueName string) IQueueSpecification {
+func newAmqpQueue(management *AmqpManagement, queueName string) *AmqpQueue {
 	return &AmqpQueue{management: management,
 		name:      queueName,
 		arguments: make(map[string]any)}
@@ -134,7 +136,8 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 	if Quorum == a.GetQueueType() ||
 		Stream == a.GetQueueType() {
 		// mandatory arguments for quorum queues and streams
-		a.Exclusive(false).AutoDelete(false)
+		a.Exclusive(false)
+		a.AutoDelete(false)
 	}
 
 	if err := a.validate(); err != nil {
@@ -164,9 +167,8 @@ func (a *AmqpQueue) Delete(ctx context.Context) error {
 	return err
 }
 
-func (a *AmqpQueue) Name(queueName string) IQueueSpecification {
+func (a *AmqpQueue) Name(queueName string) {
 	a.name = queueName
-	return a
 }
 
 func (a *AmqpQueue) GetName() string {

@@ -47,9 +47,8 @@ func (e *AmqpExchange) Declare(ctx context.Context) (IExchangeInfo, error) {
 	return newAmqpExchangeInfo(e.name), nil
 }
 
-func (e *AmqpExchange) AutoDelete(isAutoDelete bool) IExchangeSpecification {
+func (e *AmqpExchange) AutoDelete(isAutoDelete bool) {
 	e.isAutoDelete = isAutoDelete
-	return e
 }
 
 func (e *AmqpExchange) IsAutoDelete() bool {
@@ -62,9 +61,10 @@ func (e *AmqpExchange) Delete(ctx context.Context) error {
 	return err
 }
 
-func (e *AmqpExchange) ExchangeType(exchangeType ExchangeType) IExchangeSpecification {
-	e.exchangeType = exchangeType
-	return e
+func (e *AmqpExchange) ExchangeType(exchangeType ExchangeType) {
+	if len(exchangeType.Type) > 0 {
+		e.exchangeType = exchangeType
+	}
 }
 
 func (e *AmqpExchange) GetExchangeType() TExchangeType {

@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	mq "github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
-	"os"
 	"time"
 )
 
@@ -23,71 +21,56 @@ func main() {
 	amqpConnection.NotifyStatusChange(chStatusChanged)
 	err := amqpConnection.Open(context.Background(), mq.NewConnectionSettings())
 	if err != nil {
+		fmt.Printf("Error opening connection: %v\n", err)
 		return
 	}
-
 	fmt.Printf("AMQP Connection opened.\n")
 	management := amqpConnection.Management()
-	queueSpec := management.Queue("getting_started_queue").
-		QueueType(mq.QueueType{Type: mq.Quorum}).
-		MaxLengthBytes(mq.CapacityGB(1))
-	exchangeSpec := management.Exchange("getting_started_exchange").
-		ExchangeType(mq.ExchangeType{Type: mq.Topic})
-
-	queueInfo, err := queueSpec.Declare(context.Background())
+	exchangeInfo, err := management.DeclareExchange(context.TODO(), &mq.ExchangeSpecification{
+		Name: "getting-started-exchange",
+	})
 	if err != nil {
-		fmt.Printf("Error declaring queue %s\n", err)
-		return
-	}
-	fmt.Printf("Queue %s created.\n", queueInfo.GetName())
-
-	exchangeInfo, err := exchangeSpec.Declare(context.Background())
-	if err != nil {
-		fmt.Printf("Error declaring exchange %s\n", err)
-		return
-	}
-	fmt.Printf("Exchange %s created.\n", exchangeInfo.GetName())
-
-	bindingSpec := management.Binding().SourceExchange(exchangeSpec).DestinationQueue(queueSpec).Key("routing-key")
-
-	err = bindingSpec.Bind(context.Background())
-	if err != nil {
-		fmt.Printf("Error binding %s\n", err)
+		fmt.Printf("Error declaring exchange: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Binding between %s and %s created.\n", exchangeInfo.GetName(), queueInfo.GetName())
+	queueInfo, err := management.DeclareQueue(context.TODO(), &mq.QueueSpecification{
+		Name:      "getting-started-queue",
+		QueueType: mq.QueueType{Type: mq.Quorum},
+	})
 
-	fmt.Println("Press any key to cleanup and exit")
-	reader := bufio.NewReader(os.Stdin)
-	_, _ = reader.ReadString('\n')
-
-	err = bindingSpec.Unbind(context.Background())
 	if err != nil {
-		fmt.Printf("Error unbinding %s\n", err)
+		fmt.Printf("Error declaring queue: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Binding between %s and %s deleted.\n", exchangeInfo.GetName(), queueInfo.GetName())
+	bindingPath, err := management.Bind(context.TODO(), &mq.BindingSpecification{
+		SourceExchange:   exchangeInfo.GetName(),
+		DestinationQueue: queueInfo.GetName(),
+		BindingKey:       "routing-key",
+	})
 
-	err = exchangeSpec.Delete(context.Background())
-	if err != nil {
-		fmt.Printf("Error deleting exchange %s\n", err)
-		return
-	}
-
-	err = queueSpec.Delete(context.Background())
-	if err != nil {
-		return
-	}
-	fmt.Printf("Queue %s deleted.\n", queueInfo.GetName())
-
-	err = amqpConnection.Close(context.Background())
-	if err != nil {
-		return
-	}
-	fmt.Printf("AMQP Connection closed.\n")
 	// Wait for the status change to be printed
 	time.Sleep(500 * time.Millisecond)
+
+	err = management.Unbind(context.TODO(), bindingPath)
+
+	if err != nil {
+		fmt.Printf("Error unbinding: %v\n", err)
+		return
+	}
+
+	err = management.DeleteExchange(context.TODO(), exchangeInfo.GetName())
+	if err != nil {
+		fmt.Printf("Error deleting exchange: %v\n", err)
+		return
+	}
+
+	err = management.DeleteQueue(context.TODO(), queueInfo.GetName())
+	if err != nil {
+		fmt.Printf("Error deleting queue: %v\n", err)
+		return
+	}
+
 	close(chStatusChanged)
 }

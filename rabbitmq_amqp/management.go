@@ -7,10 +7,14 @@ import (
 type IManagement interface {
 	Open(ctx context.Context, connection IConnection) error
 	Close(ctx context.Context) error
-	Queue(queueName string) IQueueSpecification
-	Exchange(exchangeName string) IExchangeSpecification
-	Binding() IBindingSpecification
-	QueueClientName() IQueueSpecification
+	DeclareQueue(ctx context.Context, specification *QueueSpecification) (IQueueInfo, error)
+	DeleteQueue(ctx context.Context, name string) error
+	DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (IExchangeInfo, error)
+	DeleteExchange(ctx context.Context, name string) error
+
+	Bind(ctx context.Context, bindingSpecification *BindingSpecification) (string, error)
+	Unbind(ctx context.Context, bindingPath string) error
+
 	GetStatus() int
 	NotifyStatusChange(channel chan *StatusChanged)
 	Request(ctx context.Context, body any, path string, method string,
