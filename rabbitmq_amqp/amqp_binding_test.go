@@ -33,14 +33,14 @@ var _ = Describe("AMQP Bindings test ", func() {
 		})
 		Expect(err).To(BeNil())
 		Expect(exchangeInfo).NotTo(BeNil())
-		Expect(exchangeInfo.GetName()).To(Equal(exchangeName))
+		Expect(exchangeInfo.Name()).To(Equal(exchangeName))
 
 		queueInfo, err := management.DeclareQueue(context.TODO(), &QueueSpecification{
 			Name: queueName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
-		Expect(queueInfo.GetName()).To(Equal(queueName))
+		Expect(queueInfo.Name()).To(Equal(queueName))
 		bindingPath, err := management.Bind(context.TODO(), &BindingSpecification{
 			SourceExchange:   exchangeName,
 			DestinationQueue: queueName,

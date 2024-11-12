@@ -17,11 +17,11 @@ type AmqpQueueInfo struct {
 	queueType    TQueueType
 }
 
-func (a *AmqpQueueInfo) GetLeader() string {
+func (a *AmqpQueueInfo) Leader() string {
 	return a.leader
 }
 
-func (a *AmqpQueueInfo) GetReplicas() []string {
+func (a *AmqpQueueInfo) Members() []string {
 	return a.replicas
 }
 
@@ -54,11 +54,11 @@ func (a *AmqpQueueInfo) Type() TQueueType {
 	return a.queueType
 }
 
-func (a *AmqpQueueInfo) GetName() string {
+func (a *AmqpQueueInfo) Name() string {
 	return a.name
 }
 
-func (a *AmqpQueueInfo) GetArguments() map[string]any {
+func (a *AmqpQueueInfo) Arguments() map[string]any {
 	return a.arguments
 }
 
@@ -176,8 +176,4 @@ func (a *AmqpQueue) Purge(ctx context.Context) (int, error) {
 
 func (a *AmqpQueue) Name(queueName string) {
 	a.name = queueName
-}
-
-func (a *AmqpQueue) GetName() string {
-	return a.name
 }

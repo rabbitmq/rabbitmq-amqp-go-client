@@ -39,14 +39,14 @@ type QueueSpecification struct {
 // It is returned by the Declare method of IQueueSpecification
 // The information come from the server
 type IQueueInfo interface {
-	GetName() string
+	Name() string
 	IsDurable() bool
 	IsAutoDelete() bool
 	IsExclusive() bool
 	Type() TQueueType
-	GetLeader() string
-	GetReplicas() []string
-	GetArguments() map[string]any
+	Leader() string
+	Members() []string
+	Arguments() map[string]any
 }
 
 type TExchangeType string
@@ -69,7 +69,7 @@ func (e ExchangeType) String() string {
 // It is empty at the moment because the server does not return any information
 // We leave it here for future use. In case the server returns information about an exchange
 type IExchangeInfo interface {
-	GetName() string
+	Name() string
 }
 
 type ExchangeSpecification struct {

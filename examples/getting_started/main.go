@@ -45,13 +45,10 @@ func main() {
 	}
 
 	bindingPath, err := management.Bind(context.TODO(), &mq.BindingSpecification{
-		SourceExchange:   exchangeInfo.GetName(),
-		DestinationQueue: queueInfo.GetName(),
+		SourceExchange:   exchangeInfo.Name(),
+		DestinationQueue: queueInfo.Name(),
 		BindingKey:       "routing-key",
 	})
-
-	// Wait for the status change to be printed
-	time.Sleep(500 * time.Millisecond)
 
 	err = management.Unbind(context.TODO(), bindingPath)
 
@@ -60,17 +57,33 @@ func main() {
 		return
 	}
 
-	err = management.DeleteExchange(context.TODO(), exchangeInfo.GetName())
+	err = management.DeleteExchange(context.TODO(), exchangeInfo.Name())
 	if err != nil {
 		fmt.Printf("Error deleting exchange: %v\n", err)
 		return
 	}
 
-	err = management.DeleteQueue(context.TODO(), queueInfo.GetName())
+	err = management.DeleteQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
 		fmt.Printf("Error deleting queue: %v\n", err)
 		return
 	}
+
+	err = management.Close(context.Background())
+	if err != nil {
+		fmt.Printf("Error closing management: %v\n", err)
+		return
+	}
+
+	err = amqpConnection.Close(context.Background())
+	if err != nil {
+		fmt.Printf("Error closing connection: %v\n", err)
+		return
+	}
+
+	fmt.Printf("AMQP Connection closed.\n")
+	// Wait for the status change to be printed
+	time.Sleep(500 * time.Millisecond)
 
 	close(chStatusChanged)
 }

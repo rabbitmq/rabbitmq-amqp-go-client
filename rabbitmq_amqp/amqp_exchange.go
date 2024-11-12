@@ -13,7 +13,7 @@ func newAmqpExchangeInfo(name string) IExchangeInfo {
 	return &AmqpExchangeInfo{name: name}
 }
 
-func (a *AmqpExchangeInfo) GetName() string {
+func (a *AmqpExchangeInfo) Name() string {
 	return a.name
 }
 
@@ -71,6 +71,6 @@ func (e *AmqpExchange) GetExchangeType() TExchangeType {
 	return e.exchangeType.Type
 }
 
-func (e *AmqpExchange) GetName() string {
+func (e *AmqpExchange) Name() string {
 	return e.name
 }
