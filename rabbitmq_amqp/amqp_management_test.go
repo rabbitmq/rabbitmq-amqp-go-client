@@ -2,9 +2,11 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"time"
+
+	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("Management tests", func() {
@@ -67,5 +69,23 @@ var _ = Describe("Management tests", func() {
 		Expect(result).NotTo(BeNil())
 		Expect(management.Close(context.Background())).To(BeNil())
 		amqpConnection.Close(context.Background())
+	})
+
+	It("GET on non-existing queue returns ErrDoesNotExist", func() {
+		amqpConnection := NewAmqpConnection()
+		Expect(amqpConnection).NotTo(BeNil())
+		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
+
+		connectionSettings := NewConnectionSettings()
+		Expect(connectionSettings).NotTo(BeNil())
+		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
+		err := amqpConnection.Open(context.Background(), connectionSettings)
+		Expect(err).To(BeNil())
+
+		management := amqpConnection.Management()
+		path := "/queues/i-do-not-exist"
+		result, err := management.Request(context.Background(), amqp.Null{}, path, commandGet, []int{responseCode200, responseCode404})
+		Expect(err).To(Equal(ErrDoesNotExist))
+		Expect(result).To(BeNil())
 	})
 })

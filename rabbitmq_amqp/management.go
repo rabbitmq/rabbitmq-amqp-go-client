@@ -15,6 +15,9 @@ type IManagement interface {
 	Bind(ctx context.Context, bindingSpecification *BindingSpecification) (string, error)
 	Unbind(ctx context.Context, bindingPath string) error
 
+	PurgeQueue(ctx context.Context, queueName string) (int, error)
+
+	QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error)
 	GetStatus() int
 	NotifyStatusChange(channel chan *StatusChanged)
 	Request(ctx context.Context, body any, path string, method string,
