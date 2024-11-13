@@ -3,30 +3,29 @@ package main
 import (
 	"context"
 	"fmt"
-	mq "github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
+	"github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
 	"time"
 )
 
 func main() {
 	fmt.Printf("Getting started with AMQP Go AMQP 1.0 Client\n")
-	chStatusChanged := make(chan *mq.StatusChanged, 1)
+	chStatusChanged := make(chan *rabbitmq_amqp.StatusChanged, 1)
 
-	go func(ch chan *mq.StatusChanged) {
+	go func(ch chan *rabbitmq_amqp.StatusChanged) {
 		for statusChanged := range ch {
-			fmt.Printf("Status changed from %d to %d\n", statusChanged.From, statusChanged.To)
+			fmt.Printf("%s\n", statusChanged)
 		}
 	}(chStatusChanged)
 
-	amqpConnection := mq.NewAmqpConnection()
-	amqpConnection.NotifyStatusChange(chStatusChanged)
-	err := amqpConnection.Open(context.Background(), mq.NewConnectionSettings())
+	amqpConnection := rabbitmq_amqp.NewAmqpConnectionNotifyStatusChanged(chStatusChanged)
+	err := amqpConnection.Open(context.Background(), rabbitmq_amqp.NewConnectionSettings())
 	if err != nil {
 		fmt.Printf("Error opening connection: %v\n", err)
 		return
 	}
 	fmt.Printf("AMQP Connection opened.\n")
 	management := amqpConnection.Management()
-	exchangeInfo, err := management.DeclareExchange(context.TODO(), &mq.ExchangeSpecification{
+	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.ExchangeSpecification{
 		Name: "getting-started-exchange",
 	})
 	if err != nil {
@@ -34,9 +33,9 @@ func main() {
 		return
 	}
 
-	queueInfo, err := management.DeclareQueue(context.TODO(), &mq.QueueSpecification{
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QueueSpecification{
 		Name:      "getting-started-queue",
-		QueueType: mq.QueueType{Type: mq.Quorum},
+		QueueType: rabbitmq_amqp.QueueType{Type: rabbitmq_amqp.Quorum},
 	})
 
 	if err != nil {
@@ -44,11 +43,16 @@ func main() {
 		return
 	}
 
-	bindingPath, err := management.Bind(context.TODO(), &mq.BindingSpecification{
+	bindingPath, err := management.Bind(context.TODO(), &rabbitmq_amqp.BindingSpecification{
 		SourceExchange:   exchangeInfo.Name(),
 		DestinationQueue: queueInfo.Name(),
 		BindingKey:       "routing-key",
 	})
+
+	if err != nil {
+		fmt.Printf("Error binding: %v\n", err)
+		return
+	}
 
 	err = management.Unbind(context.TODO(), bindingPath)
 
@@ -66,12 +70,6 @@ func main() {
 	err = management.DeleteQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
 		fmt.Printf("Error deleting queue: %v\n", err)
-		return
-	}
-
-	err = management.Close(context.Background())
-	if err != nil {
-		fmt.Printf("Error closing management: %v\n", err)
 		return
 	}
 

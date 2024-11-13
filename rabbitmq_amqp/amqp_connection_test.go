@@ -15,7 +15,7 @@ var _ = Describe("AMQP Connection Test", func() {
 
 		connectionSettings := NewConnectionSettings()
 		Expect(connectionSettings).NotTo(BeNil())
-		connectionSettings.SaslMechanism(SaslMechanism{Type: Anonymous})
+		connectionSettings.SaslMechanism = Anonymous
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
 
 		err := amqpConnection.Open(context.Background(), connectionSettings)
@@ -32,7 +32,7 @@ var _ = Describe("AMQP Connection Test", func() {
 		connectionSettings := NewConnectionSettings()
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		connectionSettings.SaslMechanism(SaslMechanism{Type: Plain})
+		connectionSettings.SaslMechanism = Plain
 
 		err := amqpConnection.Open(context.Background(), connectionSettings)
 		Expect(err).To(BeNil())
@@ -40,28 +40,32 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Connection should fail due of wrong port", func() {
+	It("AMQP Connection should fail due of wrong Port", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
-		connectionSettings := NewConnectionSettings()
+		connectionSettings := &ConnectionSettings{
+			Host: "localhost",
+			Port: 1234,
+		}
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		connectionSettings.Host("localhost").Port(1234)
 
 		err := amqpConnection.Open(context.Background(), connectionSettings)
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should fail due of wrong host", func() {
+	It("AMQP Connection should fail due of wrong Host", func() {
 		amqpConnection := NewAmqpConnection()
 		Expect(amqpConnection).NotTo(BeNil())
 		Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))
 
-		connectionSettings := NewConnectionSettings()
+		connectionSettings := &ConnectionSettings{
+			Host: "wronghost",
+			Port: 5672,
+		}
 		Expect(connectionSettings).NotTo(BeNil())
 		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		connectionSettings.Host("wronghost").Port(5672)
 
 		err := amqpConnection.Open(context.Background(), connectionSettings)
 		Expect(err).NotTo(BeNil())

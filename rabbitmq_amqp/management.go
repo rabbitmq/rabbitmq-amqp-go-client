@@ -18,7 +18,7 @@ type IManagement interface {
 	PurgeQueue(ctx context.Context, queueName string) (int, error)
 
 	QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error)
-	GetStatus() int
+	Status() int
 	NotifyStatusChange(channel chan *StatusChanged)
 	Request(ctx context.Context, body any, path string, method string,
 		expectedResponseCodes []int) (map[string]any, error)

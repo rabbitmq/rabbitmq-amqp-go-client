@@ -265,6 +265,6 @@ func (a *AmqpManagement) NotifyStatusChange(channel chan *StatusChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpManagement) GetStatus() int {
+func (a *AmqpManagement) Status() int {
 	return a.lifeCycle.Status()
 }
