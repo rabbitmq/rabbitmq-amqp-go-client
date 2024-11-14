@@ -35,6 +35,7 @@ func (c *ConnectionSettings) BuildAddress() string {
 	return c.Scheme + "://" + c.Host + ":" + fmt.Sprint(c.Port)
 }
 
+// NewConnectionSettings creates a new ConnectionSettings struct with default values.
 func NewConnectionSettings() *ConnectionSettings {
 	return &ConnectionSettings{
 		Host:        "localhost",
@@ -50,9 +51,19 @@ func NewConnectionSettings() *ConnectionSettings {
 }
 
 type IConnection interface {
+	// Open opens a connection to the AMQP 1.0 server.
 	Open(ctx context.Context, connectionSettings *ConnectionSettings) error
+
+	// Close closes the connection to the AMQP 1.0 server.
 	Close(ctx context.Context) error
+
+	// Management returns the management interface for the connection.
 	Management() IManagement
+
+	// NotifyStatusChange registers a channel to receive status change notifications.
+	// The channel will receive a StatusChanged struct whenever the status of the connection changes.
 	NotifyStatusChange(channel chan *StatusChanged)
+	// Status returns the current status of the connection.
+	// See LifeCycle struct for more information.
 	Status() int
 }

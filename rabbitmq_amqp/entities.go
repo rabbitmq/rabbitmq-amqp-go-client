@@ -1,9 +1,5 @@
 package rabbitmq_amqp
 
-import (
-	"context"
-)
-
 type TQueueType string
 
 const (
@@ -20,11 +16,7 @@ func (e QueueType) String() string {
 	return string(e.Type)
 }
 
-type IEntityInfoSpecification[T any] interface {
-	Declare(ctx context.Context) (T, error)
-	Delete(ctx context.Context) error
-}
-
+// QueueSpecification represents the specification of a queue
 type QueueSpecification struct {
 	Name                 string
 	IsAutoDelete         bool

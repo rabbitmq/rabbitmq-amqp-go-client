@@ -20,6 +20,8 @@ type AmqpConnection struct {
 	lifeCycle  *LifeCycle
 }
 
+// Management returns the management interface for the connection.
+// See IManagement interface.
 func (a *AmqpConnection) Management() IManagement {
 	return a.management
 }
@@ -47,6 +49,9 @@ func NewAmqpConnectionNotifyStatusChanged(channel chan *StatusChanged) IConnecti
 	}
 }
 
+// Open opens a connection to the AMQP 1.0 server.
+// using the provided connectionSettings and the AMQPLite library.
+// Setups the connection and the management interface.
 func (a *AmqpConnection) Open(ctx context.Context, connectionSettings *ConnectionSettings) error {
 	sASLType := amqp.SASLTypeAnonymous()
 	switch connectionSettings.SaslMechanism {

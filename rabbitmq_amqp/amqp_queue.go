@@ -12,7 +12,7 @@ type AmqpQueueInfo struct {
 	isAutoDelete bool
 	isExclusive  bool
 	leader       string
-	replicas     []string
+	members      []string
 	arguments    map[string]any
 	queueType    TQueueType
 }
@@ -22,7 +22,7 @@ func (a *AmqpQueueInfo) Leader() string {
 }
 
 func (a *AmqpQueueInfo) Members() []string {
-	return a.replicas
+	return a.members
 }
 
 func newAmqpQueueInfo(response map[string]any) IQueueInfo {
@@ -33,7 +33,7 @@ func newAmqpQueueInfo(response map[string]any) IQueueInfo {
 		isExclusive:  response["exclusive"].(bool),
 		queueType:    TQueueType(response["type"].(string)),
 		leader:       response["leader"].(string),
-		replicas:     response["replicas"].([]string),
+		members:      response["replicas"].([]string),
 		arguments:    response["arguments"].(map[string]any),
 	}
 }
