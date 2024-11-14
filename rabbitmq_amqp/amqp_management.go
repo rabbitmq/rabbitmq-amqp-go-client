@@ -248,7 +248,10 @@ func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
 	return bind.Unbind(ctx, bindingPath)
 }
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error) {
-	path := queuePath(queueName)
+	path, err := NewAddressBuilder().Queue(queueName).Address()
+	if err != nil {
+		return nil, err
+	}
 	result, err := a.Request(ctx, amqp.Null{}, path, commandGet, []int{responseCode200, responseCode404})
 	if err != nil {
 		return nil, err

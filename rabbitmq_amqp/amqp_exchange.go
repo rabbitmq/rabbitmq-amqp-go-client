@@ -34,13 +34,16 @@ func newAmqpExchange(management *AmqpManagement, name string) *AmqpExchange {
 }
 
 func (e *AmqpExchange) Declare(ctx context.Context) (IExchangeInfo, error) {
-	path := exchangePath(e.name)
+	path, err := NewAddressBuilder().Exchange(e.name).Address()
+	if err != nil {
+		return nil, err
+	}
 	kv := make(map[string]any)
 	kv["auto_delete"] = e.isAutoDelete
 	kv["durable"] = true
 	kv["type"] = e.exchangeType.String()
 	kv["arguments"] = e.arguments
-	_, err := e.management.Request(ctx, kv, path, commandPut, []int{responseCode204, responseCode201, responseCode409})
+	_, err = e.management.Request(ctx, kv, path, commandPut, []int{responseCode204, responseCode201, responseCode409})
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +59,11 @@ func (e *AmqpExchange) IsAutoDelete() bool {
 }
 
 func (e *AmqpExchange) Delete(ctx context.Context) error {
-	path := exchangePath(e.name)
-	_, err := e.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode204})
+	path, err := NewAddressBuilder().Exchange(e.name).Address()
+	if err != nil {
+		return err
+	}
+	_, err = e.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode204})
 	return err
 }
 

@@ -20,7 +20,7 @@ var _ = Describe("Management tests", func() {
 		cancel()
 		err = amqpConnection.Management().Open(ctx, amqpConnection)
 		Expect(err).NotTo(BeNil())
-		amqpConnection.Close(context.Background())
+		Expect(amqpConnection.Close(context.Background())).To(BeNil())
 	})
 
 	It("AMQP Management should receive events", func() {
@@ -41,7 +41,7 @@ var _ = Describe("Management tests", func() {
 
 		Expect(recv.From).To(Equal(Open))
 		Expect(recv.To).To(Equal(Closed))
-		amqpConnection.Close(context.Background())
+		Expect(amqpConnection.Close(context.Background())).To(BeNil())
 	})
 
 	It("Request", func() {
@@ -67,7 +67,7 @@ var _ = Describe("Management tests", func() {
 		Expect(err).To(BeNil())
 		Expect(result).NotTo(BeNil())
 		Expect(management.Close(context.Background())).To(BeNil())
-		amqpConnection.Close(context.Background())
+		Expect(amqpConnection.Close(context.Background())).To(BeNil())
 	})
 
 	It("GET on non-existing queue returns ErrDoesNotExist", func() {

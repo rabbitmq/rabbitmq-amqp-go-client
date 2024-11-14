@@ -223,7 +223,13 @@ func publishMessages(queueName string, count int) {
 	if err != nil {
 		Fail(err.Error())
 	}
-	sender, err := session.NewSender(context.TODO(), queuePath(queueName), nil)
+
+	address, err := NewAddressBuilder().Queue(queueName).Address()
+	if err != nil {
+		Fail(err.Error())
+	}
+
+	sender, err := session.NewSender(context.TODO(), address, nil)
 	if err != nil {
 		Fail(err.Error())
 	}

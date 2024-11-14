@@ -4,10 +4,8 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"net/url"
-	"strings"
-
 	"github.com/google/uuid"
+	"strings"
 )
 
 const (
@@ -28,73 +26,6 @@ const (
 	queues                = "queues"
 	bindings              = "bindings"
 )
-
-// encodePathSegments takes a string and returns its percent-encoded representation.
-func encodePathSegments(input string) string {
-	var encoded strings.Builder
-
-	// Iterate over each character in the input string
-	for _, char := range input {
-		// Check if the character is an unreserved character (i.e., it doesn't need encoding)
-		if isUnreserved(char) {
-			encoded.WriteRune(char) // Append as is
-		} else {
-			// Encode character To %HH format
-			encoded.WriteString(fmt.Sprintf("%%%02X", char))
-		}
-	}
-
-	return encoded.String()
-}
-
-// Decode takes a percent-encoded string and returns its decoded representation.
-func decode(input string) (string, error) {
-	// Use url.QueryUnescape which properly decodes percent-encoded strings
-	decoded, err := url.QueryUnescape(input)
-	if err != nil {
-		return "", err
-	}
-
-	return decoded, nil
-}
-
-// isUnreserved checks if a character is an unreserved character in percent encoding
-// Unreserved characters are: A-Z, a-z, 0-9, -, ., _, ~
-func isUnreserved(char rune) bool {
-	return (char >= 'A' && char <= 'Z') ||
-		(char >= 'a' && char <= 'z') ||
-		(char >= '0' && char <= '9') ||
-		char == '-' || char == '.' || char == '_' || char == '~'
-}
-
-func queuePath(queueName string) string {
-	return "/" + queues + "/" + encodePathSegments(queueName)
-}
-
-func queuePurgePath(queueName string) string {
-	return "/" + queues + "/" + encodePathSegments(queueName) + "/messages"
-}
-
-func exchangePath(exchangeName string) string {
-	return "/" + exchanges + "/" + encodePathSegments(exchangeName)
-}
-
-func bindingPath() string {
-	return "/" + bindings
-}
-
-func bindingPathWithExchangeQueueKey(toQueue bool, sourceName, destinationName, key string) string {
-	sourceNameEncoded := encodePathSegments(sourceName)
-	destinationNameEncoded := encodePathSegments(destinationName)
-	keyEncoded := encodePathSegments(key)
-	destinationType := "dste"
-	if toQueue {
-		destinationType = "dstq"
-	}
-	format := "/%s/src=%s;%s=%s;key=%s;args="
-	return fmt.Sprintf(format, bindings, sourceNameEncoded, destinationType, destinationNameEncoded, keyEncoded)
-
-}
 
 func validatePositive(label string, value int64) error {
 	if value < 0 {
@@ -118,4 +49,9 @@ func generateName(prefix string) string {
 	result = strings.ReplaceAll(result, "/", "_")
 	result = strings.ReplaceAll(result, "=", "")
 	return prefix + result
+}
+
+func isStringNilOrEmpty(str *string) bool {
+	return str == nil || len(*str) == 0
+
 }

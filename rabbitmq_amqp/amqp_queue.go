@@ -149,7 +149,10 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 		a.name = generateNameWithDefaultPrefix()
 	}
 
-	path := queuePath(a.name)
+	path, err := NewAddressBuilder().Queue(a.name).Address()
+	if err != nil {
+		return nil, err
+	}
 	kv := make(map[string]any)
 	kv["durable"] = true
 	kv["auto_delete"] = a.isAutoDelete
@@ -163,13 +166,20 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 }
 
 func (a *AmqpQueue) Delete(ctx context.Context) error {
-	path := queuePath(a.name)
-	_, err := a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
+	path, err := NewAddressBuilder().Queue(a.name).Address()
+	if err != nil {
+		return err
+	}
+	_, err = a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
 	return err
 }
 
 func (a *AmqpQueue) Purge(ctx context.Context) (int, error) {
-	path := queuePurgePath(a.name)
+	path, err := NewAddressBuilder().Queue(a.name).Append("/messages").Address()
+	if err != nil {
+		return 0, err
+	}
+
 	response, err := a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
 	return int(response["message_count"].(uint64)), err
 }
