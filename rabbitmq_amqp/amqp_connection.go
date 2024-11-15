@@ -18,6 +18,15 @@ type AmqpConnection struct {
 	Connection *amqp.Conn
 	management IManagement
 	lifeCycle  *LifeCycle
+	session    *amqp.Session
+}
+
+func (a *AmqpConnection) NewIMPublisher(ctx context.Context) (IMPublisher, error) {
+	sender, err := a.session.NewSender(ctx, "", createSenderLinkOptions("", "IMPublisher"))
+	if err != nil {
+		return nil, err
+	}
+	return NewMPublisher(sender), nil
 }
 
 // Management returns the management interface for the connection.
@@ -72,7 +81,10 @@ func (a *AmqpConnection) Open(ctx context.Context, connectionSettings *Connectio
 	}
 	a.Connection = conn
 	a.lifeCycle.SetStatus(Open)
-
+	a.session, err = a.Connection.NewSession(ctx, nil)
+	if err != nil {
+		return err
+	}
 	err = a.Management().Open(ctx, a)
 	if err != nil {
 		// TODO close connection?

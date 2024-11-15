@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"time"
-
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
+	"strconv"
+	"time"
 )
 
 var ErrPreconditionFailed = errors.New("precondition Failed")
@@ -30,18 +29,7 @@ func NewAmqpManagement() *AmqpManagement {
 
 func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
 	if a.receiver == nil {
-		prop := make(map[string]any)
-		prop["paired"] = true
-		opts := &amqp.ReceiverOptions{
-			DynamicAddress:            false,
-			Name:                      linkPairName,
-			Properties:                prop,
-			RequestedSenderSettleMode: amqp.SenderSettleModeSettled.Ptr(),
-			SettlementMode:            amqp.ReceiverSettleModeFirst.Ptr(),
-			TargetAddress:             managementNodeAddress,
-			ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
-			Credit:                    100,
-		}
+		opts := createReceiverLinkOptions(managementNodeAddress, linkPairName)
 		receiver, err := a.session.NewReceiver(ctx, managementNodeAddress, opts)
 		if err != nil {
 			return err
@@ -54,19 +42,8 @@ func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
 
 func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	if a.sender == nil {
-		prop := make(map[string]any)
-		prop["paired"] = true
-		opts := &amqp.SenderOptions{
-			DynamicAddress:              false,
-			ExpiryPolicy:                amqp.ExpiryPolicyLinkDetach,
-			ExpiryTimeout:               0,
-			Name:                        linkPairName,
-			Properties:                  prop,
-			SettlementMode:              amqp.SenderSettleModeSettled.Ptr(),
-			RequestedReceiverSettleMode: amqp.ReceiverSettleModeFirst.Ptr(),
-			SourceAddress:               managementNodeAddress,
-		}
-		sender, err := a.session.NewSender(ctx, managementNodeAddress, opts)
+		sender, err := a.session.NewSender(ctx, managementNodeAddress,
+			createSenderLinkOptions(managementNodeAddress, linkPairName))
 		if err != nil {
 			return err
 		}
