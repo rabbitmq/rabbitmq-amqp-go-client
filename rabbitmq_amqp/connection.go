@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/Azure/go-amqp"
 )
 
 type TSaslMechanism string
@@ -66,4 +67,14 @@ type IConnection interface {
 	// Status returns the current status of the connection.
 	// See LifeCycle struct for more information.
 	Status() int
+
+	NewIMPublisher(ctx context.Context) (IMPublisher, error)
+}
+
+// IMPublisher is an interface for publishers messages based.
+// on the AMQP 1.0 protocol.
+// No Target address is specified each message is sent to a specific address.
+type IMPublisher interface {
+	Publish(ctx context.Context, message *amqp.Message, address *AddressBuilder) error
+	Close(ctx context.Context) error
 }
