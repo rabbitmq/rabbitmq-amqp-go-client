@@ -1,9 +1,5 @@
 package rabbitmq_amqp
 
-import (
-	"context"
-)
-
 type TQueueType string
 
 const (
@@ -20,38 +16,29 @@ func (e QueueType) String() string {
 	return string(e.Type)
 }
 
-type IEntityInfoSpecification[T any] interface {
-	Declare(ctx context.Context) (T, error)
-	Delete(ctx context.Context) error
-}
-
-type IQueueSpecification interface {
-	GetName() string
-	Exclusive(isExclusive bool) IQueueSpecification
-	IsExclusive() bool
-	AutoDelete(isAutoDelete bool) IQueueSpecification
-	IsAutoDelete() bool
-	IEntityInfoSpecification[IQueueInfo]
-	QueueType(queueType QueueType) IQueueSpecification
-	GetQueueType() TQueueType
-	MaxLengthBytes(length int64) IQueueSpecification
-	DeadLetterExchange(dlx string) IQueueSpecification
-	DeadLetterRoutingKey(dlrk string) IQueueSpecification
-	Purge(ctx context.Context) (int, error)
+// QueueSpecification represents the specification of a queue
+type QueueSpecification struct {
+	Name                 string
+	IsAutoDelete         bool
+	IsExclusive          bool
+	QueueType            QueueType
+	MaxLengthBytes       int64
+	DeadLetterExchange   string
+	DeadLetterRoutingKey string
 }
 
 // IQueueInfo represents the information of a queue
 // It is returned by the Declare method of IQueueSpecification
 // The information come from the server
 type IQueueInfo interface {
-	GetName() string
+	Name() string
 	IsDurable() bool
 	IsAutoDelete() bool
 	IsExclusive() bool
 	Type() TQueueType
-	GetLeader() string
-	GetReplicas() []string
-	GetArguments() map[string]any
+	Leader() string
+	Members() []string
+	Arguments() map[string]any
 }
 
 type TExchangeType string
@@ -74,24 +61,18 @@ func (e ExchangeType) String() string {
 // It is empty at the moment because the server does not return any information
 // We leave it here for future use. In case the server returns information about an exchange
 type IExchangeInfo interface {
-	GetName() string
+	Name() string
 }
 
-type IExchangeSpecification interface {
-	GetName() string
-	AutoDelete(isAutoDelete bool) IExchangeSpecification
-	IsAutoDelete() bool
-	IEntityInfoSpecification[IExchangeInfo]
-	ExchangeType(exchangeType ExchangeType) IExchangeSpecification
-	GetExchangeType() TExchangeType
+type ExchangeSpecification struct {
+	Name         string
+	IsAutoDelete bool
+	ExchangeType ExchangeType
 }
 
-type IBindingSpecification interface {
-	SourceExchange(exchangeSpec IExchangeSpecification) IBindingSpecification
-	SourceExchangeName(exchangeName string) IBindingSpecification
-	DestinationQueue(queueSpec IQueueSpecification) IBindingSpecification
-	DestinationQueueName(queueName string) IBindingSpecification
-	Key(bindingKey string) IBindingSpecification
-	Bind(ctx context.Context) error
-	Unbind(ctx context.Context) error
+type BindingSpecification struct {
+	SourceExchange      string
+	DestinationQueue    string
+	DestinationExchange string
+	BindingKey          string
 }

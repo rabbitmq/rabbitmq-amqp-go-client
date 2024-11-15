@@ -2,131 +2,17 @@ package rabbitmq_amqp
 
 import (
 	"context"
-	"crypto/tls"
-	"fmt"
 	"github.com/Azure/go-amqp"
 )
 
-type ConnectionSettings struct {
-	host          string
-	port          int
-	user          string
-	password      string
-	virtualHost   string
-	scheme        string
-	containerId   string
-	useSsl        bool
-	tlsConfig     *tls.Config
-	saslMechanism TSaslMechanism
-}
-
-func (c *ConnectionSettings) GetSaslMechanism() TSaslMechanism {
-	return c.saslMechanism
-}
-
-func (c *ConnectionSettings) SaslMechanism(mechanism SaslMechanism) IConnectionSettings {
-	c.saslMechanism = mechanism.Type
-	return c
-}
-
-func (c *ConnectionSettings) TlsConfig(config *tls.Config) IConnectionSettings {
-	c.tlsConfig = config
-	return c
-}
-
-func (c *ConnectionSettings) GetTlsConfig() *tls.Config {
-	return c.tlsConfig
-}
-
-func (c *ConnectionSettings) Port(port int) IConnectionSettings {
-	c.port = port
-	return c
-}
-
-func (c *ConnectionSettings) User(userName string) IConnectionSettings {
-	c.user = userName
-	return c
-}
-
-func (c *ConnectionSettings) Password(password string) IConnectionSettings {
-	c.password = password
-	return c
-}
-
-func (c *ConnectionSettings) VirtualHost(virtualHost string) IConnectionSettings {
-	c.virtualHost = virtualHost
-	return c
-}
-
-func (c *ConnectionSettings) ContainerId(containerId string) IConnectionSettings {
-	c.containerId = containerId
-	return c
-}
-
-func (c *ConnectionSettings) GetHost() string {
-	return c.host
-}
-
-func (c *ConnectionSettings) Host(hostName string) IConnectionSettings {
-	c.host = hostName
-	return c
-}
-
-func (c *ConnectionSettings) GetPort() int {
-	return c.port
-}
-
-func (c *ConnectionSettings) GetUser() string {
-	return c.user
-}
-
-func (c *ConnectionSettings) GetPassword() string {
-	return c.password
-}
-
-func (c *ConnectionSettings) GetVirtualHost() string {
-	return c.virtualHost
-}
-
-func (c *ConnectionSettings) GetScheme() string {
-	return c.scheme
-}
-
-func (c *ConnectionSettings) GetContainerId() string {
-	return c.containerId
-}
-
-func (c *ConnectionSettings) UseSsl(value bool) IConnectionSettings {
-	c.useSsl = value
-	if value {
-		c.scheme = "amqps"
-	} else {
-		c.scheme = "amqp"
-	}
-	return c
-}
-
-func (c *ConnectionSettings) IsSsl() bool {
-	return c.useSsl
-}
-
-func (c *ConnectionSettings) BuildAddress() string {
-	return c.scheme + "://" + c.host + ":" + fmt.Sprint(c.port)
-}
-
-func NewConnectionSettings() IConnectionSettings {
-	return &ConnectionSettings{
-		host:        "localhost",
-		port:        5672,
-		user:        "guest",
-		password:    "guest",
-		virtualHost: "/",
-		scheme:      "amqp",
-		containerId: "amqp-go-client",
-		useSsl:      false,
-		tlsConfig:   nil,
-	}
-}
+//func (c *ConnectionSettings) UseSsl(value bool) {
+//	c.UseSsl = value
+//	if value {
+//		c.Scheme = "amqps"
+//	} else {
+//		c.Scheme = "amqp"
+//	}
+//}
 
 type AmqpConnection struct {
 	Connection *amqp.Conn
@@ -134,10 +20,15 @@ type AmqpConnection struct {
 	lifeCycle  *LifeCycle
 }
 
+// Management returns the management interface for the connection.
+// See IManagement interface.
 func (a *AmqpConnection) Management() IManagement {
 	return a.management
 }
 
+// NewAmqpConnection creates a new AmqpConnection
+// with a new AmqpManagement and a new LifeCycle.
+// Returns a pointer to the new AmqpConnection
 func NewAmqpConnection() IConnection {
 	return &AmqpConnection{
 		management: NewAmqpManagement(),
@@ -145,20 +36,36 @@ func NewAmqpConnection() IConnection {
 	}
 }
 
-func (a *AmqpConnection) Open(ctx context.Context, connectionSettings IConnectionSettings) error {
+// NewAmqpConnectionNotifyStatusChanged creates a new AmqpConnection
+// with a new AmqpManagement and a new LifeCycle
+// and sets the channel for status changes.
+// Returns a pointer to the new AmqpConnection
+func NewAmqpConnectionNotifyStatusChanged(channel chan *StatusChanged) IConnection {
+	lifeCycle := NewLifeCycle()
+	lifeCycle.chStatusChanged = channel
+	return &AmqpConnection{
+		management: NewAmqpManagement(),
+		lifeCycle:  lifeCycle,
+	}
+}
+
+// Open opens a connection to the AMQP 1.0 server.
+// using the provided connectionSettings and the AMQPLite library.
+// Setups the connection and the management interface.
+func (a *AmqpConnection) Open(ctx context.Context, connectionSettings *ConnectionSettings) error {
 	sASLType := amqp.SASLTypeAnonymous()
-	switch connectionSettings.GetSaslMechanism() {
+	switch connectionSettings.SaslMechanism {
 	case Plain:
-		sASLType = amqp.SASLTypePlain(connectionSettings.GetUser(), connectionSettings.GetPassword())
+		sASLType = amqp.SASLTypePlain(connectionSettings.User, connectionSettings.Password)
 	case External:
 		sASLType = amqp.SASLTypeExternal("")
 	}
 
 	conn, err := amqp.Dial(ctx, connectionSettings.BuildAddress(), &amqp.ConnOptions{
-		ContainerID: connectionSettings.GetContainerId(),
+		ContainerID: connectionSettings.ContainerId,
 		SASLType:    sASLType,
-		HostName:    connectionSettings.GetVirtualHost(),
-		TLSConfig:   connectionSettings.GetTlsConfig(),
+		HostName:    connectionSettings.VirtualHost,
+		TLSConfig:   connectionSettings.TlsConfig,
 	})
 	if err != nil {
 		return err
@@ -188,6 +95,6 @@ func (a *AmqpConnection) NotifyStatusChange(channel chan *StatusChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpConnection) GetStatus() int {
+func (a *AmqpConnection) Status() int {
 	return a.lifeCycle.Status()
 }

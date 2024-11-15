@@ -46,7 +46,7 @@ func CapacityFrom(value string) (int64, error) {
 	match, err := regexp.Compile("^((kb|mb|gb|tb))")
 	if err != nil {
 		return 0,
-			fmt.Errorf("Capacity, invalid unit size format:%s", value)
+			fmt.Errorf("capacity, invalid unit size format:%s", value)
 	}
 
 	foundUnitSize := strings.ToLower(value[len(value)-2:])
@@ -55,7 +55,7 @@ func CapacityFrom(value string) (int64, error) {
 
 		size, err := strconv.Atoi(value[:len(value)-2])
 		if err != nil {
-			return 0, fmt.Errorf("Capacity, Invalid number format: %s", value)
+			return 0, fmt.Errorf("capacity, Invalid number format: %s", value)
 		}
 		switch foundUnitSize {
 		case UnitKb:
@@ -72,5 +72,5 @@ func CapacityFrom(value string) (int64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("Capacity, Invalid unit size format: %s", value)
+	return 0, fmt.Errorf("capacity, Invalid unit size format: %s", value)
 }

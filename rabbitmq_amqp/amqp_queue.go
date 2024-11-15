@@ -12,17 +12,17 @@ type AmqpQueueInfo struct {
 	isAutoDelete bool
 	isExclusive  bool
 	leader       string
-	replicas     []string
+	members      []string
 	arguments    map[string]any
 	queueType    TQueueType
 }
 
-func (a *AmqpQueueInfo) GetLeader() string {
+func (a *AmqpQueueInfo) Leader() string {
 	return a.leader
 }
 
-func (a *AmqpQueueInfo) GetReplicas() []string {
-	return a.replicas
+func (a *AmqpQueueInfo) Members() []string {
+	return a.members
 }
 
 func newAmqpQueueInfo(response map[string]any) IQueueInfo {
@@ -33,7 +33,7 @@ func newAmqpQueueInfo(response map[string]any) IQueueInfo {
 		isExclusive:  response["exclusive"].(bool),
 		queueType:    TQueueType(response["type"].(string)),
 		leader:       response["leader"].(string),
-		replicas:     response["replicas"].([]string),
+		members:      response["replicas"].([]string),
 		arguments:    response["arguments"].(map[string]any),
 	}
 }
@@ -54,11 +54,11 @@ func (a *AmqpQueueInfo) Type() TQueueType {
 	return a.queueType
 }
 
-func (a *AmqpQueueInfo) GetName() string {
+func (a *AmqpQueueInfo) Name() string {
 	return a.name
 }
 
-func (a *AmqpQueueInfo) GetArguments() map[string]any {
+func (a *AmqpQueueInfo) Arguments() map[string]any {
 	return a.arguments
 }
 
@@ -70,24 +70,28 @@ type AmqpQueue struct {
 	name         string
 }
 
-func (a *AmqpQueue) DeadLetterExchange(dlx string) IQueueSpecification {
-	a.arguments["x-dead-letter-exchange"] = dlx
-	return a
+func (a *AmqpQueue) DeadLetterExchange(dlx string) {
+	if len(dlx) != 0 {
+		a.arguments["x-dead-letter-exchange"] = dlx
+	}
 }
 
-func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) IQueueSpecification {
-	a.arguments["x-dead-letter-routing-key"] = dlrk
-	return a
+func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) {
+	if len(dlrk) != 0 {
+		a.arguments["x-dead-letter-routing-key"] = dlrk
+	}
 }
 
-func (a *AmqpQueue) MaxLengthBytes(length int64) IQueueSpecification {
-	a.arguments["max-length-bytes"] = length
-	return a
+func (a *AmqpQueue) MaxLengthBytes(length int64) {
+	if length != 0 {
+		a.arguments["max-length-bytes"] = length
+	}
 }
 
-func (a *AmqpQueue) QueueType(queueType QueueType) IQueueSpecification {
-	a.arguments["x-queue-type"] = queueType.String()
-	return a
+func (a *AmqpQueue) QueueType(queueType QueueType) {
+	if len(queueType.String()) != 0 {
+		a.arguments["x-queue-type"] = queueType.String()
+	}
 }
 
 func (a *AmqpQueue) GetQueueType() TQueueType {
@@ -97,25 +101,23 @@ func (a *AmqpQueue) GetQueueType() TQueueType {
 	return TQueueType(a.arguments["x-queue-type"].(string))
 }
 
-func (a *AmqpQueue) Exclusive(isExclusive bool) IQueueSpecification {
+func (a *AmqpQueue) Exclusive(isExclusive bool) {
 	a.isExclusive = isExclusive
-	return a
 }
 
 func (a *AmqpQueue) IsExclusive() bool {
 	return a.isExclusive
 }
 
-func (a *AmqpQueue) AutoDelete(isAutoDelete bool) IQueueSpecification {
+func (a *AmqpQueue) AutoDelete(isAutoDelete bool) {
 	a.isAutoDelete = isAutoDelete
-	return a
 }
 
 func (a *AmqpQueue) IsAutoDelete() bool {
 	return a.isAutoDelete
 }
 
-func newAmqpQueue(management *AmqpManagement, queueName string) IQueueSpecification {
+func newAmqpQueue(management *AmqpManagement, queueName string) *AmqpQueue {
 	return &AmqpQueue{management: management,
 		name:      queueName,
 		arguments: make(map[string]any)}
@@ -135,7 +137,8 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 	if Quorum == a.GetQueueType() ||
 		Stream == a.GetQueueType() {
 		// mandatory arguments for quorum queues and streams
-		a.Exclusive(false).AutoDelete(false)
+		a.Exclusive(false)
+		a.AutoDelete(false)
 	}
 
 	if err := a.validate(); err != nil {
@@ -146,7 +149,10 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 		a.name = generateNameWithDefaultPrefix()
 	}
 
-	path := queuePath(a.name)
+	path, err := NewAddressBuilder().Queue(a.name).Address()
+	if err != nil {
+		return nil, err
+	}
 	kv := make(map[string]any)
 	kv["durable"] = true
 	kv["auto_delete"] = a.isAutoDelete
@@ -160,22 +166,24 @@ func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
 }
 
 func (a *AmqpQueue) Delete(ctx context.Context) error {
-	path := queuePath(a.name)
-	_, err := a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
+	path, err := NewAddressBuilder().Queue(a.name).Address()
+	if err != nil {
+		return err
+	}
+	_, err = a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
 	return err
 }
 
 func (a *AmqpQueue) Purge(ctx context.Context) (int, error) {
-	path := queuePurgePath(a.name)
+	path, err := NewAddressBuilder().Queue(a.name).Append("/messages").Address()
+	if err != nil {
+		return 0, err
+	}
+
 	response, err := a.management.Request(ctx, amqp.Null{}, path, commandDelete, []int{responseCode200})
 	return int(response["message_count"].(uint64)), err
 }
 
-func (a *AmqpQueue) Name(queueName string) IQueueSpecification {
+func (a *AmqpQueue) Name(queueName string) {
 	a.name = queueName
-	return a
-}
-
-func (a *AmqpQueue) GetName() string {
-	return a.name
 }

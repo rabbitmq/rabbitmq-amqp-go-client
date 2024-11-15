@@ -20,48 +20,36 @@ func newAMQPBinding(management *AmqpManagement) *AMQPBinding {
 	return &AMQPBinding{management: management}
 }
 
-func (b *AMQPBinding) Key(bindingKey string) IBindingSpecification {
+func (b *AMQPBinding) BindingKey(bindingKey string) {
 	b.bindingKey = bindingKey
-	return b
 }
 
-func (b *AMQPBinding) SourceExchange(exchangeSpec IExchangeSpecification) IBindingSpecification {
-	b.sourceName = exchangeSpec.GetName()
-	b.toQueue = false
-	return b
+func (b *AMQPBinding) SourceExchange(sourceName string) {
+	if len(sourceName) > 0 {
+		b.sourceName = sourceName
+		b.toQueue = false
+	}
 }
 
-func (b *AMQPBinding) SourceExchangeName(exchangeName string) IBindingSpecification {
-	b.sourceName = exchangeName
-	b.toQueue = false
-	return b
+func (b *AMQPBinding) DestinationExchange(destinationName string) {
+	if len(destinationName) > 0 {
+		b.destinationName = destinationName
+		b.toQueue = false
+	}
 }
 
-func (b *AMQPBinding) DestinationExchange(exchangeSpec IExchangeInfo) IBindingSpecification {
-	b.destinationName = exchangeSpec.GetName()
-	b.toQueue = false
-	return b
+func (b *AMQPBinding) DestinationQueue(queueName string) {
+	if len(queueName) > 0 {
+		b.destinationName = queueName
+		b.toQueue = true
+	}
 }
 
-func (b *AMQPBinding) DestinationExchangeName(exchangeName string) IBindingSpecification {
-	b.destinationName = exchangeName
-	b.toQueue = false
-	return b
-}
-
-func (b *AMQPBinding) DestinationQueue(queueSpec IQueueSpecification) IBindingSpecification {
-	b.destinationName = queueSpec.GetName()
-	b.toQueue = true
-	return b
-}
-
-func (b *AMQPBinding) DestinationQueueName(queueName string) IBindingSpecification {
-	b.destinationName = queueName
-	b.toQueue = true
-	return b
-}
-
-func (b *AMQPBinding) Bind(ctx context.Context) error {
+// Bind creates a binding between an exchange and a queue or exchange
+// with the specified binding key.
+// Returns the binding path that can be used to unbind the binding.
+// Given a virtual host, the binding path is unique.
+func (b *AMQPBinding) Bind(ctx context.Context) (string, error) {
 	path := bindingPath()
 	kv := make(map[string]any)
 	kv["binding_key"] = b.bindingKey
@@ -69,11 +57,14 @@ func (b *AMQPBinding) Bind(ctx context.Context) error {
 	kv["destination_queue"] = b.destinationName
 	kv["arguments"] = make(map[string]any)
 	_, err := b.management.Request(ctx, kv, path, commandPost, []int{responseCode204})
-	return err
+	bindingPathWithExchangeQueueKey := bindingPathWithExchangeQueueKey(b.toQueue, b.sourceName, b.destinationName, b.bindingKey)
+	return bindingPathWithExchangeQueueKey, err
 }
 
-func (b *AMQPBinding) Unbind(ctx context.Context) error {
-	bindingPathWithExchangeQueueKey := bindingPathWithExchangeQueueKey(b.toQueue, b.sourceName, b.destinationName, b.bindingKey)
-	_, err := b.management.Request(ctx, amqp.Null{}, bindingPathWithExchangeQueueKey, commandDelete, []int{responseCode204})
+// Unbind removes a binding between an exchange and a queue or exchange
+// with the specified binding key.
+// The bindingPath is the unique path that was returned when the binding was created.
+func (b *AMQPBinding) Unbind(ctx context.Context, bindingPath string) error {
+	_, err := b.management.Request(ctx, amqp.Null{}, bindingPath, commandDelete, []int{responseCode204})
 	return err
 }

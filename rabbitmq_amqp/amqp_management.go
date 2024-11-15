@@ -22,14 +22,6 @@ type AmqpManagement struct {
 	cancel    context.CancelFunc
 }
 
-func (a *AmqpManagement) Binding() IBindingSpecification {
-	return newAMQPBinding(a)
-}
-
-func (a *AmqpManagement) Exchange(exchangeName string) IExchangeSpecification {
-	return newAmqpExchange(a, exchangeName)
-}
-
 func NewAmqpManagement() *AmqpManagement {
 	return &AmqpManagement{
 		lifeCycle: NewLifeCycle(),
@@ -201,12 +193,65 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
-func (a *AmqpManagement) Queue(queueName string) IQueueSpecification {
-	return newAmqpQueue(a, queueName)
+func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (IQueueInfo, error) {
+	var amqpQueue *AmqpQueue
+
+	if specification == nil || len(specification.Name) <= 0 {
+		// If the specification is nil or the name is empty, then we create a new queue
+		// with a random name with generateNameWithDefaultPrefix()
+		amqpQueue = newAmqpQueue(a, "")
+	} else {
+		amqpQueue = newAmqpQueue(a, specification.Name)
+		amqpQueue.AutoDelete(specification.IsAutoDelete)
+		amqpQueue.Exclusive(specification.IsExclusive)
+		amqpQueue.MaxLengthBytes(specification.MaxLengthBytes)
+		amqpQueue.DeadLetterExchange(specification.DeadLetterExchange)
+		amqpQueue.DeadLetterRoutingKey(specification.DeadLetterRoutingKey)
+		amqpQueue.QueueType(specification.QueueType)
+	}
+
+	return amqpQueue.Declare(ctx)
 }
 
+func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
+	q := newAmqpQueue(a, name)
+	return q.Delete(ctx)
+}
+
+func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (IExchangeInfo, error) {
+	if exchangeSpecification == nil {
+		return nil, fmt.Errorf("exchangeSpecification is nil")
+	}
+
+	exchange := newAmqpExchange(a, exchangeSpecification.Name)
+	exchange.AutoDelete(exchangeSpecification.IsAutoDelete)
+	exchange.ExchangeType(exchangeSpecification.ExchangeType)
+	return exchange.Declare(ctx)
+}
+
+func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error {
+	e := newAmqpExchange(a, name)
+	return e.Delete(ctx)
+}
+
+func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification *BindingSpecification) (string, error) {
+	bind := newAMQPBinding(a)
+	bind.SourceExchange(bindingSpecification.SourceExchange)
+	bind.DestinationQueue(bindingSpecification.DestinationQueue)
+	bind.DestinationExchange(bindingSpecification.DestinationExchange)
+	bind.BindingKey(bindingSpecification.BindingKey)
+	return bind.Bind(ctx)
+
+}
+func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
+	bind := newAMQPBinding(a)
+	return bind.Unbind(ctx, bindingPath)
+}
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error) {
-	path := queuePath(queueName)
+	path, err := NewAddressBuilder().Queue(queueName).Address()
+	if err != nil {
+		return nil, err
+	}
 	result, err := a.Request(ctx, amqp.Null{}, path, commandGet, []int{responseCode200, responseCode404})
 	if err != nil {
 		return nil, err
@@ -214,14 +259,15 @@ func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueu
 	return newAmqpQueueInfo(result), nil
 }
 
-func (a *AmqpManagement) QueueClientName() IQueueSpecification {
-	return newAmqpQueue(a, "")
+func (a *AmqpManagement) PurgeQueue(ctx context.Context, queueName string) (int, error) {
+	purge := newAmqpQueue(a, queueName)
+	return purge.Purge(ctx)
 }
 
 func (a *AmqpManagement) NotifyStatusChange(channel chan *StatusChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpManagement) GetStatus() int {
+func (a *AmqpManagement) Status() int {
 	return a.lifeCycle.Status()
 }

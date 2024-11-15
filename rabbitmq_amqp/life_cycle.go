@@ -1,6 +1,9 @@
 package rabbitmq_amqp
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 const (
 	Open         = iota
@@ -9,9 +12,28 @@ const (
 	Closed       = iota
 )
 
+func statusToString(status int) string {
+	switch status {
+	case Open:
+		return "Open"
+	case Reconnecting:
+		return "Reconnecting"
+	case Closing:
+		return "Closing"
+	case Closed:
+		return "Closed"
+	}
+	return "Unknown"
+
+}
+
 type StatusChanged struct {
 	From int
 	To   int
+}
+
+func (s StatusChanged) String() string {
+	return fmt.Sprintf("From: %s, To: %s", statusToString(s.From), statusToString(s.To))
 }
 
 type LifeCycle struct {
