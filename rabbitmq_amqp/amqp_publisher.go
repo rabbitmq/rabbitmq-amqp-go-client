@@ -5,31 +5,34 @@ import (
 	"github.com/Azure/go-amqp"
 )
 
-type MPublisher struct {
+type Publisher struct {
 	sender *amqp.Sender
 }
 
-func NewMPublisher(sender *amqp.Sender) *MPublisher {
-	return &MPublisher{sender: sender}
+func newPublisher(sender *amqp.Sender) *Publisher {
+	return &Publisher{sender: sender}
 }
 
-func (m *MPublisher) Publish(ctx context.Context, message *amqp.Message, address *AddressBuilder) error {
+func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) error {
 
-	messageTo, err := address.Address()
-	if err != nil {
-		return err
-	}
-	if message.Properties == nil {
-		message.Properties = &amqp.MessageProperties{}
-	}
-	message.Properties.To = &messageTo
-	err = m.sender.Send(ctx, message, nil)
+	/// for the outcome of the message delivery, see https://github.com/Azure/go-amqp/issues/347
+	//RELEASED
+	///**
+	// * The broker could not route the message to any queue.
+	// *
+	// * <p>This is likely to be due to a topology misconfiguration.
+	// */
+	// so at the moment we don't have access on this information
+	// TODO: remove this comment when the issue is resolved
+
+	err := m.sender.Send(ctx, message, nil)
+
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *MPublisher) Close(ctx context.Context) error {
+func (m *Publisher) Close(ctx context.Context) error {
 	return m.sender.Close(ctx)
 }

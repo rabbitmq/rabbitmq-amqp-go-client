@@ -225,7 +225,7 @@ func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
 	return bind.Unbind(ctx, bindingPath)
 }
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error) {
-	path, err := NewAddressBuilder().Queue(queueName).Address()
+	path, err := QueueAddress(&queueName)
 	if err != nil {
 		return nil, err
 	}

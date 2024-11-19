@@ -2,58 +2,10 @@ package rabbitmq_amqp
 
 import (
 	"context"
-	"crypto/tls"
-	"fmt"
 	"github.com/Azure/go-amqp"
 )
 
-type TSaslMechanism string
-
-const (
-	Plain     TSaslMechanism = "plain"
-	External  TSaslMechanism = "external"
-	Anonymous TSaslMechanism = "anonymous"
-)
-
-type SaslMechanism struct {
-	Type TSaslMechanism
-}
-
-type ConnectionSettings struct {
-	Host          string
-	Port          int
-	User          string
-	Password      string
-	VirtualHost   string
-	Scheme        string
-	ContainerId   string
-	UseSsl        bool
-	TlsConfig     *tls.Config
-	SaslMechanism TSaslMechanism
-}
-
-func (c *ConnectionSettings) BuildAddress() string {
-	return c.Scheme + "://" + c.Host + ":" + fmt.Sprint(c.Port)
-}
-
-// NewConnectionSettings creates a new ConnectionSettings struct with default values.
-func NewConnectionSettings() *ConnectionSettings {
-	return &ConnectionSettings{
-		Host:        "localhost",
-		Port:        5672,
-		User:        "guest",
-		Password:    "guest",
-		VirtualHost: "/",
-		Scheme:      "amqp",
-		ContainerId: "amqp-go-client",
-		UseSsl:      false,
-		TlsConfig:   nil,
-	}
-}
-
 type IConnection interface {
-	// Open opens a connection to the AMQP 1.0 server.
-	Open(ctx context.Context, connectionSettings *ConnectionSettings) error
 
 	// Close closes the connection to the AMQP 1.0 server.
 	Close(ctx context.Context) error
@@ -68,13 +20,13 @@ type IConnection interface {
 	// See LifeCycle struct for more information.
 	Status() int
 
-	NewIMPublisher(ctx context.Context) (IMPublisher, error)
+	// Publisher returns a new IPublisher interface for the connection.
+	Publisher(ctx context.Context, destinationAddr string, linkName string) (IPublisher, error)
 }
 
-// IMPublisher is an interface for publishers messages based.
+// IPublisher is an interface for publishers messages based.
 // on the AMQP 1.0 protocol.
-// No Target address is specified each message is sent to a specific address.
-type IMPublisher interface {
-	Publish(ctx context.Context, message *amqp.Message, address *AddressBuilder) error
+type IPublisher interface {
+	Publish(ctx context.Context, message *amqp.Message) error
 	Close(ctx context.Context) error
 }

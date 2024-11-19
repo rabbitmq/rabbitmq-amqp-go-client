@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+
 	fmt.Printf("Getting started with AMQP Go AMQP 1.0 Client\n")
 	chStatusChanged := make(chan *rabbitmq_amqp.StatusChanged, 1)
 
@@ -17,12 +18,12 @@ func main() {
 		}
 	}(chStatusChanged)
 
-	amqpConnection := rabbitmq_amqp.NewAmqpConnectionNotifyStatusChanged(chStatusChanged)
-	err := amqpConnection.Open(context.Background(), rabbitmq_amqp.NewConnectionSettings())
+	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), "amqp://", nil)
 	if err != nil {
 		fmt.Printf("Error opening connection: %v\n", err)
 		return
 	}
+	amqpConnection.NotifyStatusChange(chStatusChanged)
 	fmt.Printf("AMQP Connection opened.\n")
 	management := amqpConnection.Management()
 	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.ExchangeSpecification{
