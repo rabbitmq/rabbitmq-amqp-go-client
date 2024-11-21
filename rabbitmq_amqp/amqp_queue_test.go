@@ -13,14 +13,9 @@ var _ = Describe("AMQP Queue test ", func() {
 	var connection IConnection
 	var management IManagement
 	BeforeEach(func() {
-		connection = NewAmqpConnection()
-		Expect(connection).NotTo(BeNil())
-		Expect(connection).To(BeAssignableToTypeOf(&AmqpConnection{}))
-		connectionSettings := NewConnectionSettings()
-		Expect(connectionSettings).NotTo(BeNil())
-		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		err := connection.Open(context.TODO(), connectionSettings)
+		conn, err := Dial(context.TODO(), "amqp://", nil)
 		Expect(err).To(BeNil())
+		connection = conn
 		management = connection.Management()
 
 	})
@@ -224,7 +219,7 @@ func publishMessages(queueName string, count int) {
 		Fail(err.Error())
 	}
 
-	address, err := NewAddressBuilder().Queue(queueName).Address()
+	address, err := QueueAddress(&queueName)
 	if err != nil {
 		Fail(err.Error())
 	}

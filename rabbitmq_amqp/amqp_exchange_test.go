@@ -11,13 +11,8 @@ var _ = Describe("AMQP Exchange test ", func() {
 	var connection IConnection
 	var management IManagement
 	BeforeEach(func() {
-		connection = NewAmqpConnection()
-		Expect(connection).NotTo(BeNil())
-		Expect(connection).To(BeAssignableToTypeOf(&AmqpConnection{}))
-		connectionSettings := NewConnectionSettings()
-		Expect(connectionSettings).NotTo(BeNil())
-		Expect(connectionSettings).To(BeAssignableToTypeOf(&ConnectionSettings{}))
-		err := connection.Open(context.TODO(), connectionSettings)
+		conn, err := Dial(context.TODO(), "amqp://", nil)
+		connection = conn
 		Expect(err).To(BeNil())
 		management = connection.Management()
 	})

@@ -34,7 +34,7 @@ func newAmqpExchange(management *AmqpManagement, name string) *AmqpExchange {
 }
 
 func (e *AmqpExchange) Declare(ctx context.Context) (IExchangeInfo, error) {
-	path, err := NewAddressBuilder().Exchange(e.name).Address()
+	path, err := ExchangeAddress(&e.name, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (e *AmqpExchange) IsAutoDelete() bool {
 }
 
 func (e *AmqpExchange) Delete(ctx context.Context) error {
-	path, err := NewAddressBuilder().Exchange(e.name).Address()
+	path, err := ExchangeAddress(&e.name, nil)
 	if err != nil {
 		return err
 	}

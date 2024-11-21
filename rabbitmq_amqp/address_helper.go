@@ -7,66 +7,56 @@ import (
 	"strings"
 )
 
-type AddressBuilder struct {
-	queue    *string
-	exchange *string
-	key      *string
-	append   *string
-}
-
-func NewAddressBuilder() *AddressBuilder {
-	return &AddressBuilder{}
-}
-
-func (a *AddressBuilder) Queue(queue string) *AddressBuilder {
-	a.queue = &queue
-	return a
-}
-
-func (a *AddressBuilder) Exchange(exchange string) *AddressBuilder {
-	a.exchange = &exchange
-	return a
-}
-
-func (a *AddressBuilder) Key(key string) *AddressBuilder {
-	a.key = &key
-	return a
-}
-
-func (a *AddressBuilder) Append(append string) *AddressBuilder {
-	a.append = &append
-	return a
-}
-
-func (a *AddressBuilder) Address() (string, error) {
-	if a.exchange == nil && a.queue == nil {
+// Address Creates the address for the exchange or queue following the RabbitMQ conventions.
+// see: https://www.rabbitmq.com/docs/next/amqp#address-v2
+func Address(exchange, key, queue *string, urlParameters *string) (string, error) {
+	if exchange == nil && queue == nil {
 		return "", errors.New("exchange or queue must be set")
 	}
 
 	urlAppend := ""
-	if !isStringNilOrEmpty(a.append) {
-		urlAppend = *a.append
+	if !isStringNilOrEmpty(urlParameters) {
+		urlAppend = *urlParameters
 	}
-	if !isStringNilOrEmpty(a.exchange) && !isStringNilOrEmpty(a.queue) {
+	if !isStringNilOrEmpty(exchange) && !isStringNilOrEmpty(queue) {
 		return "", errors.New("exchange and queue cannot be set together")
 	}
 
-	if !isStringNilOrEmpty(a.exchange) {
-		if !isStringNilOrEmpty(a.key) {
-			return "/" + exchanges + "/" + encodePathSegments(*a.exchange) + "/" + encodePathSegments(*a.key) + urlAppend, nil
+	if !isStringNilOrEmpty(exchange) {
+		if !isStringNilOrEmpty(key) {
+			return "/" + exchanges + "/" + encodePathSegments(*exchange) + "/" + encodePathSegments(*key) + urlAppend, nil
 		}
-		return "/" + exchanges + "/" + encodePathSegments(*a.exchange) + urlAppend, nil
+		return "/" + exchanges + "/" + encodePathSegments(*exchange) + urlAppend, nil
 	}
 
-	if a.queue == nil {
+	if queue == nil {
 		return "", nil
 	}
 
-	if isStringNilOrEmpty(a.queue) {
+	if isStringNilOrEmpty(queue) {
 		return "", errors.New("queue must be set")
 	}
 
-	return "/" + queues + "/" + encodePathSegments(*a.queue) + urlAppend, nil
+	return "/" + queues + "/" + encodePathSegments(*queue) + urlAppend, nil
+}
+
+// ExchangeAddress Creates the address for the exchange
+// See Address for more information
+func ExchangeAddress(exchange, key *string) (string, error) {
+	return Address(exchange, key, nil, nil)
+}
+
+// QueueAddress Creates the address for the queue.
+// See Address for more information
+func QueueAddress(queue *string) (string, error) {
+	return Address(nil, nil, queue, nil)
+}
+
+// PurgeQueueAddress Creates the address for purging the queue.
+// See Address for more information
+func PurgeQueueAddress(queue *string) (string, error) {
+	parameter := "/messages"
+	return Address(nil, nil, queue, &parameter)
 }
 
 // encodePathSegments takes a string and returns its percent-encoded representation.
