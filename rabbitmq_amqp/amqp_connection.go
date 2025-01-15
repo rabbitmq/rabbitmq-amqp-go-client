@@ -17,12 +17,12 @@ import (
 
 type AmqpConnection struct {
 	Connection *amqp.Conn
-	management IManagement
+	management *AmqpManagement
 	lifeCycle  *LifeCycle
 	session    *amqp.Session
 }
 
-func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (IPublisher, error) {
+func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (*Publisher, error) {
 	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName))
 	if err != nil {
 		return nil, err
@@ -30,25 +30,32 @@ func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, l
 	return newPublisher(sender), nil
 }
 
-// Management returns the management interface for the connection.
-// See IManagement interface.
-func (a *AmqpConnection) Management() IManagement {
-	return a.management
-}
-
 // Dial creates a new AmqpConnection
 // with a new AmqpManagement and a new LifeCycle.
 // Returns a pointer to the new AmqpConnection
-func Dial(ctx context.Context, addr string, connOptions *amqp.ConnOptions) (IConnection, error) {
+func Dial(ctx context.Context, addresses []string, connOptions *amqp.ConnOptions) (*AmqpConnection, error) {
 	conn := &AmqpConnection{
 		management: NewAmqpManagement(),
 		lifeCycle:  NewLifeCycle(),
 	}
-	err := conn.open(ctx, addr, connOptions)
-	if err != nil {
-		return nil, err
+	tmp := make([]string, len(addresses))
+	copy(tmp, addresses)
+
+	// random pick and extract one address to use for connection
+	for len(tmp) > 0 {
+		idx := random(len(tmp))
+		addr := tmp[idx]
+		// remove the index from the tmp list
+		tmp = append(tmp[:idx], tmp[idx+1:]...)
+		err := conn.open(ctx, addr, connOptions)
+		if err != nil {
+			Error("Failed to open connection", ExtractWithoutPassword(addr), err)
+			continue
+		}
+		Debug("Connected to", ExtractWithoutPassword(addr))
+		return conn, nil
 	}
-	return conn, nil
+	return nil, fmt.Errorf("no address to connect to")
 }
 
 // Open opens a connection to the AMQP 1.0 server.
@@ -84,7 +91,7 @@ func (a *AmqpConnection) open(ctx context.Context, addr string, connOptions *amq
 	if err != nil {
 		return err
 	}
-	err = a.Management().Open(ctx, a)
+	err = a.management.Open(ctx, a)
 	if err != nil {
 		// TODO close connection?
 		return err
@@ -95,7 +102,7 @@ func (a *AmqpConnection) open(ctx context.Context, addr string, connOptions *amq
 }
 
 func (a *AmqpConnection) Close(ctx context.Context) error {
-	err := a.Management().Close(ctx)
+	err := a.management.Close(ctx)
 	if err != nil {
 		return err
 	}
@@ -111,3 +118,11 @@ func (a *AmqpConnection) NotifyStatusChange(channel chan *StatusChanged) {
 func (a *AmqpConnection) Status() int {
 	return a.lifeCycle.Status()
 }
+
+// *** management section ***
+
+func (a *AmqpConnection) Management() *AmqpManagement {
+	return a.management
+}
+
+//*** end management section ***

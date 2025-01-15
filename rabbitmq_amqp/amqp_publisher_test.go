@@ -10,7 +10,7 @@ import (
 var _ = Describe("AMQP publisher ", func() {
 	It("Send a message to a queue with a Message Target Publisher", func() {
 		qName := generateNameWithDateTime("Send a message to a queue with a Message Target Publisher")
-		connection, err := Dial(context.Background(), "amqp://", nil)
+		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
@@ -30,7 +30,7 @@ var _ = Describe("AMQP publisher ", func() {
 		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
 		Expect(err).To(BeNil())
 		Expect(nMessages).To(Equal(1))
-		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(publisher.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 	})
 })

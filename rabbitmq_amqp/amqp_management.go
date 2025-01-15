@@ -54,8 +54,8 @@ func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	return nil
 }
 
-func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error {
-	session, err := connection.(*AmqpConnection).Connection.NewSession(ctx, nil)
+func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) error {
+	session, err := connection.Connection.NewSession(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
-func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (IQueueInfo, error) {
+func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (*AmqpQueueInfo, error) {
 	var amqpQueue *AmqpQueue
 
 	if specification == nil || len(specification.Name) <= 0 {
@@ -195,7 +195,7 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	return q.Delete(ctx)
 }
 
-func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (IExchangeInfo, error) {
+func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
 		return nil, fmt.Errorf("exchangeSpecification is nil")
 	}
@@ -224,7 +224,7 @@ func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
 	bind := newAMQPBinding(a)
 	return bind.Unbind(ctx, bindingPath)
 }
-func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error) {
+func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*AmqpQueueInfo, error) {
 	path, err := QueueAddress(&queueName)
 	if err != nil {
 		return nil, err

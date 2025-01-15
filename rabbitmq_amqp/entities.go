@@ -27,20 +27,6 @@ type QueueSpecification struct {
 	DeadLetterRoutingKey string
 }
 
-// IQueueInfo represents the information of a queue
-// It is returned by the Declare method of IQueueSpecification
-// The information come from the server
-type IQueueInfo interface {
-	Name() string
-	IsDurable() bool
-	IsAutoDelete() bool
-	IsExclusive() bool
-	Type() TQueueType
-	Leader() string
-	Members() []string
-	Arguments() map[string]any
-}
-
 type TExchangeType string
 
 const (
@@ -55,13 +41,6 @@ type ExchangeType struct {
 
 func (e ExchangeType) String() string {
 	return string(e.Type)
-}
-
-// IExchangeInfo represents the information of an exchange
-// It is empty at the moment because the server does not return any information
-// We leave it here for future use. In case the server returns information about an exchange
-type IExchangeInfo interface {
-	Name() string
 }
 
 type ExchangeSpecification struct {

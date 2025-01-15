@@ -1,6 +1,10 @@
 package rabbitmq_amqp
 
-import "github.com/Azure/go-amqp"
+import (
+	"github.com/Azure/go-amqp"
+	"math/rand"
+	"time"
+)
 
 // senderLinkOptions returns the options for a sender link
 // with the given address and link name.
@@ -36,4 +40,9 @@ func createReceiverLinkOptions(address string, linkName string) *amqp.ReceiverOp
 		ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
 		Credit:                    100,
 	}
+}
+
+func random(max int) int {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	return r.Intn(max)
 }

@@ -25,7 +25,7 @@ func main() {
 	}(chStatusChanged)
 
 	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), "amqp://", nil)
+	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://", "amqp://nohost"}, nil)
 	if err != nil {
 		fmt.Printf("Error opening connection: %v\n", err)
 		return

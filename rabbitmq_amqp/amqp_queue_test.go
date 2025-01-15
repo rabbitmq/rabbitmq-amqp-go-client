@@ -10,10 +10,10 @@ import (
 )
 
 var _ = Describe("AMQP Queue test ", func() {
-	var connection IConnection
-	var management IManagement
+	var connection *AmqpConnection
+	var management *AmqpManagement
 	BeforeEach(func() {
-		conn, err := Dial(context.TODO(), "amqp://", nil)
+		conn, err := Dial(context.TODO(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		connection = conn
 		management = connection.Management()
