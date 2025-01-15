@@ -28,6 +28,12 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(err).To(BeNil())
 	})
 
+	It("AMQP Connection connect to the one correct uri and fails the others", func() {
+		conn, err := Dial(context.Background(), []string{"amqp://localhost:1234", "amqp://nohost:555", "amqp://"}, nil)
+		Expect(err).To(BeNil())
+		Expect(conn.Close(context.Background()))
+	})
+
 	It("AMQP Connection should fail due of wrong Port", func() {
 		_, err := Dial(context.Background(), []string{"amqp://localhost:1234"}, nil)
 		Expect(err).NotTo(BeNil())
@@ -35,6 +41,11 @@ var _ = Describe("AMQP Connection Test", func() {
 
 	It("AMQP Connection should fail due of wrong Host", func() {
 		_, err := Dial(context.Background(), []string{"amqp://wrong_host:5672"}, nil)
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("AMQP Connection should fails with all the wrong uris", func() {
+		_, err := Dial(context.Background(), []string{"amqp://localhost:1234", "amqp://nohost:555", "amqp://nono"}, nil)
 		Expect(err).NotTo(BeNil())
 	})
 
