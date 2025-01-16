@@ -25,7 +25,7 @@ func (a *AmqpQueueInfo) Members() []string {
 	return a.members
 }
 
-func newAmqpQueueInfo(response map[string]any) IQueueInfo {
+func newAmqpQueueInfo(response map[string]any) *AmqpQueueInfo {
 	return &AmqpQueueInfo{
 		name:         response["name"].(string),
 		isDurable:    response["durable"].(bool),
@@ -133,7 +133,7 @@ func (a *AmqpQueue) validate() error {
 	return nil
 }
 
-func (a *AmqpQueue) Declare(ctx context.Context) (IQueueInfo, error) {
+func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
 	if Quorum == a.GetQueueType() ||
 		Stream == a.GetQueueType() {
 		// mandatory arguments for quorum queues and streams

@@ -5,6 +5,11 @@ import (
 	"github.com/Azure/go-amqp"
 )
 
+type PublishResult struct {
+	Outcome amqp.DeliveryState
+	Message *amqp.Message
+}
+
 type Publisher struct {
 	sender *amqp.Sender
 }
@@ -13,26 +18,33 @@ func newPublisher(sender *amqp.Sender) *Publisher {
 	return &Publisher{sender: sender}
 }
 
-func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) error {
+// Publish sends a message to the destination address.
+// The message is sent to the destination address and the outcome of the operation is returned.
+// The outcome is a DeliveryState that indicates if the message was accepted or rejected.
+// RabbitMQ supports the following DeliveryState types:
+// - StateAccepted
+// - StateReleased
+// - StateRejected
+// See: https://www.rabbitmq.com/docs/next/amqp#outcomes for more information.
+func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
 
-	/// for the outcome of the message delivery, see https://github.com/Azure/go-amqp/issues/347
-	//RELEASED
-	///**
-	// * The broker could not route the message to any queue.
-	// *
-	// * <p>This is likely to be due to a topology misconfiguration.
-	// */
-	// so at the moment we don't have access on this information
-	// TODO: remove this comment when the issue is resolved
-
-	err := m.sender.Send(ctx, message, nil)
-
+	r, err := m.sender.SendWithReceipt(ctx, message, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	state, err := r.Wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	publishResult := &PublishResult{
+		Message: message,
+		Outcome: state,
+	}
+	return publishResult, err
 }
 
+// Close closes the publisher.
 func (m *Publisher) Close(ctx context.Context) error {
 	return m.sender.Close(ctx)
 }

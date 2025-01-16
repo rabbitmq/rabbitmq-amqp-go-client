@@ -9,7 +9,7 @@ type AmqpExchangeInfo struct {
 	name string
 }
 
-func newAmqpExchangeInfo(name string) IExchangeInfo {
+func newAmqpExchangeInfo(name string) *AmqpExchangeInfo {
 	return &AmqpExchangeInfo{name: name}
 }
 
@@ -33,7 +33,7 @@ func newAmqpExchange(management *AmqpManagement, name string) *AmqpExchange {
 	}
 }
 
-func (e *AmqpExchange) Declare(ctx context.Context) (IExchangeInfo, error) {
+func (e *AmqpExchange) Declare(ctx context.Context) (*AmqpExchangeInfo, error) {
 	path, err := ExchangeAddress(&e.name, nil)
 	if err != nil {
 		return nil, err

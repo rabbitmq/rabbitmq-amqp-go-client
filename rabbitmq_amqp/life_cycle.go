@@ -5,70 +5,102 @@ import (
 	"sync"
 )
 
+type LifeCycleState interface {
+	getState() int
+}
+
+type StateOpen struct {
+}
+
+func (o *StateOpen) getState() int {
+	return open
+}
+
+type StateReconnecting struct {
+}
+
+func (r *StateReconnecting) getState() int {
+	return reconnecting
+}
+
+type StateClosing struct {
+}
+
+func (c *StateClosing) getState() int {
+	return closing
+}
+
+type StateClosed struct {
+}
+
+func (c *StateClosed) getState() int {
+	return closed
+}
+
 const (
-	Open         = iota
-	Reconnecting = iota
-	Closing      = iota
-	Closed       = iota
+	open         = iota
+	reconnecting = iota
+	closing      = iota
+	closed       = iota
 )
 
-func statusToString(status int) string {
-	switch status {
-	case Open:
-		return "Open"
-	case Reconnecting:
-		return "Reconnecting"
-	case Closing:
-		return "Closing"
-	case Closed:
-		return "Closed"
+func statusToString(status LifeCycleState) string {
+	switch status.getState() {
+	case open:
+		return "open"
+	case reconnecting:
+		return "reconnecting"
+	case closing:
+		return "closing"
+	case closed:
+		return "closed"
 	}
-	return "Unknown"
+	return "unknown"
 
 }
 
-type StatusChanged struct {
-	From int
-	To   int
+type StateChanged struct {
+	From LifeCycleState
+	To   LifeCycleState
 }
 
-func (s StatusChanged) String() string {
+func (s StateChanged) String() string {
 	return fmt.Sprintf("From: %s, To: %s", statusToString(s.From), statusToString(s.To))
 }
 
 type LifeCycle struct {
-	status          int
-	chStatusChanged chan *StatusChanged
+	state           LifeCycleState
+	chStatusChanged chan *StateChanged
 	mutex           *sync.Mutex
 }
 
 func NewLifeCycle() *LifeCycle {
 	return &LifeCycle{
-		status: Closed,
-		mutex:  &sync.Mutex{},
+		state: &StateClosed{},
+		mutex: &sync.Mutex{},
 	}
 }
 
-func (l *LifeCycle) Status() int {
+func (l *LifeCycle) State() LifeCycleState {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	return l.status
+	return l.state
 }
 
-func (l *LifeCycle) SetStatus(value int) {
+func (l *LifeCycle) SetState(value LifeCycleState) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	if l.status == value {
+	if l.state == value {
 		return
 	}
 
-	oldState := l.status
-	l.status = value
+	oldState := l.state
+	l.state = value
 
 	if l.chStatusChanged == nil {
 		return
 	}
-	l.chStatusChanged <- &StatusChanged{
+	l.chStatusChanged <- &StateChanged{
 		From: oldState,
 		To:   value,
 	}

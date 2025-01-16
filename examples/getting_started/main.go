@@ -9,29 +9,28 @@ import (
 )
 
 func main() {
-
 	exchangeName := "getting-started-exchange"
 	queueName := "getting-started-queue"
 	routingKey := "routing-key"
 
-	fmt.Printf("Getting started with AMQP Go AMQP 1.0 Client\n")
+	rabbitmq_amqp.Info("Getting started with AMQP Go AMQP 1.0 Client")
 
-	/// Create a channel to receive status change notifications
-	chStatusChanged := make(chan *rabbitmq_amqp.StatusChanged, 1)
-	go func(ch chan *rabbitmq_amqp.StatusChanged) {
+	/// Create a channel to receive state change notifications
+	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
+	go func(ch chan *rabbitmq_amqp.StateChanged) {
 		for statusChanged := range ch {
-			fmt.Printf("%s\n", statusChanged)
+			rabbitmq_amqp.Info("[Connection]", "Status changed", statusChanged)
 		}
-	}(chStatusChanged)
+	}(stateChanged)
 
 	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), "amqp://", nil)
+	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, nil)
 	if err != nil {
-		fmt.Printf("Error opening connection: %v\n", err)
+		rabbitmq_amqp.Error("Error opening connection", err)
 		return
 	}
 	// Register the channel to receive status change notifications
-	amqpConnection.NotifyStatusChange(chStatusChanged)
+	amqpConnection.NotifyStatusChange(stateChanged)
 
 	fmt.Printf("AMQP Connection opened.\n")
 	// Create the management interface for the connection
@@ -41,7 +40,7 @@ func main() {
 		Name: exchangeName,
 	})
 	if err != nil {
-		fmt.Printf("Error declaring exchange: %v\n", err)
+		rabbitmq_amqp.Error("Error declaring exchange", err)
 		return
 	}
 
@@ -52,7 +51,7 @@ func main() {
 	})
 
 	if err != nil {
-		fmt.Printf("Error declaring queue: %v\n", err)
+		rabbitmq_amqp.Error("Error declaring queue", err)
 		return
 	}
 
@@ -64,7 +63,7 @@ func main() {
 	})
 
 	if err != nil {
-		fmt.Printf("Error binding: %v\n", err)
+		rabbitmq_amqp.Error("Error binding", err)
 		return
 	}
 
@@ -72,15 +71,30 @@ func main() {
 
 	publisher, err := amqpConnection.Publisher(context.Background(), addr, "getting-started-publisher")
 	if err != nil {
-		fmt.Printf("Error creating publisher: %v\n", err)
+		rabbitmq_amqp.Error("Error creating publisher", err)
 		return
 	}
 
 	// Publish a message to the exchange
-	err = publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
+	publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
 	if err != nil {
-		fmt.Printf("Error publishing message: %v\n", err)
+		rabbitmq_amqp.Error("Error publishing message", err)
 		return
+	}
+	switch publishResult.Outcome {
+	case &amqp.StateAccepted{}:
+		rabbitmq_amqp.Info("Message accepted")
+	case &amqp.StateReleased{}:
+		rabbitmq_amqp.Warn("Message was not routed")
+	case &amqp.StateRejected{}:
+		rabbitmq_amqp.Warn("Message rejected")
+		stateType := publishResult.Outcome.(*amqp.StateRejected)
+		if stateType.Error != nil {
+			rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
+		}
+	default:
+		// these status are not supported
+		rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
 	}
 
 	println("press any key to close the connection")
@@ -132,5 +146,5 @@ func main() {
 	// Wait for the status change to be printed
 	time.Sleep(500 * time.Millisecond)
 
-	close(chStatusChanged)
+	close(stateChangeds)
 }

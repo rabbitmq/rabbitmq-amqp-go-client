@@ -10,10 +10,10 @@ import (
 )
 
 var _ = Describe("AMQP Queue test ", func() {
-	var connection IConnection
-	var management IManagement
+	var connection *AmqpConnection
+	var management *AmqpManagement
 	BeforeEach(func() {
-		conn, err := Dial(context.TODO(), "amqp://", nil)
+		conn, err := Dial(context.TODO(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		connection = conn
 		management = connection.Management()
@@ -148,7 +148,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	It("AMQP Declare Queue should fail with Precondition fail", func() {
 		// The first queue is declared as Classic, and it should succeed
 		// The second queue is declared as Quorum, and it should fail since it is already declared as Classic
-		const queueName = "AMQP Declare Queue should fail with Precondition fail"
+		queueName := generateName("AMQP Declare Queue should fail with Precondition fail")
 
 		_, err := management.DeclareQueue(context.TODO(), &QueueSpecification{
 			Name:      queueName,
@@ -168,7 +168,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	})
 
 	It("AMQP Declare Queue should fail during validation", func() {
-		const queueName = "AMQP Declare Queue should fail during validation"
+		queueName := generateName("AMQP Declare Queue should fail during validation")
 		_, err := management.DeclareQueue(context.TODO(), &QueueSpecification{
 			Name:           queueName,
 			MaxLengthBytes: -1,
@@ -188,7 +188,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	})
 
 	It("AMQP Purge Queue should succeed and return the number of messages purged", func() {
-		const queueName = "AMQP Purge Queue should succeed and return the number of messages purged"
+		queueName := generateName("AMQP Purge Queue should succeed and return the number of messages purged")
 		queueInfo, err := management.DeclareQueue(context.TODO(), &QueueSpecification{
 			Name: queueName,
 		})
@@ -197,6 +197,8 @@ var _ = Describe("AMQP Queue test ", func() {
 		purged, err := management.PurgeQueue(context.TODO(), queueInfo.Name())
 		Expect(err).To(BeNil())
 		Expect(purged).To(Equal(10))
+		err = management.DeleteQueue(context.TODO(), queueName)
+		Expect(err).To(BeNil())
 	})
 
 	It("AMQP GET on non-existing queue should return ErrDoesNotExist", func() {
@@ -207,33 +209,24 @@ var _ = Describe("AMQP Queue test ", func() {
 	})
 })
 
-// TODO: This should be replaced with this library's publish function
-// but for the time being, we need a way to publish messages or test purposes
 func publishMessages(queueName string, count int) {
-	conn, err := amqp.Dial(context.TODO(), "amqp://guest:guest@localhost", nil)
-	if err != nil {
-		Fail(err.Error())
-	}
-	session, err := conn.NewSession(context.TODO(), nil)
-	if err != nil {
-		Fail(err.Error())
-	}
+	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
+	Expect(err).To(BeNil())
 
 	address, err := QueueAddress(&queueName)
-	if err != nil {
-		Fail(err.Error())
-	}
+	Expect(err).To(BeNil())
 
-	sender, err := session.NewSender(context.TODO(), address, nil)
-	if err != nil {
-		Fail(err.Error())
-	}
+	publisher, err := conn.Publisher(context.TODO(), address, "test")
+	Expect(err).To(BeNil())
+	Expect(publisher).NotTo(BeNil())
 
 	for i := 0; i < count; i++ {
-		err = sender.Send(context.TODO(), amqp.NewMessage([]byte("Message #"+strconv.Itoa(i))), nil)
-		if err != nil {
-			Fail(err.Error())
-		}
+		publishResult, err := publisher.Publish(context.TODO(), amqp.NewMessage([]byte("Message #"+strconv.Itoa(i))))
+		Expect(err).To(BeNil())
+		Expect(publishResult).NotTo(BeNil())
+		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
 	}
+	err = conn.Close(context.TODO())
+	Expect(err).To(BeNil())
 
 }

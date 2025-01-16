@@ -43,7 +43,7 @@ func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
 func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	if a.sender == nil {
 		sender, err := a.session.NewSender(ctx, managementNodeAddress,
-			createSenderLinkOptions(managementNodeAddress, linkPairName))
+			createSenderLinkOptions(managementNodeAddress, linkPairName, AtMostOnce))
 		if err != nil {
 			return err
 		}
@@ -54,8 +54,8 @@ func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	return nil
 }
 
-func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error {
-	session, err := connection.(*AmqpConnection).Connection.NewSession(ctx, nil)
+func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) error {
+	session, err := connection.Connection.NewSession(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (a *AmqpManagement) Open(ctx context.Context, connection IConnection) error
 	// some channels or I/O or something elsewhere
 	time.Sleep(time.Millisecond * 10)
 
-	a.lifeCycle.SetStatus(Open)
+	a.lifeCycle.SetState(&StateOpen{})
 	return ctx.Err()
 }
 
@@ -85,7 +85,7 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	_ = a.sender.Close(ctx)
 	_ = a.receiver.Close(ctx)
 	err := a.session.Close(ctx)
-	a.lifeCycle.SetStatus(Closed)
+	a.lifeCycle.SetState(&StateClosed{})
 	return err
 }
 
@@ -170,7 +170,7 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
-func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (IQueueInfo, error) {
+func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (*AmqpQueueInfo, error) {
 	var amqpQueue *AmqpQueue
 
 	if specification == nil || len(specification.Name) <= 0 {
@@ -195,7 +195,7 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	return q.Delete(ctx)
 }
 
-func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (IExchangeInfo, error) {
+func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
 		return nil, fmt.Errorf("exchangeSpecification is nil")
 	}
@@ -224,7 +224,7 @@ func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
 	bind := newAMQPBinding(a)
 	return bind.Unbind(ctx, bindingPath)
 }
-func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (IQueueInfo, error) {
+func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*AmqpQueueInfo, error) {
 	path, err := QueueAddress(&queueName)
 	if err != nil {
 		return nil, err
@@ -241,10 +241,10 @@ func (a *AmqpManagement) PurgeQueue(ctx context.Context, queueName string) (int,
 	return purge.Purge(ctx)
 }
 
-func (a *AmqpManagement) NotifyStatusChange(channel chan *StatusChanged) {
+func (a *AmqpManagement) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpManagement) Status() int {
-	return a.lifeCycle.Status()
+func (a *AmqpManagement) State() LifeCycleState {
+	return a.lifeCycle.State()
 }

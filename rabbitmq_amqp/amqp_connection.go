@@ -17,38 +17,50 @@ import (
 
 type AmqpConnection struct {
 	Connection *amqp.Conn
-	management IManagement
+	management *AmqpManagement
 	lifeCycle  *LifeCycle
 	session    *amqp.Session
 }
 
-func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (IPublisher, error) {
-	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName))
+func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (*Publisher, error) {
+	if !validateAddress(destinationAdd) {
+		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+	}
+
+	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
 	}
 	return newPublisher(sender), nil
 }
 
-// Management returns the management interface for the connection.
-// See IManagement interface.
-func (a *AmqpConnection) Management() IManagement {
-	return a.management
-}
-
-// Dial creates a new AmqpConnection
-// with a new AmqpManagement and a new LifeCycle.
-// Returns a pointer to the new AmqpConnection
-func Dial(ctx context.Context, addr string, connOptions *amqp.ConnOptions) (IConnection, error) {
+// Dial connect to the AMQP 1.0 server using the provided connectionSettings
+// Returns a pointer to the new AmqpConnection if successful else an error.
+// addresses is a list of addresses to connect to. It picks one randomly.
+// It is enough that one of the addresses is reachable.
+func Dial(ctx context.Context, addresses []string, connOptions *amqp.ConnOptions) (*AmqpConnection, error) {
 	conn := &AmqpConnection{
 		management: NewAmqpManagement(),
 		lifeCycle:  NewLifeCycle(),
 	}
-	err := conn.open(ctx, addr, connOptions)
-	if err != nil {
-		return nil, err
+	tmp := make([]string, len(addresses))
+	copy(tmp, addresses)
+
+	// random pick and extract one address to use for connection
+	for len(tmp) > 0 {
+		idx := random(len(tmp))
+		addr := tmp[idx]
+		// remove the index from the tmp list
+		tmp = append(tmp[:idx], tmp[idx+1:]...)
+		err := conn.open(ctx, addr, connOptions)
+		if err != nil {
+			Error("Failed to open connection", ExtractWithoutPassword(addr), err)
+			continue
+		}
+		Debug("Connected to", ExtractWithoutPassword(addr))
+		return conn, nil
 	}
-	return conn, nil
+	return nil, fmt.Errorf("no address to connect to")
 }
 
 // Open opens a connection to the AMQP 1.0 server.
@@ -84,30 +96,42 @@ func (a *AmqpConnection) open(ctx context.Context, addr string, connOptions *amq
 	if err != nil {
 		return err
 	}
-	err = a.Management().Open(ctx, a)
+	err = a.management.Open(ctx, a)
 	if err != nil {
 		// TODO close connection?
 		return err
 	}
 
-	a.lifeCycle.SetStatus(Open)
+	a.lifeCycle.SetState(&StateOpen{})
 	return nil
 }
 
 func (a *AmqpConnection) Close(ctx context.Context) error {
-	err := a.Management().Close(ctx)
+	err := a.management.Close(ctx)
 	if err != nil {
 		return err
 	}
 	err = a.Connection.Close()
-	a.lifeCycle.SetStatus(Closed)
+	a.lifeCycle.SetState(&StateClosed{})
 	return err
 }
 
-func (a *AmqpConnection) NotifyStatusChange(channel chan *StatusChanged) {
+// NotifyStatusChange registers a channel to receive getState change notifications
+// from the connection.
+func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpConnection) Status() int {
-	return a.lifeCycle.Status()
+func (a *AmqpConnection) State() LifeCycleState {
+	return a.lifeCycle.State()
 }
+
+// *** management section ***
+
+// Management returns the management interface for the connection.
+// The management interface is used to declare and delete exchanges, queues, and bindings.
+func (a *AmqpConnection) Management() *AmqpManagement {
+	return a.management
+}
+
+//*** end management section ***
