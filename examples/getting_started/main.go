@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	exchangeName := "getting-started-exchange"
 	queueName := "getting-started-queue"
 	routingKey := "routing-key"
@@ -25,7 +24,7 @@ func main() {
 	}(chStatusChanged)
 
 	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://", "amqp://nohost"}, nil)
+	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, nil)
 	if err != nil {
 		fmt.Printf("Error opening connection: %v\n", err)
 		return
@@ -77,10 +76,37 @@ func main() {
 	}
 
 	// Publish a message to the exchange
-	err = publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
+	outcome, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
 	if err != nil {
 		fmt.Printf("Error publishing message: %v\n", err)
 		return
+	}
+
+	// determine how the peer settled the message
+	switch stateType := outcome.DeliveryState.(type) {
+	case *amqp.StateAccepted:
+		// message was accepted, no further action is required
+		rabbitmq_amqp.Info("Message accepted")
+	case *amqp.StateModified:
+		// message must be modified and resent before it can be processed.
+		// the values in stateType provide further context.
+		rabbitmq_amqp.Info("Message modified")
+	case *amqp.StateReceived:
+		// see the fields in [StateReceived] for information on
+		// how to handle this delivery state.
+		rabbitmq_amqp.Info("Message received")
+	case *amqp.StateRejected:
+		rabbitmq_amqp.Warn("Message rejected")
+		// the peer rejected the message
+		if stateType.Error != nil {
+			// the error will provide information about why the
+			// message was rejected. note that the peer isn't required
+			// to provide an error.
+			rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
+		}
+	case *amqp.StateReleased:
+		// message was not routed
+		rabbitmq_amqp.Warn("Message was not routed")
 	}
 
 	println("press any key to close the connection")

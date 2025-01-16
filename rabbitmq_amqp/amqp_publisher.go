@@ -5,6 +5,10 @@ import (
 	"github.com/Azure/go-amqp"
 )
 
+type PublishOutcome struct {
+	DeliveryState amqp.DeliveryState
+}
+
 type Publisher struct {
 	sender *amqp.Sender
 }
@@ -13,7 +17,7 @@ func newPublisher(sender *amqp.Sender) *Publisher {
 	return &Publisher{sender: sender}
 }
 
-func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) error {
+func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishOutcome, error) {
 
 	/// for the outcome of the message delivery, see https://github.com/Azure/go-amqp/issues/347
 	//RELEASED
@@ -24,13 +28,19 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) error {
 	// */
 	// so at the moment we don't have access on this information
 	// TODO: remove this comment when the issue is resolved
-
-	err := m.sender.Send(ctx, message, nil)
-
+	outcome := &PublishOutcome{}
+	r, err := m.sender.SendWithReceipt(ctx, message, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	state, err := r.Wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	outcome.DeliveryState = state
+
+	return outcome, err
 }
 
 func (m *Publisher) Close(ctx context.Context) error {

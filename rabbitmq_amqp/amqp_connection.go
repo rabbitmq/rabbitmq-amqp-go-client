@@ -23,16 +23,17 @@ type AmqpConnection struct {
 }
 
 func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (*Publisher, error) {
-	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName))
+	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
 	}
 	return newPublisher(sender), nil
 }
 
-// Dial creates a new AmqpConnection
-// with a new AmqpManagement and a new LifeCycle.
-// Returns a pointer to the new AmqpConnection
+// Dial connect to the AMQP 1.0 server using the provided connectionSettings
+// Returns a pointer to the new AmqpConnection if successful else an error.
+// addresses is a list of addresses to connect to. It picks one randomly.
+// It is enough that one of the addresses is reachable.
 func Dial(ctx context.Context, addresses []string, connOptions *amqp.ConnOptions) (*AmqpConnection, error) {
 	conn := &AmqpConnection{
 		management: NewAmqpManagement(),

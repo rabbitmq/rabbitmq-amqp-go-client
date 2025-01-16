@@ -6,12 +6,24 @@ import (
 	"time"
 )
 
+const AtMostOnce = 0
+const AtLeastOnce = 1
+
 // senderLinkOptions returns the options for a sender link
 // with the given address and link name.
 // That should be the same for all the links.
-func createSenderLinkOptions(address string, linkName string) *amqp.SenderOptions {
+func createSenderLinkOptions(address string, linkName string, deliveryMode int) *amqp.SenderOptions {
 	prop := make(map[string]any)
 	prop["paired"] = true
+	sndSettleMode := amqp.SenderSettleModeSettled.Ptr()
+	/// SndSettleMode = deliveryMode == DeliveryMode.AtMostOnce
+	//                    ? SenderSettleMode.Settled
+	//                    : SenderSettleMode.Unsettled,
+
+	if deliveryMode == AtLeastOnce {
+		sndSettleMode = amqp.SenderSettleModeUnsettled.Ptr()
+	}
+
 	return &amqp.SenderOptions{
 		SourceAddress:               address,
 		DynamicAddress:              false,
@@ -19,7 +31,7 @@ func createSenderLinkOptions(address string, linkName string) *amqp.SenderOption
 		ExpiryTimeout:               0,
 		Name:                        linkName,
 		Properties:                  prop,
-		SettlementMode:              amqp.SenderSettleModeSettled.Ptr(),
+		SettlementMode:              sndSettleMode,
 		RequestedReceiverSettleMode: amqp.ReceiverSettleModeFirst.Ptr(),
 	}
 }
