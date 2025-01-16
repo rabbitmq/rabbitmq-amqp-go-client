@@ -26,12 +26,22 @@ func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, l
 	if !validateAddress(destinationAdd) {
 		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 	}
-
 	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
 	}
 	return newPublisher(sender), nil
+}
+
+func (a *AmqpConnection) Consumer(ctx context.Context, destinationAdd string, linkName string) (*Consumer, error) {
+	if !validateAddress(destinationAdd) {
+		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+	}
+	receiver, err := a.session.NewReceiver(ctx, destinationAdd, createReceiverLinkOptions(destinationAdd, linkName, AtLeastOnce))
+	if err != nil {
+		return nil, err
+	}
+	return newConsumer(receiver), nil
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings

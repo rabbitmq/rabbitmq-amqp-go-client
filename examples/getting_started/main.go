@@ -67,6 +67,37 @@ func main() {
 		return
 	}
 
+	addrQueue, err := rabbitmq_amqp.QueueAddress(&queueName)
+	if err != nil {
+		rabbitmq_amqp.Error("Error getting queue address", err)
+		return
+	}
+
+	consumer, err := amqpConnection.Consumer(context.Background(), addrQueue, "getting-started-consumer")
+	if err != nil {
+		rabbitmq_amqp.Error("Error creating consumer", err)
+		return
+	}
+
+	// Consume messages from the queue
+	go func() {
+		msg, err := consumer.Receive(context.Background())
+		if err != nil {
+			rabbitmq_amqp.Error("Error receiving message", err)
+			return
+		}
+		rabbitmq_amqp.Info("[Receiver]", "Received message", fmt.Sprintf("%s", msg.Data))
+		err = consumer.RejectMessage(context.Background(), msg, &amqp.Error{
+			Condition:   "a",
+			Description: "d",
+			Info:        nil,
+		})
+		if err != nil {
+			rabbitmq_amqp.Error("Error accepting message", err)
+			return
+		}
+	}()
+
 	addr, err := rabbitmq_amqp.ExchangeAddress(&exchangeName, &routingKey)
 
 	publisher, err := amqpConnection.Publisher(context.Background(), addr, "getting-started-publisher")
@@ -81,17 +112,20 @@ func main() {
 		rabbitmq_amqp.Error("Error publishing message", err)
 		return
 	}
-	switch publishResult.Outcome {
-	case &amqp.StateAccepted{}:
+	switch publishResult.Outcome.(type) {
+	case *amqp.StateAccepted:
 		rabbitmq_amqp.Info("Message accepted")
-	case &amqp.StateReleased{}:
+		break
+	case *amqp.StateReleased:
 		rabbitmq_amqp.Warn("Message was not routed")
-	case &amqp.StateRejected{}:
+		break
+	case *amqp.StateRejected:
 		rabbitmq_amqp.Warn("Message rejected")
 		stateType := publishResult.Outcome.(*amqp.StateRejected)
 		if stateType.Error != nil {
 			rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
 		}
+		break
 	default:
 		// these status are not supported
 		rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
@@ -146,5 +180,5 @@ func main() {
 	// Wait for the status change to be printed
 	time.Sleep(500 * time.Millisecond)
 
-	close(stateChangeds)
+	close(stateChanged)
 }
