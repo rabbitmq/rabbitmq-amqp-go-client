@@ -15,13 +15,13 @@ func main() {
 
 	rabbitmq_amqp.Info("Getting started with AMQP Go AMQP 1.0 Client")
 
-	/// Create a channel to receive status change notifications
-	chStatusChanged := make(chan *rabbitmq_amqp.StatusChanged, 1)
-	go func(ch chan *rabbitmq_amqp.StatusChanged) {
+	/// Create a channel to receive state change notifications
+	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
+	go func(ch chan *rabbitmq_amqp.StateChanged) {
 		for statusChanged := range ch {
-			rabbitmq_amqp.Info("Status changed", statusChanged)
+			rabbitmq_amqp.Info("[Connection]", "Status changed", statusChanged)
 		}
-	}(chStatusChanged)
+	}(stateChanged)
 
 	// Open a connection to the AMQP 1.0 server
 	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, nil)
@@ -30,7 +30,7 @@ func main() {
 		return
 	}
 	// Register the channel to receive status change notifications
-	amqpConnection.NotifyStatusChange(chStatusChanged)
+	amqpConnection.NotifyStatusChange(stateChanged)
 
 	fmt.Printf("AMQP Connection opened.\n")
 	// Create the management interface for the connection
@@ -81,33 +81,20 @@ func main() {
 		rabbitmq_amqp.Error("Error publishing message", err)
 		return
 	}
-
-	// determine how the peer settled the message
-	switch publishResult.DeliveryState {
+	switch publishResult.Outcome {
 	case &amqp.StateAccepted{}:
-		// message was accepted, no further action is required
 		rabbitmq_amqp.Info("Message accepted")
-	case &amqp.StateModified{}:
-		// message must be modified and resent before it can be processed.
-		// the values in stateType provide further context.
-		rabbitmq_amqp.Info("Message modified")
-	case &amqp.StateReceived{}:
-		// see the fields in [StateReceived] for information on
-		// how to handle this delivery state.
-		rabbitmq_amqp.Info("Message received")
+	case &amqp.StateReleased{}:
+		rabbitmq_amqp.Warn("Message was not routed")
 	case &amqp.StateRejected{}:
 		rabbitmq_amqp.Warn("Message rejected")
-		// the peer rejected the message
-		stateType := publishResult.DeliveryState.(*amqp.StateRejected)
+		stateType := publishResult.Outcome.(*amqp.StateRejected)
 		if stateType.Error != nil {
-			// the error will provide information about why the
-			// message was rejected. note that the peer isn't required
-			// to provide an error.
 			rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
 		}
-	case &amqp.StateReleased{}:
-		// message was not routed
-		rabbitmq_amqp.Warn("Message was not routed")
+	default:
+		// these status are not supported
+		rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
 	}
 
 	println("press any key to close the connection")
@@ -159,5 +146,5 @@ func main() {
 	// Wait for the status change to be printed
 	time.Sleep(500 * time.Millisecond)
 
-	close(chStatusChanged)
+	close(stateChangeds)
 }

@@ -102,7 +102,7 @@ func (a *AmqpConnection) open(ctx context.Context, addr string, connOptions *amq
 		return err
 	}
 
-	a.lifeCycle.SetStatus(Open)
+	a.lifeCycle.SetState(&StateOpen{})
 	return nil
 }
 
@@ -112,20 +112,24 @@ func (a *AmqpConnection) Close(ctx context.Context) error {
 		return err
 	}
 	err = a.Connection.Close()
-	a.lifeCycle.SetStatus(Closed)
+	a.lifeCycle.SetState(&StateClosed{})
 	return err
 }
 
-func (a *AmqpConnection) NotifyStatusChange(channel chan *StatusChanged) {
+// NotifyStatusChange registers a channel to receive getState change notifications
+// from the connection.
+func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpConnection) Status() int {
-	return a.lifeCycle.Status()
+func (a *AmqpConnection) State() LifeCycleState {
+	return a.lifeCycle.State()
 }
 
 // *** management section ***
 
+// Management returns the management interface for the connection.
+// The management interface is used to declare and delete exchanges, queues, and bindings.
 func (a *AmqpConnection) Management() *AmqpManagement {
 	return a.management
 }

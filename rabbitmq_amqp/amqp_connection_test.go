@@ -57,7 +57,7 @@ var _ = Describe("AMQP Connection Test", func() {
 	})
 
 	It("AMQP Connection should receive events", func() {
-		ch := make(chan *StatusChanged, 1)
+		ch := make(chan *StateChanged, 1)
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		connection.NotifyStatusChange(ch)
@@ -66,8 +66,8 @@ var _ = Describe("AMQP Connection Test", func() {
 
 		recv := <-ch
 		Expect(recv).NotTo(BeNil())
-		Expect(recv.From).To(Equal(Open))
-		Expect(recv.To).To(Equal(Closed))
+		Expect(recv.From).To(Equal(&StateOpen{}))
+		Expect(recv.To).To(Equal(&StateClosed{}))
 	})
 
 	//It("AMQP TLS Connection should success with SASLTypeAnonymous ", func() {

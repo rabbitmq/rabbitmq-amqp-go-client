@@ -224,7 +224,7 @@ func publishMessages(queueName string, count int) {
 		publishResult, err := publisher.Publish(context.TODO(), amqp.NewMessage([]byte("Message #"+strconv.Itoa(i))))
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
-		Expect(publishResult.DeliveryState).To(Equal(&amqp.StateAccepted{}))
+		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
 	}
 	err = conn.Close(context.TODO())
 	Expect(err).To(BeNil())

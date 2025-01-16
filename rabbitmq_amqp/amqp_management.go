@@ -77,7 +77,7 @@ func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) e
 	// some channels or I/O or something elsewhere
 	time.Sleep(time.Millisecond * 10)
 
-	a.lifeCycle.SetStatus(Open)
+	a.lifeCycle.SetState(&StateOpen{})
 	return ctx.Err()
 }
 
@@ -85,7 +85,7 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	_ = a.sender.Close(ctx)
 	_ = a.receiver.Close(ctx)
 	err := a.session.Close(ctx)
-	a.lifeCycle.SetStatus(Closed)
+	a.lifeCycle.SetState(&StateClosed{})
 	return err
 }
 
@@ -241,10 +241,10 @@ func (a *AmqpManagement) PurgeQueue(ctx context.Context, queueName string) (int,
 	return purge.Purge(ctx)
 }
 
-func (a *AmqpManagement) NotifyStatusChange(channel chan *StatusChanged) {
+func (a *AmqpManagement) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpManagement) Status() int {
-	return a.lifeCycle.Status()
+func (a *AmqpManagement) State() LifeCycleState {
+	return a.lifeCycle.State()
 }
