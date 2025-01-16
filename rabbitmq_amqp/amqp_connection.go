@@ -23,6 +23,10 @@ type AmqpConnection struct {
 }
 
 func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (*Publisher, error) {
+	if !validateAddress(destinationAdd) {
+		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+	}
+
 	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err

@@ -3,7 +3,6 @@ package rabbitmq_amqp
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 )
 
@@ -77,16 +76,16 @@ func encodePathSegments(input string) string {
 	return encoded.String()
 }
 
-// Decode takes a percent-encoded string and returns its decoded representation.
-func decode(input string) (string, error) {
-	// Use url.QueryUnescape which properly decodes percent-encoded strings
-	decoded, err := url.QueryUnescape(input)
-	if err != nil {
-		return "", err
-	}
-
-	return decoded, nil
-}
+//// Decode takes a percent-encoded string and returns its decoded representation.
+//func decode(input string) (string, error) {
+//	// Use url.QueryUnescape which properly decodes percent-encoded strings
+//	decoded, err := url.QueryUnescape(input)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	return decoded, nil
+//}
 
 // isUnreserved checks if a character is an unreserved character in percent encoding
 // Unreserved characters are: A-Z, a-z, 0-9, -, ., _, ~
@@ -111,5 +110,8 @@ func bindingPathWithExchangeQueueKey(toQueue bool, sourceName, destinationName, 
 	}
 	format := "/%s/src=%s;%s=%s;key=%s;args="
 	return fmt.Sprintf(format, bindings, sourceNameEncoded, destinationType, destinationNameEncoded, keyEncoded)
+}
 
+func validateAddress(address string) bool {
+	return strings.HasPrefix(address, fmt.Sprintf("/%s/", exchanges)) || strings.HasPrefix(address, fmt.Sprintf("/%s/", queues))
 }

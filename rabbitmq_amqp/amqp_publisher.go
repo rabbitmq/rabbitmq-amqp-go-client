@@ -5,8 +5,9 @@ import (
 	"github.com/Azure/go-amqp"
 )
 
-type PublishOutcome struct {
+type PublishResult struct {
 	DeliveryState amqp.DeliveryState
+	Message       *amqp.Message
 }
 
 type Publisher struct {
@@ -17,18 +18,8 @@ func newPublisher(sender *amqp.Sender) *Publisher {
 	return &Publisher{sender: sender}
 }
 
-func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishOutcome, error) {
+func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
 
-	/// for the outcome of the message delivery, see https://github.com/Azure/go-amqp/issues/347
-	//RELEASED
-	///**
-	// * The broker could not route the message to any queue.
-	// *
-	// * <p>This is likely to be due to a topology misconfiguration.
-	// */
-	// so at the moment we don't have access on this information
-	// TODO: remove this comment when the issue is resolved
-	outcome := &PublishOutcome{}
 	r, err := m.sender.SendWithReceipt(ctx, message, nil)
 	if err != nil {
 		return nil, err
@@ -38,9 +29,11 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 		return nil, err
 	}
 
-	outcome.DeliveryState = state
-
-	return outcome, err
+	publishResult := &PublishResult{
+		Message:       message,
+		DeliveryState: state,
+	}
+	return publishResult, err
 }
 
 func (m *Publisher) Close(ctx context.Context) error {
