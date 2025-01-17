@@ -103,6 +103,7 @@ func (a *AmqpConnection) open(ctx context.Context, addr string, connOptions *amq
 	}
 	a.Connection = conn
 	a.session, err = a.Connection.NewSession(ctx, nil)
+
 	if err != nil {
 		return err
 	}

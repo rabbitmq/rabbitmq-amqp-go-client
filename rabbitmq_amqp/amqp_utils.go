@@ -42,13 +42,13 @@ func createSenderLinkOptions(address string, linkName string, deliveryMode int) 
 func createReceiverLinkOptions(address string, linkName string, deliveryMode int) *amqp.ReceiverOptions {
 	prop := make(map[string]any)
 	prop["paired"] = true
-	receiverSettleMode := amqp.ReceiverSettleModeFirst.Ptr()
+	receiverSettleMode := amqp.SenderSettleModeSettled.Ptr()
 	/// SndSettleMode = deliveryMode == DeliveryMode.AtMostOnce
 	//                    ? SenderSettleMode.Settled
 	//                    : SenderSettleMode.Unsettled,
 
 	if deliveryMode == AtLeastOnce {
-		receiverSettleMode = amqp.ReceiverSettleModeFirst.Ptr()
+		receiverSettleMode = amqp.SenderSettleModeUnsettled.Ptr()
 	}
 
 	return &amqp.ReceiverOptions{
@@ -56,8 +56,10 @@ func createReceiverLinkOptions(address string, linkName string, deliveryMode int
 		DynamicAddress:            false,
 		Name:                      linkName,
 		Properties:                prop,
-		SettlementMode:            receiverSettleMode,
-		RequestedSenderSettleMode: amqp.SenderSettleModeSettled.Ptr(),
+		Durability:                0,
+		ExpiryTimeout:             0,
+		SettlementMode:            amqp.ReceiverSettleModeFirst.Ptr(),
+		RequestedSenderSettleMode: receiverSettleMode,
 		ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
 		Credit:                    100,
 	}

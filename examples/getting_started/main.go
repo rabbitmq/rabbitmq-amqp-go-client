@@ -67,12 +67,7 @@ func main() {
 		return
 	}
 
-	addrQueue, err := rabbitmq_amqp.QueueAddress(&queueName)
-	if err != nil {
-		rabbitmq_amqp.Error("Error getting queue address", err)
-		return
-	}
-
+	addrQueue, _ := rabbitmq_amqp.QueueAddress(&queueName)
 	consumer, err := amqpConnection.Consumer(context.Background(), addrQueue, "getting-started-consumer")
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating consumer", err)
@@ -81,20 +76,18 @@ func main() {
 
 	// Consume messages from the queue
 	go func() {
-		msg, err := consumer.Receive(context.Background())
-		if err != nil {
-			rabbitmq_amqp.Error("Error receiving message", err)
-			return
-		}
-		rabbitmq_amqp.Info("[Receiver]", "Received message", fmt.Sprintf("%s", msg.Data))
-		err = consumer.RejectMessage(context.Background(), msg, &amqp.Error{
-			Condition:   "a",
-			Description: "d",
-			Info:        nil,
-		})
-		if err != nil {
-			rabbitmq_amqp.Error("Error accepting message", err)
-			return
+		for {
+			msg, err := consumer.Receive(context.Background())
+			if err != nil {
+				rabbitmq_amqp.Error("Error receiving message", err)
+				return
+			}
+			rabbitmq_amqp.Info("[Receiver]", "Received message", fmt.Sprintf("%s", msg.Data))
+			err = consumer.Accept(context.Background(), msg)
+			if err != nil {
+				rabbitmq_amqp.Error("Error accepting message", err)
+				return
+			}
 		}
 	}()
 
@@ -106,29 +99,32 @@ func main() {
 		return
 	}
 
-	// Publish a message to the exchange
-	publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
-	if err != nil {
-		rabbitmq_amqp.Error("Error publishing message", err)
-		return
-	}
-	switch publishResult.Outcome.(type) {
-	case *amqp.StateAccepted:
-		rabbitmq_amqp.Info("Message accepted")
-		break
-	case *amqp.StateReleased:
-		rabbitmq_amqp.Warn("Message was not routed")
-		break
-	case *amqp.StateRejected:
-		rabbitmq_amqp.Warn("Message rejected")
-		stateType := publishResult.Outcome.(*amqp.StateRejected)
-		if stateType.Error != nil {
-			rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
+	for i := 0; i < 100; i++ {
+
+		// Publish a message to the exchange
+		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
+		if err != nil {
+			rabbitmq_amqp.Error("Error publishing message", err)
+			return
 		}
-		break
-	default:
-		// these status are not supported
-		rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
+		switch publishResult.Outcome.(type) {
+		case *amqp.StateAccepted:
+			rabbitmq_amqp.Info("Message accepted")
+			break
+		case *amqp.StateReleased:
+			rabbitmq_amqp.Warn("Message was not routed")
+			break
+		case *amqp.StateRejected:
+			rabbitmq_amqp.Warn("Message rejected")
+			stateType := publishResult.Outcome.(*amqp.StateRejected)
+			if stateType.Error != nil {
+				rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
+			}
+			break
+		default:
+			// these status are not supported
+			rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
+		}
 	}
 
 	println("press any key to close the connection")
@@ -136,6 +132,12 @@ func main() {
 	var input string
 	_, _ = fmt.Scanln(&input)
 
+	// Close the consumer
+	//err = consumer.Close(context.Background())
+	//if err != nil {
+	//	rabbitmq_amqp.Error("Error closing consumer", err)
+	//	return
+	//}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
