@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
@@ -74,22 +75,31 @@ func main() {
 		return
 	}
 
+	consumerContext, cancel := context.WithCancel(context.Background())
+
 	// Consume messages from the queue
-	go func() {
+	go func(ctx context.Context) {
 		for {
-			msg, err := consumer.Receive(context.Background())
-			if err != nil {
-				rabbitmq_amqp.Error("Error receiving message", err)
+			deliveryContext, err := consumer.Receive(ctx)
+			if errors.Is(err, context.Canceled) {
+				rabbitmq_amqp.Info("[Receiver]", "consumer closed. Context", err)
 				return
 			}
-			rabbitmq_amqp.Info("[Receiver]", "Received message", fmt.Sprintf("%s", msg.Data))
-			err = consumer.Accept(context.Background(), msg)
+			if err != nil {
+				rabbitmq_amqp.Error("[Consumer]", "Error receiving message", err)
+				return
+			}
+
+			rabbitmq_amqp.Info("[Receiver]", "Received message",
+				fmt.Sprintf("%s", deliveryContext.Message().Data))
+
+			err = deliveryContext.Accept(context.Background())
 			if err != nil {
 				rabbitmq_amqp.Error("Error accepting message", err)
 				return
 			}
 		}
-	}()
+	}(consumerContext)
 
 	addr, err := rabbitmq_amqp.ExchangeAddress(&exchangeName, &routingKey)
 
@@ -132,12 +142,12 @@ func main() {
 	var input string
 	_, _ = fmt.Scanln(&input)
 
-	// Close the consumer
-	//err = consumer.Close(context.Background())
-	//if err != nil {
-	//	rabbitmq_amqp.Error("Error closing consumer", err)
-	//	return
-	//}
+	cancel()
+	//Close the consumer
+	err = consumer.Close(context.Background())
+	if err != nil {
+		rabbitmq_amqp.Error("[Consumer]", err)
+	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
