@@ -1,6 +1,7 @@
 package rabbitmq_amqp
 
 import (
+	"fmt"
 	"github.com/Azure/go-amqp"
 	"math/rand"
 	"time"
@@ -68,4 +69,25 @@ func createReceiverLinkOptions(address string, linkName string, deliveryMode int
 func random(max int) int {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	return r.Intn(max)
+}
+
+func validateMessageAnnotations(annotations amqp.Annotations) error {
+	for k, _ := range annotations {
+		switch tp := k.(type) {
+		case string:
+			if err := validateMessageAnnotationKey(tp); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("message annotation key must be a string: %v", k)
+		}
+	}
+	return nil
+}
+
+func validateMessageAnnotationKey(key string) error {
+	if key[:2] != "x-" {
+		return fmt.Errorf("message annotation key must start with 'x-': %s", key)
+	}
+	return nil
 }

@@ -22,7 +22,7 @@ func (dc *DeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
 	return dc.receiver.RejectMessage(ctx, dc.message, e)
 }
 
-func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations Annotations) error {
+func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
 	if err := validateMessageAnnotations(annotations); err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 	return dc.receiver.ReleaseMessage(ctx, dc.message)
 }
 
-func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations Annotations) error {
+func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
 	if err := validateMessageAnnotations(annotations); err != nil {
 		return err
 	}
