@@ -1,6 +1,7 @@
 package rabbitmq_amqp
 
 import (
+	"fmt"
 	"github.com/Azure/go-amqp"
 	"math/rand"
 	"time"
@@ -39,16 +40,27 @@ func createSenderLinkOptions(address string, linkName string, deliveryMode int) 
 // receiverLinkOptions returns the options for a receiver link
 // with the given address and link name.
 // That should be the same for all the links.
-func createReceiverLinkOptions(address string, linkName string) *amqp.ReceiverOptions {
+func createReceiverLinkOptions(address string, linkName string, deliveryMode int) *amqp.ReceiverOptions {
 	prop := make(map[string]any)
 	prop["paired"] = true
+	receiverSettleMode := amqp.SenderSettleModeSettled.Ptr()
+	/// SndSettleMode = deliveryMode == DeliveryMode.AtMostOnce
+	//                    ? SenderSettleMode.Settled
+	//                    : SenderSettleMode.Unsettled,
+
+	if deliveryMode == AtLeastOnce {
+		receiverSettleMode = amqp.SenderSettleModeUnsettled.Ptr()
+	}
+
 	return &amqp.ReceiverOptions{
 		TargetAddress:             address,
 		DynamicAddress:            false,
 		Name:                      linkName,
 		Properties:                prop,
-		RequestedSenderSettleMode: amqp.SenderSettleModeSettled.Ptr(),
+		Durability:                0,
+		ExpiryTimeout:             0,
 		SettlementMode:            amqp.ReceiverSettleModeFirst.Ptr(),
+		RequestedSenderSettleMode: receiverSettleMode,
 		ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
 		Credit:                    100,
 	}
@@ -57,4 +69,25 @@ func createReceiverLinkOptions(address string, linkName string) *amqp.ReceiverOp
 func random(max int) int {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	return r.Intn(max)
+}
+
+func validateMessageAnnotations(annotations amqp.Annotations) error {
+	for k, _ := range annotations {
+		switch tp := k.(type) {
+		case string:
+			if err := validateMessageAnnotationKey(tp); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("message annotation key must be a string: %v", k)
+		}
+	}
+	return nil
+}
+
+func validateMessageAnnotationKey(key string) error {
+	if key[:2] != "x-" {
+		return fmt.Errorf("message annotation key must start with 'x-': %s", key)
+	}
+	return nil
 }

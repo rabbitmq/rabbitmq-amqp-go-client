@@ -27,7 +27,6 @@ func newPublisher(sender *amqp.Sender) *Publisher {
 // - StateRejected
 // See: https://www.rabbitmq.com/docs/next/amqp#outcomes for more information.
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
-
 	r, err := m.sender.SendWithReceipt(ctx, message, nil)
 	if err != nil {
 		return nil, err
@@ -36,7 +35,6 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 	if err != nil {
 		return nil, err
 	}
-
 	publishResult := &PublishResult{
 		Message: message,
 		Outcome: state,

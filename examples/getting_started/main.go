@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
@@ -67,34 +68,77 @@ func main() {
 		return
 	}
 
-	addr, err := rabbitmq_amqp.ExchangeAddress(&exchangeName, &routingKey)
+	// Create a consumer to receive messages from the queue
+	// you need to build the address of the queue, but you can use the helper function
+	addrQueue, _ := rabbitmq_amqp.QueueAddress(&queueName)
+	consumer, err := amqpConnection.Consumer(context.Background(), addrQueue, "getting-started-consumer")
+	if err != nil {
+		rabbitmq_amqp.Error("Error creating consumer", err)
+		return
+	}
 
+	consumerContext, cancel := context.WithCancel(context.Background())
+
+	// Consume messages from the queue
+	go func(ctx context.Context) {
+		for {
+			deliveryContext, err := consumer.Receive(ctx)
+			if errors.Is(err, context.Canceled) {
+				// The consumer was closed correctly
+				rabbitmq_amqp.Info("[Consumer]", "consumer closed. Context", err)
+				return
+			}
+			if err != nil {
+				// An error occurred receiving the message
+				rabbitmq_amqp.Error("[Consumer]", "Error receiving message", err)
+				return
+			}
+
+			rabbitmq_amqp.Info("[Consumer]", "Received message",
+				fmt.Sprintf("%s", deliveryContext.Message().Data))
+
+			err = deliveryContext.Accept(context.Background())
+			if err != nil {
+				rabbitmq_amqp.Error("Error accepting message", err)
+				return
+			}
+		}
+	}(consumerContext)
+
+	addr, _ := rabbitmq_amqp.ExchangeAddress(&exchangeName, &routingKey)
 	publisher, err := amqpConnection.Publisher(context.Background(), addr, "getting-started-publisher")
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating publisher", err)
 		return
 	}
 
-	// Publish a message to the exchange
-	publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
-	if err != nil {
-		rabbitmq_amqp.Error("Error publishing message", err)
-		return
-	}
-	switch publishResult.Outcome {
-	case &amqp.StateAccepted{}:
-		rabbitmq_amqp.Info("Message accepted")
-	case &amqp.StateReleased{}:
-		rabbitmq_amqp.Warn("Message was not routed")
-	case &amqp.StateRejected{}:
-		rabbitmq_amqp.Warn("Message rejected")
-		stateType := publishResult.Outcome.(*amqp.StateRejected)
-		if stateType.Error != nil {
-			rabbitmq_amqp.Warn("Message rejected with error: %v", stateType.Error)
+	for i := 0; i < 10; i++ {
+
+		// Publish a message to the exchange
+		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
+		if err != nil {
+			rabbitmq_amqp.Error("Error publishing message", err)
+			return
 		}
-	default:
-		// these status are not supported
-		rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
+		switch publishResult.Outcome.(type) {
+		case *amqp.StateAccepted:
+			rabbitmq_amqp.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
+			break
+		case *amqp.StateReleased:
+			rabbitmq_amqp.Warn("[Publisher]", "Message was not routed", publishResult.Message.Data[0])
+			break
+		case *amqp.StateRejected:
+			rabbitmq_amqp.Warn("[Publisher]", "Message rejected", publishResult.Message.Data[0])
+			stateType := publishResult.Outcome.(*amqp.StateRejected)
+			if stateType.Error != nil {
+				rabbitmq_amqp.Warn("[Publisher]", "Message rejected with error: %v", stateType.Error)
+			}
+			break
+		default:
+			// these status are not supported. Leave it for AMQP 1.0 compatibility
+			// see: https://www.rabbitmq.com/docs/next/amqp#outcomes
+			rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
+		}
 	}
 
 	println("press any key to close the connection")
@@ -102,13 +146,19 @@ func main() {
 	var input string
 	_, _ = fmt.Scanln(&input)
 
+	cancel()
+	//Close the consumer
+	err = consumer.Close(context.Background())
+	if err != nil {
+		rabbitmq_amqp.Error("[Consumer]", err)
+	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
 		return
 	}
-	// Unbind the queue from the exchange
 
+	// Unbind the queue from the exchange
 	err = management.Unbind(context.TODO(), bindingPath)
 
 	if err != nil {
@@ -143,8 +193,7 @@ func main() {
 	}
 
 	fmt.Printf("AMQP Connection closed.\n")
-	// Wait for the status change to be printed
-	time.Sleep(500 * time.Millisecond)
-
-	close(stateChangeds)
+	// not necessary. It waits for the status change to be printed
+	time.Sleep(100 * time.Millisecond)
+	close(stateChanged)
 }
