@@ -22,7 +22,7 @@ type AmqpConnection struct {
 	session    *amqp.Session
 }
 
-func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (*Publisher, error) {
+func (a *AmqpConnection) NewTargetPublisher(ctx context.Context, destinationAdd string, linkName string) (*TargetPublisher, error) {
 	if !validateAddress(destinationAdd) {
 		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 	}
@@ -30,10 +30,18 @@ func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, l
 	if err != nil {
 		return nil, err
 	}
-	return newPublisher(sender), nil
+	return newTargetPublisher(sender), nil
 }
 
-func (a *AmqpConnection) Consumer(ctx context.Context, destinationAdd string, linkName string) (*Consumer, error) {
+func (a *AmqpConnection) NewTargetsPublisher(ctx context.Context, linkName string) (*TargetsPublisher, error) {
+	sender, err := a.session.NewSender(ctx, "", createSenderLinkOptions("", linkName, AtLeastOnce))
+	if err != nil {
+		return nil, err
+	}
+	return newTargetsPublisher(sender), nil
+}
+
+func (a *AmqpConnection) NewConsumer(ctx context.Context, destinationAdd string, linkName string) (*Consumer, error) {
 	if !validateAddress(destinationAdd) {
 		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 	}

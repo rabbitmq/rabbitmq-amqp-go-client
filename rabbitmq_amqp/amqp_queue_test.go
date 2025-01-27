@@ -216,7 +216,7 @@ func publishMessages(queueName string, count int) {
 	address, err := QueueAddress(&queueName)
 	Expect(err).To(BeNil())
 
-	publisher, err := conn.Publisher(context.TODO(), address, "test")
+	publisher, err := conn.NewTargetPublisher(context.TODO(), address, "test")
 	Expect(err).To(BeNil())
 	Expect(publisher).NotTo(BeNil())
 
