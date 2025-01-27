@@ -111,13 +111,27 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Close(context.Background()))
 	})
 
-	/// Targets Publisher
-	It("Targets Publisher should fail with StateReleased when the destination does not exist", func() {
+	/// Multi Targets Publisher
+	It("Multi Targets Publisher should fail when the address is not valid", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
+		publisher, err := connection.NewMultiTargetsPublisher(context.Background(), "test")
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewTargetsPublisher(context.Background(), "test")
+		Expect(publisher).NotTo(BeNil())
+		destinationAddress := "this is not valid since does not start with exchanges or queues"
+		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), destinationAddress)
+		Expect(err).NotTo(BeNil())
+		Expect(publishResult).To(BeNil())
+		Expect(err.Error()).To(ContainSubstring("invalid destination address"))
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+	It("Multi Targets Publisher should fail with StateReleased when the destination does not exist", func() {
+		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+		publisher, err := connection.NewMultiTargetsPublisher(context.Background(), "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		qName := generateNameWithDateTime("Targets Publisher should fail when the destination does not exist")
@@ -129,12 +143,12 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("Targets Publisher should success with StateReceived when the destination exists", func() {
+	It("Multi Targets Publisher should success with StateReceived when the destination exists", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewTargetsPublisher(context.Background(), "test")
+		publisher, err := connection.NewMultiTargetsPublisher(context.Background(), "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		name := generateNameWithDateTime("Targets Publisher should success with StateReceived when the destination exists")

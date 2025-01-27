@@ -33,7 +33,7 @@ func (a *AmqpConnection) NewTargetPublisher(ctx context.Context, destinationAdd 
 	return newTargetPublisher(sender), nil
 }
 
-func (a *AmqpConnection) NewTargetsPublisher(ctx context.Context, linkName string) (*TargetsPublisher, error) {
+func (a *AmqpConnection) NewMultiTargetsPublisher(ctx context.Context, linkName string) (*TargetsPublisher, error) {
 	sender, err := a.session.NewSender(ctx, "", createSenderLinkOptions("", linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
