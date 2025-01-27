@@ -85,16 +85,16 @@ func main() {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
-				rabbitmq_amqp.Info("[NewConsumer]", "consumer closed. Context", err)
+				rabbitmq_amqp.Info("[Consumer]", "consumer closed. Context", err)
 				return
 			}
 			if err != nil {
 				// An error occurred receiving the message
-				rabbitmq_amqp.Error("[NewConsumer]", "Error receiving message", err)
+				rabbitmq_amqp.Error("[Consumer]", "Error receiving message", err)
 				return
 			}
 
-			rabbitmq_amqp.Info("[NewConsumer]", "Received message",
+			rabbitmq_amqp.Info("[Consumer]", "Received message",
 				fmt.Sprintf("%s", deliveryContext.Message().Data))
 
 			err = deliveryContext.Accept(context.Background())
@@ -122,16 +122,16 @@ func main() {
 		}
 		switch publishResult.Outcome.(type) {
 		case *amqp.StateAccepted:
-			rabbitmq_amqp.Info("[NewTargetPublisher]", "Message accepted", publishResult.Message.Data[0])
+			rabbitmq_amqp.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
 			break
 		case *amqp.StateReleased:
-			rabbitmq_amqp.Warn("[NewTargetPublisher]", "Message was not routed", publishResult.Message.Data[0])
+			rabbitmq_amqp.Warn("[Publisher]", "Message was not routed", publishResult.Message.Data[0])
 			break
 		case *amqp.StateRejected:
-			rabbitmq_amqp.Warn("[NewTargetPublisher]", "Message rejected", publishResult.Message.Data[0])
+			rabbitmq_amqp.Warn("[Publisher]", "Message rejected", publishResult.Message.Data[0])
 			stateType := publishResult.Outcome.(*amqp.StateRejected)
 			if stateType.Error != nil {
-				rabbitmq_amqp.Warn("[NewTargetPublisher]", "Message rejected with error: %v", stateType.Error)
+				rabbitmq_amqp.Warn("[Publisher]", "Message rejected with error: %v", stateType.Error)
 			}
 			break
 		default:
@@ -150,11 +150,13 @@ func main() {
 	//Close the consumer
 	err = consumer.Close(context.Background())
 	if err != nil {
-		rabbitmq_amqp.Error("[NewConsumer]", err)
+		rabbitmq_amqp.Error("[Consumer]", err)
+		return
 	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
+		rabbitmq_amqp.Error("[Publisher]", err)
 		return
 	}
 
