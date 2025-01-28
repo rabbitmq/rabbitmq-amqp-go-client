@@ -23,7 +23,7 @@ var _ = Describe("AMQP Exchange test ", func() {
 
 	It("AMQP Exchange Declare with Default and Delete should succeed", func() {
 		const exchangeName = "AMQP Exchange Declare and Delete with Default should succeed"
-		exchangeInfo, err := management.DeclareExchange(context.TODO(), &ExchangeSpecification{
+		exchangeInfo, err := management.DeclareExchange(context.TODO(), &DirectExchangeSpecification{
 			Name: exchangeName,
 		})
 		Expect(err).To(BeNil())
@@ -35,9 +35,8 @@ var _ = Describe("AMQP Exchange test ", func() {
 
 	It("AMQP Exchange Declare with Topic and Delete should succeed", func() {
 		const exchangeName = "AMQP Exchange Declare with Topic and Delete should succeed"
-		exchangeInfo, err := management.DeclareExchange(context.TODO(), &ExchangeSpecification{
-			Name:         exchangeName,
-			ExchangeType: ExchangeType{Topic},
+		exchangeInfo, err := management.DeclareExchange(context.TODO(), &TopicExchangeSpecification{
+			Name: exchangeName,
 		})
 		Expect(err).To(BeNil())
 		Expect(exchangeInfo).NotTo(BeNil())
@@ -49,9 +48,8 @@ var _ = Describe("AMQP Exchange test ", func() {
 	It("AMQP Exchange Declare with FanOut and Delete should succeed", func() {
 		const exchangeName = "AMQP Exchange Declare with FanOut and Delete should succeed"
 		//exchangeSpec := management.Exchange(exchangeName).ExchangeType(ExchangeType{FanOut})
-		exchangeInfo, err := management.DeclareExchange(context.TODO(), &ExchangeSpecification{
-			Name:         exchangeName,
-			ExchangeType: ExchangeType{FanOut},
+		exchangeInfo, err := management.DeclareExchange(context.TODO(), &FanOutExchangeSpecification{
+			Name: exchangeName,
 		})
 		Expect(err).To(BeNil())
 		Expect(exchangeInfo).NotTo(BeNil())

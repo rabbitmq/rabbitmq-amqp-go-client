@@ -37,7 +37,7 @@ func main() {
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
-	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.ExchangeSpecification{
+	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.TopicExchangeSpecification{
 		Name: exchangeName,
 	})
 	if err != nil {
@@ -46,9 +46,8 @@ func main() {
 	}
 
 	// Declare a Quorum queue
-	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QueueSpecification{
-		Name:      queueName,
-		QueueType: rabbitmq_amqp.QueueType{Type: rabbitmq_amqp.Quorum},
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QuorumQueueSpecification{
+		Name: queueName,
 	})
 
 	if err != nil {

@@ -29,17 +29,15 @@ func main() {
 		return
 	}
 
-	_, err = connection.Management().DeclareQueue(context.Background(), &rabbitmq_amqp.QueueSpecification{
-		Name:      queueName1,
-		QueueType: rabbitmq_amqp.QueueType{Type: rabbitmq_amqp.Quorum},
+	_, err = connection.Management().DeclareQueue(context.Background(), &rabbitmq_amqp.QuorumQueueSpecification{
+		Name: queueName1,
 	})
 	if err != nil {
 		return
 	}
 
-	_, err = connection.Management().DeclareQueue(context.Background(), &rabbitmq_amqp.QueueSpecification{
-		Name:      queueName2,
-		QueueType: rabbitmq_amqp.QueueType{Type: rabbitmq_amqp.Classic},
+	_, err = connection.Management().DeclareQueue(context.Background(), &rabbitmq_amqp.QuorumQueueSpecification{
+		Name: queueName2,
 	})
 
 	if err != nil {

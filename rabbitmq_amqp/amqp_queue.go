@@ -70,35 +70,14 @@ type AmqpQueue struct {
 	name         string
 }
 
-func (a *AmqpQueue) DeadLetterExchange(dlx string) {
-	if len(dlx) != 0 {
-		a.arguments["x-dead-letter-exchange"] = dlx
-	}
-}
-
-func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) {
-	if len(dlrk) != 0 {
-		a.arguments["x-dead-letter-routing-key"] = dlrk
-	}
-}
-
-func (a *AmqpQueue) MaxLengthBytes(length int64) {
-	if length != 0 {
-		a.arguments["max-length-bytes"] = length
-	}
+func (a *AmqpQueue) SetArguments(arguments map[string]any) {
+	a.arguments = arguments
 }
 
 func (a *AmqpQueue) QueueType(queueType QueueType) {
 	if len(queueType.String()) != 0 {
 		a.arguments["x-queue-type"] = queueType.String()
 	}
-}
-
-func (a *AmqpQueue) GetQueueType() TQueueType {
-	if a.arguments["x-queue-type"] == nil {
-		return Classic
-	}
-	return TQueueType(a.arguments["x-queue-type"].(string))
 }
 
 func (a *AmqpQueue) Exclusive(isExclusive bool) {
@@ -134,12 +113,6 @@ func (a *AmqpQueue) validate() error {
 }
 
 func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
-	if Quorum == a.GetQueueType() ||
-		Stream == a.GetQueueType() {
-		// mandatory arguments for quorum queues and streams
-		a.Exclusive(false)
-		a.AutoDelete(false)
-	}
 
 	if err := a.validate(); err != nil {
 		return nil, err

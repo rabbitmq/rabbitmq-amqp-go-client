@@ -170,21 +170,19 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
-func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (*AmqpQueueInfo, error) {
+func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification QueueSpecification) (*AmqpQueueInfo, error) {
 	var amqpQueue *AmqpQueue
 
-	if specification == nil || len(specification.Name) <= 0 {
+	if specification == nil || len(specification.name()) <= 0 {
 		// If the specification is nil or the name is empty, then we create a new queue
 		// with a random name with generateNameWithDefaultPrefix()
 		amqpQueue = newAmqpQueue(a, "")
 	} else {
-		amqpQueue = newAmqpQueue(a, specification.Name)
-		amqpQueue.AutoDelete(specification.IsAutoDelete)
-		amqpQueue.Exclusive(specification.IsExclusive)
-		amqpQueue.MaxLengthBytes(specification.MaxLengthBytes)
-		amqpQueue.DeadLetterExchange(specification.DeadLetterExchange)
-		amqpQueue.DeadLetterRoutingKey(specification.DeadLetterRoutingKey)
-		amqpQueue.QueueType(specification.QueueType)
+		amqpQueue = newAmqpQueue(a, specification.name())
+		amqpQueue.AutoDelete(specification.isAutoDelete())
+		amqpQueue.Exclusive(specification.isExclusive())
+		amqpQueue.QueueType(specification.queueType())
+		amqpQueue.SetArguments(specification.buildArguments())
 	}
 
 	return amqpQueue.Declare(ctx)
@@ -195,14 +193,14 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	return q.Delete(ctx)
 }
 
-func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (*AmqpExchangeInfo, error) {
+func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification ExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
 		return nil, fmt.Errorf("exchangeSpecification is nil")
 	}
 
-	exchange := newAmqpExchange(a, exchangeSpecification.Name)
-	exchange.AutoDelete(exchangeSpecification.IsAutoDelete)
-	exchange.ExchangeType(exchangeSpecification.ExchangeType)
+	exchange := newAmqpExchange(a, exchangeSpecification.name())
+	exchange.AutoDelete(exchangeSpecification.isAutoDelete())
+	exchange.ExchangeType(exchangeSpecification.exchangeType())
 	return exchange.Declare(ctx)
 }
 

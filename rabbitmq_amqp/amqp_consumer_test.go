@@ -16,11 +16,8 @@ var _ = Describe("NewConsumer tests", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
@@ -40,11 +37,8 @@ var _ = Describe("NewConsumer tests", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should ack and empty the queue")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
@@ -72,11 +66,8 @@ var _ = Describe("NewConsumer tests", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should requeue the message to the queue")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
@@ -102,11 +93,8 @@ var _ = Describe("NewConsumer tests", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should requeue the message to the queue with annotations")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
@@ -140,11 +128,8 @@ var _ = Describe("NewConsumer tests", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should discard the message to the queue with and without annotations")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())

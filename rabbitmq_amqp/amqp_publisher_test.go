@@ -13,7 +13,7 @@ var _ = Describe("AMQP publisher ", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
-		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: qName,
 		})
 		Expect(err).To(BeNil())
@@ -51,10 +51,9 @@ var _ = Describe("AMQP publisher ", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
-		exchange, err := connection.Management().DeclareExchange(context.Background(), &ExchangeSpecification{
+		exchange, err := connection.Management().DeclareExchange(context.Background(), &TopicExchangeSpecification{
 			Name:         eName,
 			IsAutoDelete: false,
-			ExchangeType: ExchangeType{Type: Topic},
 		})
 		Expect(err).To(BeNil())
 		Expect(exchange).NotTo(BeNil())
@@ -79,7 +78,7 @@ var _ = Describe("AMQP publisher ", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
-		_, err = connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: qName,
 		})
 		Expect(err).To(BeNil())
@@ -120,9 +119,8 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		name := generateNameWithDateTime("Targets Publisher should success with StateReceived when the destination exists")
-		_, err = connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:      name,
-			QueueType: QueueType{Quorum},
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: name,
 		})
 		Expect(err).To(BeNil())
 		// as first message is sent to a queue, the outcome should be StateReceived
@@ -132,10 +130,9 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
 
-		_, err = connection.Management().DeclareExchange(context.Background(), &ExchangeSpecification{
+		_, err = connection.Management().DeclareExchange(context.Background(), &TopicExchangeSpecification{
 			Name:         name,
 			IsAutoDelete: false,
-			ExchangeType: ExchangeType{Type: Topic},
 		})
 
 		// the status should be StateReleased since the exchange does not have any binding
