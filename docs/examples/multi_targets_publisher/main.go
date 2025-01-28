@@ -51,17 +51,19 @@ func main() {
 	if err != nil {
 		return
 	}
-	t1, _ := rabbitmq_amqp.QueueAddress(&queueName1)
-	t2, _ := rabbitmq_amqp.QueueAddress(&queueName2)
 
-	publishResult, err := mtPublisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), t1)
+	publishResult, err := mtPublisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), &rabbitmq_amqp.QueueAddress{
+		Queue: queueName1,
+	})
 	if err != nil {
 		return
 	}
 
 	validateOutcome(publishResult.Outcome)
 
-	publishResult, err = mtPublisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), t2)
+	publishResult, err = mtPublisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), &rabbitmq_amqp.QueueAddress{
+		Queue: queueName2,
+	})
 	if err != nil {
 		return
 	}

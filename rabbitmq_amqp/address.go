@@ -6,13 +6,16 @@ import (
 	"strings"
 )
 
+// TargetAddress is an interface that represents an address that can be used to send messages to.
+// It can be either a Queue or an Exchange with a routing key.
 type TargetAddress interface {
 	toAddress() (string, error)
 }
 
+// QueueAddress represents the address of a queue.
 type QueueAddress struct {
-	Queue      string
-	Parameters string
+	Queue      string // The name of the queue
+	Parameters string // Additional parameters not related to the queue. Most of the time it is empty
 }
 
 func (qas *QueueAddress) toAddress() (string, error) {
@@ -23,9 +26,10 @@ func (qas *QueueAddress) toAddress() (string, error) {
 	return queueAddress(q)
 }
 
+// ExchangeAddress represents the address of an exchange with a routing key.
 type ExchangeAddress struct {
-	Exchange string
-	Key      string
+	Exchange string // The name of the exchange
+	Key      string // The routing key. Can be empty
 }
 
 func (eas *ExchangeAddress) toAddress() (string, error) {
@@ -40,9 +44,9 @@ func (eas *ExchangeAddress) toAddress() (string, error) {
 	return exchangeAddress(ex, k)
 }
 
-// Address Creates the address for the exchange or queue following the RabbitMQ conventions.
+// address Creates the address for the exchange or queue following the RabbitMQ conventions.
 // see: https://www.rabbitmq.com/docs/next/amqp#address-v2
-func Address(exchange, key, queue *string, urlParameters *string) (string, error) {
+func address(exchange, key, queue *string, urlParameters *string) (string, error) {
 	if exchange == nil && queue == nil {
 		return "", errors.New("exchange or queue must be set")
 	}
@@ -74,22 +78,22 @@ func Address(exchange, key, queue *string, urlParameters *string) (string, error
 }
 
 // exchangeAddress Creates the address for the exchange
-// See Address for more information
+// See address for more information
 func exchangeAddress(exchange, key *string) (string, error) {
-	return Address(exchange, key, nil, nil)
+	return address(exchange, key, nil, nil)
 }
 
 // queueAddress Creates the address for the queue.
-// See Address for more information
+// See address for more information
 func queueAddress(queue *string) (string, error) {
-	return Address(nil, nil, queue, nil)
+	return address(nil, nil, queue, nil)
 }
 
 // PurgeQueueAddress Creates the address for purging the queue.
-// See Address for more information
+// See address for more information
 func purgeQueueAddress(queue *string) (string, error) {
 	parameter := "/messages"
-	return Address(nil, nil, queue, &parameter)
+	return address(nil, nil, queue, &parameter)
 }
 
 // encodePathSegments takes a string and returns its percent-encoded representation.

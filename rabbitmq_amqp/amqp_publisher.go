@@ -67,7 +67,12 @@ func newTargetsPublisher(sender *amqp.Sender) *TargetsPublisher {
 // - StateReleased
 // - StateRejected
 // See: https://www.rabbitmq.com/docs/next/amqp#outcomes for more information.
-func (m *TargetsPublisher) Publish(ctx context.Context, message *amqp.Message, destinationAdd string) (*PublishResult, error) {
+func (m *TargetsPublisher) Publish(ctx context.Context, message *amqp.Message, destination TargetAddress) (*PublishResult, error) {
+	destinationAdd, err := destination.toAddress()
+	if err != nil {
+		return nil, err
+	}
+
 	if !validateAddress(destinationAdd) {
 		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 	}

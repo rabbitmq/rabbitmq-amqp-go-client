@@ -149,7 +149,7 @@ func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
 		a.name = generateNameWithDefaultPrefix()
 	}
 
-	path, err := QueueAddress(&a.name)
+	path, err := queueAddress(&a.name)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
 }
 
 func (a *AmqpQueue) Delete(ctx context.Context) error {
-	path, err := QueueAddress(&a.name)
+	path, err := queueAddress(&a.name)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (a *AmqpQueue) Delete(ctx context.Context) error {
 }
 
 func (a *AmqpQueue) Purge(ctx context.Context) (int, error) {
-	path, err := PurgeQueueAddress(&a.name)
+	path, err := purgeQueueAddress(&a.name)
 	if err != nil {
 		return 0, err
 	}

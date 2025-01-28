@@ -15,7 +15,7 @@ var _ = Describe("NewConsumer tests", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should fail due to context cancellation")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		addr, _ := QueueAddress(&qName)
+
 		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
 			Name:         qName,
 			IsAutoDelete: false,
@@ -27,7 +27,9 @@ var _ = Describe("NewConsumer tests", func() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Millisecond)
 		cancel()
-		_, err = connection.NewConsumer(ctx, addr, "test")
+		_, err = connection.NewConsumer(ctx, &QueueAddress{
+			Queue: qName,
+		}, "test")
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("context canceled"))
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
@@ -47,8 +49,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 10)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.NewConsumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -80,8 +81,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 1)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.NewConsumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -111,8 +111,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 1)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.NewConsumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -150,8 +149,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 2)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.NewConsumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))

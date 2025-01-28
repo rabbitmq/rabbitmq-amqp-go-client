@@ -22,10 +22,18 @@ type AmqpConnection struct {
 	session    *amqp.Session
 }
 
-func (a *AmqpConnection) NewTargetPublisher(ctx context.Context, destinationAdd string, linkName string) (*TargetPublisher, error) {
+// NewTargetPublisher creates a new TargetPublisher that sends messages to the provided destination.
+// The destination is a TargetAddress that can be a Queue or an Exchange with a routing key.
+// See QueueAddress and ExchangeAddress for more information.
+func (a *AmqpConnection) NewTargetPublisher(ctx context.Context, destination TargetAddress, linkName string) (*TargetPublisher, error) {
+	destinationAdd, err := destination.toAddress()
+	if err != nil {
+		return nil, err
+	}
 	if !validateAddress(destinationAdd) {
 		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 	}
+
 	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
@@ -33,6 +41,7 @@ func (a *AmqpConnection) NewTargetPublisher(ctx context.Context, destinationAdd 
 	return newTargetPublisher(sender), nil
 }
 
+// NewMultiTargetsPublisher creates a new TargetsPublisher that sends messages to multiple destinations.
 func (a *AmqpConnection) NewMultiTargetsPublisher(ctx context.Context, linkName string) (*TargetsPublisher, error) {
 	sender, err := a.session.NewSender(ctx, "", createSenderLinkOptions("", linkName, AtLeastOnce))
 	if err != nil {
@@ -41,7 +50,12 @@ func (a *AmqpConnection) NewMultiTargetsPublisher(ctx context.Context, linkName 
 	return newTargetsPublisher(sender), nil
 }
 
-func (a *AmqpConnection) NewConsumer(ctx context.Context, destinationAdd string, linkName string) (*Consumer, error) {
+// NewConsumer creates a new Consumer that listens to the provided destination. Destination is a QueueAddress.
+func (a *AmqpConnection) NewConsumer(ctx context.Context, destination *QueueAddress, linkName string) (*Consumer, error) {
+	destinationAdd, err := destination.toAddress()
+	if err != nil {
+		return nil, err
+	}
 	if !validateAddress(destinationAdd) {
 		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 	}
