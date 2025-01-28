@@ -6,6 +6,40 @@ import (
 	"strings"
 )
 
+type TargetAddress interface {
+	toAddress() (string, error)
+}
+
+type QueueAddress struct {
+	Queue      string
+	Parameters string
+}
+
+func (qas *QueueAddress) toAddress() (string, error) {
+	q := &qas.Queue
+	if isStringNilOrEmpty(&qas.Queue) {
+		q = nil
+	}
+	return queueAddress(q)
+}
+
+type ExchangeAddress struct {
+	Exchange string
+	Key      string
+}
+
+func (eas *ExchangeAddress) toAddress() (string, error) {
+	ex := &eas.Exchange
+	if isStringNilOrEmpty(&eas.Exchange) {
+		ex = nil
+	}
+	k := &eas.Key
+	if isStringNilOrEmpty(&eas.Key) {
+		k = nil
+	}
+	return exchangeAddress(ex, k)
+}
+
 // Address Creates the address for the exchange or queue following the RabbitMQ conventions.
 // see: https://www.rabbitmq.com/docs/next/amqp#address-v2
 func Address(exchange, key, queue *string, urlParameters *string) (string, error) {
@@ -39,21 +73,21 @@ func Address(exchange, key, queue *string, urlParameters *string) (string, error
 	return "/" + queues + "/" + encodePathSegments(*queue) + urlAppend, nil
 }
 
-// ExchangeAddress Creates the address for the exchange
+// exchangeAddress Creates the address for the exchange
 // See Address for more information
-func ExchangeAddress(exchange, key *string) (string, error) {
+func exchangeAddress(exchange, key *string) (string, error) {
 	return Address(exchange, key, nil, nil)
 }
 
-// QueueAddress Creates the address for the queue.
+// queueAddress Creates the address for the queue.
 // See Address for more information
-func QueueAddress(queue *string) (string, error) {
+func queueAddress(queue *string) (string, error) {
 	return Address(nil, nil, queue, nil)
 }
 
 // PurgeQueueAddress Creates the address for purging the queue.
 // See Address for more information
-func PurgeQueueAddress(queue *string) (string, error) {
+func purgeQueueAddress(queue *string) (string, error) {
 	parameter := "/messages"
 	return Address(nil, nil, queue, &parameter)
 }

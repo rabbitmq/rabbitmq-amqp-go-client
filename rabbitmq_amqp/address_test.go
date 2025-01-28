@@ -56,7 +56,7 @@ var _ = Describe("Address builder test ", func() {
 
 	It("With queue and urlParameters should return address", func() {
 		queue := "my_queue"
-		address, err := PurgeQueueAddress(&queue)
+		address, err := purgeQueueAddress(&queue)
 		Expect(err).To(BeNil())
 		Expect(address).To(Equal("/queues/my_queue/messages"))
 	})
