@@ -50,11 +50,18 @@ var _ = Describe("AMQP Queue test ", func() {
 
 		queueInfo, err := management.DeclareQueue(context.TODO(), &ClassicQueueSpecification{
 			Name:                 queueName,
-			MaxLengthBytes:       CapacityGB(1),
-			DeadLetterExchange:   "dead-letter-exchange",
-			DeadLetterRoutingKey: "dead-letter-routing-key",
 			IsAutoDelete:         true,
 			IsExclusive:          true,
+			AutoExpire:           1000,
+			MessageTTL:           1000,
+			OverflowStrategy:     &DropHeadOverflowStrategy{},
+			SingleActiveConsumer: true,
+			DeadLetterExchange:   "dead-letter-exchange",
+			DeadLetterRoutingKey: "dead-letter-routing-key",
+			MaxLength:            9_000,
+			MaxLengthBytes:       CapacityGB(1),
+			MaxPriority:          2,
+			LeaderLocator:        &BalancedLeaderLocator{},
 		})
 
 		Expect(err).To(BeNil())
@@ -70,6 +77,12 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-dead-letter-exchange", "dead-letter-exchange"))
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-dead-letter-routing-key", "dead-letter-routing-key"))
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-length-bytes", int64(1000000000)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-length", int64(9000)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-message-ttl", int64(1000)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-single-active-consumer", true))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-overflow", "drop-head"))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-expires", int64(1000)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-priority", int64(2)))
 
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)

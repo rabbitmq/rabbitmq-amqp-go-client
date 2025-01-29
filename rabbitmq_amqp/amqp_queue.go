@@ -104,12 +104,26 @@ func newAmqpQueue(management *AmqpManagement, queueName string) *AmqpQueue {
 }
 
 func (a *AmqpQueue) validate() error {
-	if a.arguments["max-length-bytes"] != nil {
-		err := validatePositive("max length", a.arguments["max-length-bytes"].(int64))
+	if a.arguments["x-max-length-bytes"] != nil {
+		err := validatePositive("max length", a.arguments["x-max-length-bytes"].(int64))
 		if err != nil {
 			return err
 		}
 	}
+
+	if a.arguments["x-max-length"] != nil {
+		err := validatePositive("max length", a.arguments["x-max-length"].(int64))
+		if err != nil {
+			return err
+		}
+	}
+	if a.arguments["x-max-priority"] != nil {
+		err := validatePositive("max priority", a.arguments["x-max-priority"].(int64))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
