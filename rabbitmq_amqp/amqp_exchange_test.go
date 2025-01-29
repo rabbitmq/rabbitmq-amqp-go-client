@@ -47,7 +47,6 @@ var _ = Describe("AMQP Exchange test ", func() {
 
 	It("AMQP Exchange Declare with FanOut and Delete should succeed", func() {
 		const exchangeName = "AMQP Exchange Declare with FanOut and Delete should succeed"
-		//exchangeSpec := management.Exchange(exchangeName).ExchangeType(ExchangeType{FanOut})
 		exchangeInfo, err := management.DeclareExchange(context.TODO(), &FanOutExchangeSpecification{
 			Name: exchangeName,
 		})
@@ -56,5 +55,20 @@ var _ = Describe("AMQP Exchange test ", func() {
 		Expect(exchangeInfo.Name()).To(Equal(exchangeName))
 		err = management.DeleteExchange(context.TODO(), exchangeName)
 		Expect(err).To(BeNil())
+	})
+
+	It("AMQP Exchange should fail when specification is nil", func() {
+		_, err := management.DeclareExchange(context.TODO(), nil)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("exchange specification cannot be nil"))
+	})
+
+	It("AMQP Exchange should fail when name is empty", func() {
+		_, err := management.DeclareExchange(context.TODO(), &TopicExchangeSpecification{
+			Name:         "",
+			IsAutoDelete: false,
+		})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("exchange name cannot be empty"))
 	})
 })

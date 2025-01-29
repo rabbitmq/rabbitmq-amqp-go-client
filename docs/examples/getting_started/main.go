@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// Bind the queue to the exchange
-	bindingPath, err := management.Bind(context.TODO(), &rabbitmq_amqp.BindingSpecification{
+	bindingPath, err := management.Bind(context.TODO(), &rabbitmq_amqp.ExchangeToQueueBindingSpecification{
 		SourceExchange:   exchangeName,
 		DestinationQueue: queueName,
 		BindingKey:       routingKey,

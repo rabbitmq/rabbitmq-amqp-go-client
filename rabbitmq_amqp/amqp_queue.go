@@ -2,6 +2,7 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Azure/go-amqp"
 )
@@ -119,7 +120,7 @@ func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
 	}
 
 	if a.name == "" {
-		a.name = generateNameWithDefaultPrefix()
+		return nil, errors.New("queue name is required")
 	}
 
 	path, err := queueAddress(&a.name)

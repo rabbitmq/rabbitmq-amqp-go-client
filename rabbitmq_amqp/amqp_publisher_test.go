@@ -142,7 +142,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateReleased{}))
 
 		// Create the binding between the exchange and the queue
-		_, err = connection.Management().Bind(context.Background(), &BindingSpecification{
+		_, err = connection.Management().Bind(context.Background(), &ExchangeToQueueBindingSpecification{
 			SourceExchange:   name,
 			DestinationQueue: name,
 			BindingKey:       "#",

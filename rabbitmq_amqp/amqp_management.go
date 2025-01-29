@@ -171,19 +171,15 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 }
 
 func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification QueueSpecification) (*AmqpQueueInfo, error) {
-	var amqpQueue *AmqpQueue
-
-	if specification == nil || len(specification.name()) <= 0 {
-		// If the specification is nil or the name is empty, then we create a new queue
-		// with a random name with generateNameWithDefaultPrefix()
-		amqpQueue = newAmqpQueue(a, "")
-	} else {
-		amqpQueue = newAmqpQueue(a, specification.name())
-		amqpQueue.AutoDelete(specification.isAutoDelete())
-		amqpQueue.Exclusive(specification.isExclusive())
-		amqpQueue.QueueType(specification.queueType())
-		amqpQueue.SetArguments(specification.buildArguments())
+	if specification == nil {
+		return nil, fmt.Errorf("queue specification cannot be nil. You need to provide a valid QueueSpecification")
 	}
+
+	amqpQueue := newAmqpQueue(a, specification.name())
+	amqpQueue.AutoDelete(specification.isAutoDelete())
+	amqpQueue.Exclusive(specification.isExclusive())
+	amqpQueue.QueueType(specification.queueType())
+	amqpQueue.SetArguments(specification.buildArguments())
 
 	return amqpQueue.Declare(ctx)
 }
@@ -195,7 +191,7 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 
 func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification ExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
-		return nil, fmt.Errorf("exchangeSpecification is nil")
+		return nil, errors.New("exchange specification cannot be nil. You need to provide a valid ExchangeSpecification")
 	}
 
 	exchange := newAmqpExchange(a, exchangeSpecification.name())
@@ -209,12 +205,15 @@ func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error 
 	return e.Delete(ctx)
 }
 
-func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification *BindingSpecification) (string, error) {
+func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification BindingSpecification) (string, error) {
+	if bindingSpecification == nil {
+		return "", fmt.Errorf("binding specification cannot be nil. You need to provide a valid BindingSpecification")
+	}
+
 	bind := newAMQPBinding(a)
-	bind.SourceExchange(bindingSpecification.SourceExchange)
-	bind.DestinationQueue(bindingSpecification.DestinationQueue)
-	bind.DestinationExchange(bindingSpecification.DestinationExchange)
-	bind.BindingKey(bindingSpecification.BindingKey)
+	bind.SourceExchange(bindingSpecification.sourceExchange())
+	bind.Destination(bindingSpecification.destination(), bindingSpecification.isDestinationQueue())
+	bind.BindingKey(bindingSpecification.bindingKey())
 	return bind.Bind(ctx)
 
 }
