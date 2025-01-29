@@ -83,6 +83,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-overflow", "drop-head"))
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-expires", int64(1000)))
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-priority", int64(2)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-queue-leader-locator", "random"))
 
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
