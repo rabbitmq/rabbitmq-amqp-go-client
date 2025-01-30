@@ -22,20 +22,40 @@ type AmqpConnection struct {
 	session    *amqp.Session
 }
 
-func (a *AmqpConnection) Publisher(ctx context.Context, destinationAdd string, linkName string) (*Publisher, error) {
-	if !validateAddress(destinationAdd) {
-		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+// NewPublisher creates a new Publisher that sends messages to the provided destination.
+// The destination is a TargetAddress that can be a Queue or an Exchange with a routing key.
+// See QueueAddress and ExchangeAddress for more information.
+func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAddress, linkName string) (*Publisher, error) {
+	destinationAdd := ""
+	err := error(nil)
+	if destination != nil {
+		destinationAdd, err = destination.toAddress()
+		if err != nil {
+			return nil, err
+		}
+		err = validateAddress(destinationAdd)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
 	}
-	return newPublisher(sender), nil
+	return newPublisher(sender, destinationAdd != ""), nil
 }
 
-func (a *AmqpConnection) Consumer(ctx context.Context, destinationAdd string, linkName string) (*Consumer, error) {
-	if !validateAddress(destinationAdd) {
-		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+// NewConsumer creates a new Consumer that listens to the provided destination. Destination is a QueueAddress.
+func (a *AmqpConnection) NewConsumer(ctx context.Context, destination *QueueAddress, linkName string) (*Consumer, error) {
+	destinationAdd, err := destination.toAddress()
+	if err != nil {
+		return nil, err
+	}
+	err = validateAddress(destinationAdd)
+
+	if err != nil {
+		return nil, err
 	}
 	receiver, err := a.session.NewReceiver(ctx, destinationAdd, createReceiverLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {

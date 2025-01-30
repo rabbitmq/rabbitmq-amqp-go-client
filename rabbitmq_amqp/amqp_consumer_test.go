@@ -9,46 +9,41 @@ import (
 	"time"
 )
 
-var _ = Describe("Consumer tests", func() {
+var _ = Describe("NewConsumer tests", func() {
 
-	It("AMQP Consumer should fail due to context cancellation", func() {
-		qName := generateNameWithDateTime("AMQP Consumer should fail due to context cancellation")
+	It("AMQP NewConsumer should fail due to context cancellation", func() {
+		qName := generateNameWithDateTime("AMQP NewConsumer should fail due to context cancellation")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		addr, _ := QueueAddress(&qName)
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Millisecond)
 		cancel()
-		_, err = connection.Consumer(ctx, addr, "test")
+		_, err = connection.NewConsumer(ctx, &QueueAddress{
+			Queue: qName,
+		}, "test")
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("context canceled"))
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Consumer should ack and empty the queue", func() {
-		qName := generateNameWithDateTime("AMQP Consumer should ack and empty the queue")
+	It("AMQP NewConsumer should ack and empty the queue", func() {
+		qName := generateNameWithDateTime("AMQP NewConsumer should ack and empty the queue")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 10)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.Consumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -66,22 +61,18 @@ var _ = Describe("Consumer tests", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Consumer should requeue the message to the queue", func() {
+	It("AMQP NewConsumer should requeue the message to the queue", func() {
 
-		qName := generateNameWithDateTime("AMQP Consumer should requeue the message to the queue")
+		qName := generateNameWithDateTime("AMQP NewConsumer should requeue the message to the queue")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 1)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.Consumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -97,22 +88,18 @@ var _ = Describe("Consumer tests", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Consumer should requeue the message to the queue with annotations", func() {
+	It("AMQP NewConsumer should requeue the message to the queue with annotations", func() {
 
-		qName := generateNameWithDateTime("AMQP Consumer should requeue the message to the queue with annotations")
+		qName := generateNameWithDateTime("AMQP NewConsumer should requeue the message to the queue with annotations")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 1)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.Consumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -136,22 +123,18 @@ var _ = Describe("Consumer tests", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("AMQP Consumer should discard the message to the queue with and without annotations", func() {
+	It("AMQP NewConsumer should discard the message to the queue with and without annotations", func() {
 		// TODO: Implement this test with a dead letter queue to test the discard feature
-		qName := generateNameWithDateTime("AMQP Consumer should discard the message to the queue with and without annotations")
+		qName := generateNameWithDateTime("AMQP NewConsumer should discard the message to the queue with and without annotations")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
-		queue, err := connection.Management().DeclareQueue(context.Background(), &QueueSpecification{
-			Name:         qName,
-			IsAutoDelete: false,
-			IsExclusive:  false,
-			QueueType:    QueueType{Quorum},
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
 		})
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 2)
-		addr, _ := QueueAddress(&qName)
-		consumer, err := connection.Consumer(context.Background(), addr, "test")
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))

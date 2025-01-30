@@ -10,4 +10,10 @@ This library is in early stages of development. It is meant to be used with Rabb
 
 ## Getting Started
 
-You can find an example in: `examples/getting_started`
+You can find an example in: `docs/examples/getting_started`
+
+## Examples
+
+You can find more examples in: `docs/examples`
+
+

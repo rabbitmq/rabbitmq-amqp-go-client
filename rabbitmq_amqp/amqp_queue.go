@@ -2,6 +2,7 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Azure/go-amqp"
 )
@@ -70,35 +71,14 @@ type AmqpQueue struct {
 	name         string
 }
 
-func (a *AmqpQueue) DeadLetterExchange(dlx string) {
-	if len(dlx) != 0 {
-		a.arguments["x-dead-letter-exchange"] = dlx
-	}
-}
-
-func (a *AmqpQueue) DeadLetterRoutingKey(dlrk string) {
-	if len(dlrk) != 0 {
-		a.arguments["x-dead-letter-routing-key"] = dlrk
-	}
-}
-
-func (a *AmqpQueue) MaxLengthBytes(length int64) {
-	if length != 0 {
-		a.arguments["max-length-bytes"] = length
-	}
+func (a *AmqpQueue) SetArguments(arguments map[string]any) {
+	a.arguments = arguments
 }
 
 func (a *AmqpQueue) QueueType(queueType QueueType) {
 	if len(queueType.String()) != 0 {
 		a.arguments["x-queue-type"] = queueType.String()
 	}
-}
-
-func (a *AmqpQueue) GetQueueType() TQueueType {
-	if a.arguments["x-queue-type"] == nil {
-		return Classic
-	}
-	return TQueueType(a.arguments["x-queue-type"].(string))
 }
 
 func (a *AmqpQueue) Exclusive(isExclusive bool) {
@@ -124,32 +104,40 @@ func newAmqpQueue(management *AmqpManagement, queueName string) *AmqpQueue {
 }
 
 func (a *AmqpQueue) validate() error {
-	if a.arguments["max-length-bytes"] != nil {
-		err := validatePositive("max length", a.arguments["max-length-bytes"].(int64))
+	if a.arguments["x-max-length-bytes"] != nil {
+		err := validatePositive("max length", a.arguments["x-max-length-bytes"].(int64))
 		if err != nil {
 			return err
 		}
 	}
+
+	if a.arguments["x-max-length"] != nil {
+		err := validatePositive("max length", a.arguments["x-max-length"].(int64))
+		if err != nil {
+			return err
+		}
+	}
+	if a.arguments["x-max-priority"] != nil {
+		err := validatePositive("max priority", a.arguments["x-max-priority"].(int64))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
-	if Quorum == a.GetQueueType() ||
-		Stream == a.GetQueueType() {
-		// mandatory arguments for quorum queues and streams
-		a.Exclusive(false)
-		a.AutoDelete(false)
-	}
 
 	if err := a.validate(); err != nil {
 		return nil, err
 	}
 
 	if a.name == "" {
-		a.name = generateNameWithDefaultPrefix()
+		return nil, errors.New("queue name is required")
 	}
 
-	path, err := QueueAddress(&a.name)
+	path, err := queueAddress(&a.name)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +154,7 @@ func (a *AmqpQueue) Declare(ctx context.Context) (*AmqpQueueInfo, error) {
 }
 
 func (a *AmqpQueue) Delete(ctx context.Context) error {
-	path, err := QueueAddress(&a.name)
+	path, err := queueAddress(&a.name)
 	if err != nil {
 		return err
 	}
@@ -175,7 +163,7 @@ func (a *AmqpQueue) Delete(ctx context.Context) error {
 }
 
 func (a *AmqpQueue) Purge(ctx context.Context) (int, error) {
-	path, err := PurgeQueueAddress(&a.name)
+	path, err := purgeQueueAddress(&a.name)
 	if err != nil {
 		return 0, err
 	}

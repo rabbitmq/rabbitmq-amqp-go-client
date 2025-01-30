@@ -2,6 +2,7 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"errors"
 	"github.com/Azure/go-amqp"
 )
 
@@ -31,18 +32,9 @@ func (b *AMQPBinding) SourceExchange(sourceName string) {
 	}
 }
 
-func (b *AMQPBinding) DestinationExchange(destinationName string) {
-	if len(destinationName) > 0 {
-		b.destinationName = destinationName
-		b.toQueue = false
-	}
-}
-
-func (b *AMQPBinding) DestinationQueue(queueName string) {
-	if len(queueName) > 0 {
-		b.destinationName = queueName
-		b.toQueue = true
-	}
+func (b *AMQPBinding) Destination(name string, isQueue bool) {
+	b.destinationName = name
+	b.toQueue = isQueue
 }
 
 // Bind creates a binding between an exchange and a queue or exchange
@@ -50,11 +42,20 @@ func (b *AMQPBinding) DestinationQueue(queueName string) {
 // Returns the binding path that can be used to unbind the binding.
 // Given a virtual host, the binding path is unique.
 func (b *AMQPBinding) Bind(ctx context.Context) (string, error) {
+	destination := "destination_queue"
+	if !b.toQueue {
+		destination = "destination_exchange"
+	}
+
+	if len(b.sourceName) == 0 || len(b.destinationName) == 0 {
+		return "", errors.New("source and destination names are required")
+	}
+
 	path := bindingPath()
 	kv := make(map[string]any)
 	kv["binding_key"] = b.bindingKey
 	kv["source"] = b.sourceName
-	kv["destination_queue"] = b.destinationName
+	kv[destination] = b.destinationName
 	kv["arguments"] = make(map[string]any)
 	_, err := b.management.Request(ctx, kv, path, commandPost, []int{responseCode204})
 	bindingPathWithExchangeQueueKey := bindingPathWithExchangeQueueKey(b.toQueue, b.sourceName, b.destinationName, b.bindingKey)

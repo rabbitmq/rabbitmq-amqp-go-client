@@ -37,7 +37,7 @@ func main() {
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
-	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.ExchangeSpecification{
+	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.TopicExchangeSpecification{
 		Name: exchangeName,
 	})
 	if err != nil {
@@ -46,9 +46,8 @@ func main() {
 	}
 
 	// Declare a Quorum queue
-	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QueueSpecification{
-		Name:      queueName,
-		QueueType: rabbitmq_amqp.QueueType{Type: rabbitmq_amqp.Quorum},
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QuorumQueueSpecification{
+		Name: queueName,
 	})
 
 	if err != nil {
@@ -57,7 +56,7 @@ func main() {
 	}
 
 	// Bind the queue to the exchange
-	bindingPath, err := management.Bind(context.TODO(), &rabbitmq_amqp.BindingSpecification{
+	bindingPath, err := management.Bind(context.TODO(), &rabbitmq_amqp.ExchangeToQueueBindingSpecification{
 		SourceExchange:   exchangeName,
 		DestinationQueue: queueName,
 		BindingKey:       routingKey,
@@ -70,8 +69,10 @@ func main() {
 
 	// Create a consumer to receive messages from the queue
 	// you need to build the address of the queue, but you can use the helper function
-	addrQueue, _ := rabbitmq_amqp.QueueAddress(&queueName)
-	consumer, err := amqpConnection.Consumer(context.Background(), addrQueue, "getting-started-consumer")
+
+	consumer, err := amqpConnection.NewConsumer(context.Background(), &rabbitmq_amqp.QueueAddress{
+		Queue: queueName,
+	}, "getting-started-consumer")
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating consumer", err)
 		return
@@ -105,8 +106,10 @@ func main() {
 		}
 	}(consumerContext)
 
-	addr, _ := rabbitmq_amqp.ExchangeAddress(&exchangeName, &routingKey)
-	publisher, err := amqpConnection.Publisher(context.Background(), addr, "getting-started-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmq_amqp.ExchangeAddress{
+		Exchange: exchangeName,
+		Key:      routingKey,
+	}, "getting-started-publisher")
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating publisher", err)
 		return
@@ -151,10 +154,12 @@ func main() {
 	err = consumer.Close(context.Background())
 	if err != nil {
 		rabbitmq_amqp.Error("[Consumer]", err)
+		return
 	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
+		rabbitmq_amqp.Error("[Publisher]", err)
 		return
 	}
 

@@ -170,22 +170,16 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
-func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification *QueueSpecification) (*AmqpQueueInfo, error) {
-	var amqpQueue *AmqpQueue
-
-	if specification == nil || len(specification.Name) <= 0 {
-		// If the specification is nil or the name is empty, then we create a new queue
-		// with a random name with generateNameWithDefaultPrefix()
-		amqpQueue = newAmqpQueue(a, "")
-	} else {
-		amqpQueue = newAmqpQueue(a, specification.Name)
-		amqpQueue.AutoDelete(specification.IsAutoDelete)
-		amqpQueue.Exclusive(specification.IsExclusive)
-		amqpQueue.MaxLengthBytes(specification.MaxLengthBytes)
-		amqpQueue.DeadLetterExchange(specification.DeadLetterExchange)
-		amqpQueue.DeadLetterRoutingKey(specification.DeadLetterRoutingKey)
-		amqpQueue.QueueType(specification.QueueType)
+func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification QueueSpecification) (*AmqpQueueInfo, error) {
+	if specification == nil {
+		return nil, fmt.Errorf("queue specification cannot be nil. You need to provide a valid QueueSpecification")
 	}
+
+	amqpQueue := newAmqpQueue(a, specification.name())
+	amqpQueue.AutoDelete(specification.isAutoDelete())
+	amqpQueue.Exclusive(specification.isExclusive())
+	amqpQueue.QueueType(specification.queueType())
+	amqpQueue.SetArguments(specification.buildArguments())
 
 	return amqpQueue.Declare(ctx)
 }
@@ -195,14 +189,14 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	return q.Delete(ctx)
 }
 
-func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification *ExchangeSpecification) (*AmqpExchangeInfo, error) {
+func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification ExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
-		return nil, fmt.Errorf("exchangeSpecification is nil")
+		return nil, errors.New("exchange specification cannot be nil. You need to provide a valid ExchangeSpecification")
 	}
 
-	exchange := newAmqpExchange(a, exchangeSpecification.Name)
-	exchange.AutoDelete(exchangeSpecification.IsAutoDelete)
-	exchange.ExchangeType(exchangeSpecification.ExchangeType)
+	exchange := newAmqpExchange(a, exchangeSpecification.name())
+	exchange.AutoDelete(exchangeSpecification.isAutoDelete())
+	exchange.ExchangeType(exchangeSpecification.exchangeType())
 	return exchange.Declare(ctx)
 }
 
@@ -211,12 +205,15 @@ func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error 
 	return e.Delete(ctx)
 }
 
-func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification *BindingSpecification) (string, error) {
+func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification BindingSpecification) (string, error) {
+	if bindingSpecification == nil {
+		return "", fmt.Errorf("binding specification cannot be nil. You need to provide a valid BindingSpecification")
+	}
+
 	bind := newAMQPBinding(a)
-	bind.SourceExchange(bindingSpecification.SourceExchange)
-	bind.DestinationQueue(bindingSpecification.DestinationQueue)
-	bind.DestinationExchange(bindingSpecification.DestinationExchange)
-	bind.BindingKey(bindingSpecification.BindingKey)
+	bind.SourceExchange(bindingSpecification.sourceExchange())
+	bind.Destination(bindingSpecification.destination(), bindingSpecification.isDestinationQueue())
+	bind.BindingKey(bindingSpecification.bindingKey())
 	return bind.Bind(ctx)
 
 }
@@ -225,7 +222,7 @@ func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
 	return bind.Unbind(ctx, bindingPath)
 }
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*AmqpQueueInfo, error) {
-	path, err := QueueAddress(&queueName)
+	path, err := queueAddress(&queueName)
 	if err != nil {
 		return nil, err
 	}
