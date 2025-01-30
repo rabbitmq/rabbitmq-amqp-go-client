@@ -22,32 +22,27 @@ type AmqpConnection struct {
 	session    *amqp.Session
 }
 
-// NewTargetPublisher creates a new TargetPublisher that sends messages to the provided destination.
+// NewPublisher creates a new Publisher that sends messages to the provided destination.
 // The destination is a TargetAddress that can be a Queue or an Exchange with a routing key.
 // See QueueAddress and ExchangeAddress for more information.
-func (a *AmqpConnection) NewTargetPublisher(ctx context.Context, destination TargetAddress, linkName string) (*TargetPublisher, error) {
-	destinationAdd, err := destination.toAddress()
-	if err != nil {
-		return nil, err
-	}
-	if !validateAddress(destinationAdd) {
-		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAddress, linkName string) (*Publisher, error) {
+	destinationAdd := ""
+	err := error(nil)
+	if destination != nil {
+		destinationAdd, err = destination.toAddress()
+		if err != nil {
+			return nil, err
+		}
+		if !validateAddress(destinationAdd) {
+			return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+		}
 	}
 
 	sender, err := a.session.NewSender(ctx, destinationAdd, createSenderLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {
 		return nil, err
 	}
-	return newTargetPublisher(sender), nil
-}
-
-// NewMultiTargetsPublisher creates a new TargetsPublisher that sends messages to multiple destinations.
-func (a *AmqpConnection) NewMultiTargetsPublisher(ctx context.Context, linkName string) (*TargetsPublisher, error) {
-	sender, err := a.session.NewSender(ctx, "", createSenderLinkOptions("", linkName, AtLeastOnce))
-	if err != nil {
-		return nil, err
-	}
-	return newTargetsPublisher(sender), nil
+	return newPublisher(sender, destinationAdd != ""), nil
 }
 
 // NewConsumer creates a new Consumer that listens to the provided destination. Destination is a QueueAddress.

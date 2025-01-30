@@ -3,6 +3,7 @@ package rabbitmq_amqp
 import (
 	"errors"
 	"fmt"
+	"github.com/Azure/go-amqp"
 	"strings"
 )
 
@@ -42,6 +43,26 @@ func (eas *ExchangeAddress) toAddress() (string, error) {
 		k = nil
 	}
 	return exchangeAddress(ex, k)
+}
+
+// MessageToAddressHelper sets the To property of the message to the address of the target.
+// The target must be a QueueAddress or an ExchangeAddress.
+// Note: The field To will be overwritten if it is already set.
+func MessageToAddressHelper(msgRef *amqp.Message, target TargetAddress) error {
+	if target == nil {
+		return errors.New("target cannot be nil")
+	}
+
+	address, err := target.toAddress()
+	if err != nil {
+		return err
+	}
+
+	if msgRef.Properties == nil {
+		msgRef.Properties = &amqp.MessageProperties{}
+	}
+	msgRef.Properties.To = &address
+	return nil
 }
 
 // address Creates the address for the exchange or queue following the RabbitMQ conventions.

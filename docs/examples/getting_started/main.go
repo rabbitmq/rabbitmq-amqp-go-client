@@ -106,7 +106,7 @@ func main() {
 		}
 	}(consumerContext)
 
-	publisher, err := amqpConnection.NewTargetPublisher(context.Background(), &rabbitmq_amqp.ExchangeAddress{
+	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmq_amqp.ExchangeAddress{
 		Exchange: exchangeName,
 		Key:      routingKey,
 	}, "getting-started-publisher")

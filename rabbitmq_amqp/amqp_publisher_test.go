@@ -8,8 +8,8 @@ import (
 )
 
 var _ = Describe("AMQP publisher ", func() {
-	It("Send a message to a queue with a Message Target NewTargetPublisher", func() {
-		qName := generateNameWithDateTime("Send a message to a queue with a Message Target NewTargetPublisher")
+	It("Send a message to a queue with a Message Target NewPublisher", func() {
+		qName := generateNameWithDateTime("Send a message to a queue with a Message Target NewPublisher")
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
@@ -18,10 +18,10 @@ var _ = Describe("AMQP publisher ", func() {
 		})
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
-		publisher, err := connection.NewTargetPublisher(context.Background(), &QueueAddress{Queue: qName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
-		Expect(publisher).To(BeAssignableToTypeOf(&TargetPublisher{}))
+		Expect(publisher).To(BeAssignableToTypeOf(&Publisher{}))
 
 		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")))
 		Expect(err).To(BeNil())
@@ -35,12 +35,12 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 	})
 
-	It("NewTargetPublisher should fail to a not existing exchange", func() {
+	It("NewPublisher should fail to a not existing exchange", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		exchangeName := "Nope"
-		publisher, err := connection.NewTargetPublisher(context.Background(), &ExchangeAddress{Exchange: exchangeName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &ExchangeAddress{Exchange: exchangeName}, "test")
 		Expect(err).NotTo(BeNil())
 		Expect(publisher).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
@@ -59,7 +59,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(exchange).NotTo(BeNil())
 		routingKeyNope := "I don't exist"
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewTargetPublisher(context.Background(), &ExchangeAddress{
+		publisher, err := connection.NewPublisher(context.Background(), &ExchangeAddress{
 			Exchange: eName,
 			Key:      routingKeyNope,
 		}, "test")
@@ -82,7 +82,7 @@ var _ = Describe("AMQP publisher ", func() {
 			Name: qName,
 		})
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewTargetPublisher(context.Background(), &QueueAddress{Queue: qName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")))
@@ -99,11 +99,14 @@ var _ = Describe("AMQP publisher ", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
-		publisher, err := connection.NewMultiTargetsPublisher(context.Background(), "test")
+		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		qName := generateNameWithDateTime("Targets Publisher should fail when the destination does not exist")
-		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), &QueueAddress{Queue: qName})
+		msg := amqp.NewMessage([]byte("hello"))
+		Expect(MessageToAddressHelper(msg, &QueueAddress{Queue: qName})).To(BeNil())
+
+		publishResult, err := publisher.Publish(context.Background(), msg)
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateReleased{}))
@@ -115,7 +118,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewMultiTargetsPublisher(context.Background(), "test")
+		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		name := generateNameWithDateTime("Targets Publisher should success with StateReceived when the destination exists")
@@ -125,7 +128,10 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(err).To(BeNil())
 		// as first message is sent to a queue, the outcome should be StateReceived
 		// since the message was accepted by the existing queue
-		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), &QueueAddress{Queue: name})
+		msg := amqp.NewMessage([]byte("hello"))
+		Expect(MessageToAddressHelper(msg, &QueueAddress{Queue: name})).To(BeNil())
+
+		publishResult, err := publisher.Publish(context.Background(), msg)
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
@@ -134,9 +140,10 @@ var _ = Describe("AMQP publisher ", func() {
 			Name:         name,
 			IsAutoDelete: false,
 		})
-
+		msg = amqp.NewMessage([]byte("hello"))
+		Expect(MessageToAddressHelper(msg, &ExchangeAddress{Exchange: name})).To(BeNil())
 		// the status should be StateReleased since the exchange does not have any binding
-		publishResult, err = publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), &ExchangeAddress{Exchange: name})
+		publishResult, err = publisher.Publish(context.Background(), msg)
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateReleased{}))
@@ -149,7 +156,9 @@ var _ = Describe("AMQP publisher ", func() {
 		})
 		Expect(err).To(BeNil())
 		// the status should be StateAccepted since the exchange has a binding
-		publishResult, err = publisher.Publish(context.Background(), amqp.NewMessage([]byte("hello")), &ExchangeAddress{Exchange: name})
+		msg = amqp.NewMessage([]byte("hello"))
+		Expect(MessageToAddressHelper(msg, &ExchangeAddress{Exchange: name})).To(BeNil())
+		publishResult, err = publisher.Publish(context.Background(), msg)
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
