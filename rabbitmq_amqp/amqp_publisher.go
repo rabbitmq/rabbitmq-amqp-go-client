@@ -63,12 +63,11 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 			return nil, fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
 		}
 
-		if !validateAddress(*message.Properties.To) {
-			return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+		err := validateAddress(*message.Properties.To)
+		if err != nil {
+			return nil, err
 		}
-
 	}
-
 	r, err := m.sender.SendWithReceipt(ctx, message, nil)
 	if err != nil {
 		return nil, err

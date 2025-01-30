@@ -33,8 +33,9 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAdd
 		if err != nil {
 			return nil, err
 		}
-		if !validateAddress(destinationAdd) {
-			return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+		err = validateAddress(destinationAdd)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -51,8 +52,10 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, destination *QueueAddr
 	if err != nil {
 		return nil, err
 	}
-	if !validateAddress(destinationAdd) {
-		return nil, fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
+	err = validateAddress(destinationAdd)
+
+	if err != nil {
+		return nil, err
 	}
 	receiver, err := a.session.NewReceiver(ctx, destinationAdd, createReceiverLinkOptions(destinationAdd, linkName, AtLeastOnce))
 	if err != nil {

@@ -171,6 +171,9 @@ func bindingPathWithExchangeQueueKey(toQueue bool, sourceName, destinationName, 
 	return fmt.Sprintf(format, bindings, sourceNameEncoded, destinationType, destinationNameEncoded, keyEncoded)
 }
 
-func validateAddress(address string) bool {
-	return strings.HasPrefix(address, fmt.Sprintf("/%s/", exchanges)) || strings.HasPrefix(address, fmt.Sprintf("/%s/", queues))
+func validateAddress(address string) error {
+	if strings.HasPrefix(address, fmt.Sprintf("/%s/", exchanges)) || strings.HasPrefix(address, fmt.Sprintf("/%s/", queues)) {
+		return nil
+	}
+	return fmt.Errorf("invalid destination address, the address should start with /%s/ or/%s/ ", exchanges, queues)
 }

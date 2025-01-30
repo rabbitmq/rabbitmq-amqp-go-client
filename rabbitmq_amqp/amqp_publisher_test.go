@@ -167,4 +167,31 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
+	It("Multi Targets Publisher should fail it TO is not set or not valid", func() {
+		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
+		Expect(err).To(BeNil())
+		Expect(publisher).NotTo(BeNil())
+		msg := amqp.NewMessage([]byte("hello"))
+		// the message should fail since the TO property is not set
+		publishResult, err := publisher.Publish(context.Background(), msg)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("message properties TO is required"))
+		Expect(publishResult).To(BeNil())
+
+		invalid := "invalid"
+		// the message should fail since the TO property is not valid
+		msg.Properties = &amqp.MessageProperties{
+			To: &invalid,
+		}
+
+		publishResult, err = publisher.Publish(context.Background(), msg)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("invalid destination address"))
+		Expect(publishResult).To(BeNil())
+
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
 })
