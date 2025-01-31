@@ -1,5 +1,9 @@
 package rabbitmq_amqp
 
+type entityIdentifier interface {
+	Id() string
+}
+
 type TQueueType string
 
 const (

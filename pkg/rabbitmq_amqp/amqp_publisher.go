@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
 
 type PublishResult struct {
@@ -15,10 +16,22 @@ type PublishResult struct {
 type Publisher struct {
 	sender              *amqp.Sender
 	staticTargetAddress bool
+	id                  string
+	refEntitiesTracker  *entitiesTracker
 }
 
-func newPublisher(sender *amqp.Sender, staticTargetAddress bool) *Publisher {
-	return &Publisher{sender: sender, staticTargetAddress: staticTargetAddress}
+func (m *Publisher) Id() string {
+	return m.id
+}
+
+func newPublisher(sender *amqp.Sender, staticTargetAddress bool, refEntitiesTracker *entitiesTracker, args ...string) *Publisher {
+	id := fmt.Sprintf("publisher-%s", uuid.New().String())
+	if len(args) > 0 {
+		id = args[0]
+	}
+	r := &Publisher{sender: sender, staticTargetAddress: staticTargetAddress, refEntitiesTracker: refEntitiesTracker, id: id}
+	refEntitiesTracker.addProducer(r)
+	return r
 }
 
 /*
@@ -85,5 +98,6 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 
 // Close closes the publisher.
 func (m *Publisher) Close(ctx context.Context) error {
+	m.refEntitiesTracker.removeProducer(m)
 	return m.sender.Close(ctx)
 }

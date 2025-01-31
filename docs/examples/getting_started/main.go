@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
-	"github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
+	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
 	"time"
 )
 

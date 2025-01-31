@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
+	"sync"
 )
 
 //func (c *ConnUrlHelper) UseSsl(value bool) {
@@ -16,10 +18,13 @@ import (
 //}
 
 type AmqpConnection struct {
-	Connection *amqp.Conn
-	management *AmqpManagement
-	lifeCycle  *LifeCycle
-	session    *amqp.Session
+	Connection      *amqp.Conn
+	management      *AmqpManagement
+	lifeCycle       *LifeCycle
+	session         *amqp.Session
+	id              string
+	refMap          *sync.Map
+	entitiesTracker *entitiesTracker
 }
 
 // NewPublisher creates a new Publisher that sends messages to the provided destination.
@@ -43,7 +48,7 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAdd
 	if err != nil {
 		return nil, err
 	}
-	return newPublisher(sender, destinationAdd != ""), nil
+	return newPublisher(sender, destinationAdd != "", a.entitiesTracker), nil
 }
 
 // NewConsumer creates a new Consumer that listens to the provided destination. Destination is a QueueAddress.
@@ -68,10 +73,11 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, destination *QueueAddr
 // Returns a pointer to the new AmqpConnection if successful else an error.
 // addresses is a list of addresses to connect to. It picks one randomly.
 // It is enough that one of the addresses is reachable.
-func Dial(ctx context.Context, addresses []string, connOptions *amqp.ConnOptions) (*AmqpConnection, error) {
+func Dial(ctx context.Context, addresses []string, connOptions *amqp.ConnOptions, args ...string) (*AmqpConnection, error) {
 	conn := &AmqpConnection{
-		management: NewAmqpManagement(),
-		lifeCycle:  NewLifeCycle(),
+		management:      NewAmqpManagement(),
+		lifeCycle:       NewLifeCycle(),
+		entitiesTracker: newEntitiesTracker(),
 	}
 	tmp := make([]string, len(addresses))
 	copy(tmp, addresses)
@@ -88,6 +94,10 @@ func Dial(ctx context.Context, addresses []string, connOptions *amqp.ConnOptions
 			continue
 		}
 		Debug("Connected to", ExtractWithoutPassword(addr))
+		conn.id = uuid.New().String()
+		if len(args) > 0 && args[0] != "" {
+			conn.id = args[0]
+		}
 		return conn, nil
 	}
 	return nil, fmt.Errorf("no address to connect to")
@@ -140,10 +150,13 @@ func (a *AmqpConnection) open(ctx context.Context, addr string, connOptions *amq
 func (a *AmqpConnection) Close(ctx context.Context) error {
 	err := a.management.Close(ctx)
 	if err != nil {
-		return err
+		Error("Failed to close management", "error:", err)
 	}
 	err = a.Connection.Close()
 	a.lifeCycle.SetState(&StateClosed{})
+	if a.refMap != nil {
+		a.refMap.Delete(a.id)
+	}
 	return err
 }
 
@@ -155,6 +168,10 @@ func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
 
 func (a *AmqpConnection) State() LifeCycleState {
 	return a.lifeCycle.State()
+}
+
+func (a *AmqpConnection) Id() string {
+	return a.id
 }
 
 // *** management section ***
