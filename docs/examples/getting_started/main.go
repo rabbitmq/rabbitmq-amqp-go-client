@@ -20,7 +20,7 @@ func main() {
 	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
 	go func(ch chan *rabbitmq_amqp.StateChanged) {
 		for statusChanged := range ch {
-			rabbitmq_amqp.Info("[Connection]", "Status changed", statusChanged)
+			rabbitmq_amqp.Info("[connection]", "Status changed", statusChanged)
 		}
 	}(stateChanged)
 
@@ -33,7 +33,7 @@ func main() {
 	// Register the channel to receive status change notifications
 	amqpConnection.NotifyStatusChange(stateChanged)
 
-	fmt.Printf("AMQP Connection opened.\n")
+	fmt.Printf("AMQP connection opened.\n")
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
@@ -197,7 +197,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("AMQP Connection closed.\n")
+	fmt.Printf("AMQP connection closed.\n")
 	// not necessary. It waits for the status change to be printed
 	time.Sleep(100 * time.Millisecond)
 	close(stateChanged)

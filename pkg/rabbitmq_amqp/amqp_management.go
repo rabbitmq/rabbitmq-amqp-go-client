@@ -49,7 +49,7 @@ func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 }
 
 func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) error {
-	session, err := connection.Connection.NewSession(ctx, nil)
+	session, err := connection.azureConnection.NewSession(ctx, nil)
 	if err != nil {
 		return err
 	}

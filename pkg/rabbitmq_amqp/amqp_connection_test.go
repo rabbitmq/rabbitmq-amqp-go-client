@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-var _ = Describe("AMQP Connection Test", func() {
-	It("AMQP SASLTypeAnonymous Connection should succeed", func() {
+var _ = Describe("AMQP connection Test", func() {
+	It("AMQP SASLTypeAnonymous connection should succeed", func() {
 
 		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous()})
@@ -18,7 +18,7 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP SASLTypePlain Connection should succeed", func() {
+	It("AMQP SASLTypePlain connection should succeed", func() {
 
 		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
 			SASLType: amqp.SASLTypePlain("guest", "guest")})
@@ -28,35 +28,35 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(err).To(BeNil())
 	})
 
-	It("AMQP Connection connect to the one correct uri and fails the others", func() {
+	It("AMQP connection connect to the one correct uri and fails the others", func() {
 		conn, err := Dial(context.Background(), []string{"amqp://localhost:1234", "amqp://nohost:555", "amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(conn.Close(context.Background()))
 	})
 
-	It("AMQP Connection should fail due of wrong Port", func() {
+	It("AMQP connection should fail due of wrong Port", func() {
 		_, err := Dial(context.Background(), []string{"amqp://localhost:1234"}, nil)
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should fail due of wrong Host", func() {
+	It("AMQP connection should fail due of wrong Host", func() {
 		_, err := Dial(context.Background(), []string{"amqp://wrong_host:5672"}, nil)
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should fails with all the wrong uris", func() {
+	It("AMQP connection should fails with all the wrong uris", func() {
 		_, err := Dial(context.Background(), []string{"amqp://localhost:1234", "amqp://nohost:555", "amqp://nono"}, nil)
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should fail due to context cancellation", func() {
+	It("AMQP connection should fail due to context cancellation", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 		cancel()
 		_, err := Dial(ctx, []string{"amqp://"}, nil)
 		Expect(err).NotTo(BeNil())
 	})
 
-	It("AMQP Connection should receive events", func() {
+	It("AMQP connection should receive events", func() {
 		ch := make(chan *StateChanged, 1)
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
@@ -70,7 +70,7 @@ var _ = Describe("AMQP Connection Test", func() {
 		Expect(recv.To).To(Equal(&StateClosed{}))
 	})
 
-	//It("AMQP TLS Connection should success with SASLTypeAnonymous ", func() {
+	//It("AMQP TLS connection should success with SASLTypeAnonymous ", func() {
 	//	amqpConnection := NewAmqpConnection()
 	//	Expect(amqpConnection).NotTo(BeNil())
 	//	Expect(amqpConnection).To(BeAssignableToTypeOf(&AmqpConnection{}))

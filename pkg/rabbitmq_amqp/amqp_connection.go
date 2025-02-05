@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -54,7 +55,7 @@ type AmqpConnOptions struct {
 }
 
 type AmqpConnection struct {
-	Connection      *amqp.Conn
+	azureConnection *amqp.Conn
 	id              string
 	management      *AmqpManagement
 	lifeCycle       *LifeCycle
@@ -159,7 +160,7 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 	copy(tmp, addresses)
 
 	// random pick and extract one address to use for connection
-	var conn *amqp.Conn
+	var azureConnection *amqp.Conn
 	for len(tmp) > 0 {
 		idx := random(len(tmp))
 		addr := tmp[idx]
@@ -174,7 +175,7 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 		connOptions.HostName = fmt.Sprintf("vhost:%s", uri.Vhost)
 		// remove the index from the tmp list
 		tmp = append(tmp[:idx], tmp[idx+1:]...)
-		conn, err = amqp.Dial(ctx, addr, amqpLiteConnOptions)
+		azureConnection, err = amqp.Dial(ctx, addr, amqpLiteConnOptions)
 		if err != nil {
 			Error("Failed to open connection", ExtractWithoutPassword(addr), err)
 			continue
@@ -182,7 +183,7 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 		Debug("Connected to", ExtractWithoutPassword(addr))
 		break
 	}
-	if conn == nil {
+	if azureConnection == nil {
 		return fmt.Errorf("failed to connect to any of the provided addresses")
 	}
 
@@ -192,20 +193,20 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 		a.id = uuid.New().String()
 	}
 
-	a.Connection = conn
+	a.azureConnection = azureConnection
 	var err error
-	a.session, err = a.Connection.NewSession(ctx, nil)
+	a.session, err = a.azureConnection.NewSession(ctx, nil)
 	go func() {
 		select {
-		case <-conn.Done():
+		case <-azureConnection.Done():
 			{
-				if conn.Err() != nil {
-					Error("Connection closed unexpectedly", "error", conn.Err())
+				a.lifeCycle.SetState(&StateClosed{error: azureConnection.Err()})
+				if azureConnection.Err() != nil {
+					Error("connection closed unexpectedly", "error", azureConnection.Err())
 					a.maybeReconnect()
 					return
 				}
-
-				Debug("Connection closed successfully")
+				Debug("connection closed successfully")
 			}
 		}
 	}()
@@ -223,12 +224,12 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 	return nil
 }
 func (a *AmqpConnection) maybeReconnect() {
-	a.lifeCycle.SetState(&StateReconnecting{})
 
 	if !a.amqpConnOptions.RecoveryConfiguration.ActiveRecovery {
 		Info("Recovery is disabled, closing connection")
 		return
 	}
+	a.lifeCycle.SetState(&StateReconnecting{})
 	numberOfAttempts := 1
 	waitTime := a.amqpConnOptions.RecoveryConfiguration.BackOffReconnectInterval
 	for numberOfAttempts <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts {
@@ -246,38 +247,50 @@ func (a *AmqpConnection) maybeReconnect() {
 			waitTime = waitTime * 2
 			Error("Failed to connection. ", "id", a.Id(), "error", err)
 		} else {
-			Info("Reconnected successfully")
-			a.entitiesTracker.publishers.Range(func(key, value any) bool {
-				publisher := value.(*Publisher)
-				// try to createSender
-				err = publisher.createSender(context.Background())
-				if err != nil {
-					Error("Failed to createSender publisher", "ID", publisher.Id(), "error", err)
-				}
-				return true
-			})
-
 			break
 		}
 	}
 
+	var fails int32
+	Info("Reconnected successfully, restarting publishers and consumers")
+	a.entitiesTracker.publishers.Range(func(key, value any) bool {
+		publisher := value.(*Publisher)
+		// try to createSender
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		err := publisher.createSender(ctx)
+		if err != nil {
+			atomic.AddInt32(&fails, 1)
+			Error("Failed to createSender publisher", "ID", publisher.Id(), "error", err)
+		}
+		cancel()
+		return true
+	})
+	Info("Restarted publishers", "number of fails", fails)
+
 }
 
 func (a *AmqpConnection) close() {
-
-	a.lifeCycle.SetState(&StateClosed{})
 	if a.refMap != nil {
 		a.refMap.Delete(a.Id())
 	}
 	a.entitiesTracker.CleanUp()
 }
 
+/*
+Close closes the connection to the AMQP 1.0 server and the management interface.
+All the publishers and consumers are closed as well.
+*/
 func (a *AmqpConnection) Close(ctx context.Context) error {
+	// the status closed (lifeCycle.SetState(&StateClosed{error: nil})) is not set here
+	// it is set in the connection.Done() channel
+	// the channel is called anyway
+	// see the open(...) function with a.lifeCycle.SetState(&StateClosed{error: connection.Err()})
+
 	err := a.management.Close(ctx)
 	if err != nil {
 		Error("Failed to close management", "error:", err)
 	}
-	err = a.Connection.Close()
+	err = a.azureConnection.Close()
 	a.close()
 	return err
 }

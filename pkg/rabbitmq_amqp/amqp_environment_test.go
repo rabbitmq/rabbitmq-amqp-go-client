@@ -7,7 +7,7 @@ import (
 )
 
 var _ = Describe("AMQP Environment Test", func() {
-	It("AMQP Environment Connection should succeed", func() {
+	It("AMQP Environment connection should succeed", func() {
 		env := NewEnvironment([]string{"amqp://"}, nil)
 		Expect(env).NotTo(BeNil())
 		Expect(env.Connections()).NotTo(BeNil())
@@ -36,7 +36,7 @@ var _ = Describe("AMQP Environment Test", func() {
 		Expect(len(env.Connections())).To(Equal(0))
 	})
 
-	It("AMQP Environment Connection ID should be unique", func() {
+	It("AMQP Environment connection ID should be unique", func() {
 		env := NewEnvironment([]string{"amqp://"}, nil)
 		Expect(env).NotTo(BeNil())
 		Expect(env.Connections()).NotTo(BeNil())
