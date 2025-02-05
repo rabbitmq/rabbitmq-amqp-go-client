@@ -28,29 +28,23 @@ func NewAmqpManagement() *AmqpManagement {
 }
 
 func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
-	if a.receiver == nil {
-		opts := createReceiverLinkOptions(managementNodeAddress, linkPairName, AtMostOnce)
-		receiver, err := a.session.NewReceiver(ctx, managementNodeAddress, opts)
-		if err != nil {
-			return err
-		}
-		a.receiver = receiver
-		return nil
+	opts := createReceiverLinkOptions(managementNodeAddress, linkPairName, AtMostOnce)
+	receiver, err := a.session.NewReceiver(ctx, managementNodeAddress, opts)
+	if err != nil {
+		return err
 	}
+	a.receiver = receiver
 	return nil
 }
 
 func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
-	if a.sender == nil {
-		sender, err := a.session.NewSender(ctx, managementNodeAddress,
-			createSenderLinkOptions(managementNodeAddress, linkPairName, AtMostOnce))
-		if err != nil {
-			return err
-		}
-
-		a.sender = sender
-		return nil
+	sender, err := a.session.NewSender(ctx, managementNodeAddress,
+		createSenderLinkOptions(managementNodeAddress, linkPairName, AtMostOnce))
+	if err != nil {
+		return err
 	}
+
+	a.sender = sender
 	return nil
 }
 

@@ -11,7 +11,7 @@ import (
 var _ = Describe("AMQP Connection Test", func() {
 	It("AMQP SASLTypeAnonymous Connection should succeed", func() {
 
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &amqp.ConnOptions{
+		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous()})
 		Expect(err).To(BeNil())
 		err = connection.Close(context.Background())
@@ -20,7 +20,7 @@ var _ = Describe("AMQP Connection Test", func() {
 
 	It("AMQP SASLTypePlain Connection should succeed", func() {
 
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &amqp.ConnOptions{
+		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
 			SASLType: amqp.SASLTypePlain("guest", "guest")})
 
 		Expect(err).To(BeNil())

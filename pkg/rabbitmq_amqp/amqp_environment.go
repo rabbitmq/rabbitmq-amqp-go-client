@@ -3,17 +3,16 @@ package rabbitmq_amqp
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/go-amqp"
 	"sync"
 )
 
 type Environment struct {
 	connections sync.Map
 	addresses   []string
-	connOptions *amqp.ConnOptions
+	connOptions *AmqpConnOptions
 }
 
-func NewEnvironment(addresses []string, connOptions *amqp.ConnOptions) *Environment {
+func NewEnvironment(addresses []string, connOptions *AmqpConnOptions) *Environment {
 	return &Environment{
 		connections: sync.Map{},
 		addresses:   addresses,
