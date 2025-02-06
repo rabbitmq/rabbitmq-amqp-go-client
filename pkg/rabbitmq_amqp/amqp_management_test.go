@@ -22,8 +22,13 @@ var _ = Describe("Management tests", func() {
 	})
 
 	It("AMQP Management should receive events", func() {
-		ch := make(chan *StateChanged, 1)
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		ch := make(chan *StateChanged, 2)
+		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+			SASLType: amqp.SASLTypeAnonymous(),
+			RecoveryConfiguration: &RecoveryConfiguration{
+				ActiveRecovery: false,
+			},
+		})
 		Expect(err).To(BeNil())
 		connection.NotifyStatusChange(ch)
 		err = connection.Close(context.Background())

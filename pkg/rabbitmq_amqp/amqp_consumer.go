@@ -2,7 +2,10 @@ package rabbitmq_amqp
 
 import (
 	"context"
+	"fmt"
 	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
+	"sync/atomic"
 )
 
 type DeliveryContext struct {
@@ -28,8 +31,8 @@ func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotatio
 	}
 	// copy the rabbitmq annotations  to amqp annotations
 	destination := make(amqp.Annotations)
-	for key, value := range annotations {
-		destination[key] = value
+	for keyA, value := range annotations {
+		destination[keyA] = value
 
 	}
 
@@ -62,21 +65,49 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 }
 
 type Consumer struct {
-	receiver *amqp.Receiver
+	receiver       atomic.Pointer[amqp.Receiver]
+	connection     *AmqpConnection
+	linkName       string
+	destinationAdd string
+	id             string
 }
 
-func newConsumer(receiver *amqp.Receiver) *Consumer {
-	return &Consumer{receiver: receiver}
+func (c *Consumer) Id() string {
+	return c.id
 }
 
-func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
-	msg, err := c.receiver.Receive(ctx, nil)
+func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, linkName string, args ...string) (*Consumer, error) {
+	id := fmt.Sprintf("consumer-%s", uuid.New().String())
+	if len(args) > 0 {
+		id = args[0]
+	}
+	r := &Consumer{connection: connection, linkName: linkName, destinationAdd: destinationAdd, id: id}
+	connection.entitiesTracker.storeOrReplaceConsumer(r)
+	err := r.createReceiver(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &DeliveryContext{receiver: c.receiver, message: msg}, nil
+	return r, nil
+}
+
+func (c *Consumer) createReceiver(ctx context.Context) error {
+	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd, createReceiverLinkOptions(c.destinationAdd, c.linkName, AtLeastOnce))
+	if err != nil {
+		return err
+	}
+
+	c.receiver.Swap(receiver)
+	return nil
+}
+
+func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
+	msg, err := c.receiver.Load().Receive(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &DeliveryContext{receiver: c.receiver.Load(), message: msg}, nil
 }
 
 func (c *Consumer) Close(ctx context.Context) error {
-	return c.receiver.Close(ctx)
+	return c.receiver.Load().Close(ctx)
 }

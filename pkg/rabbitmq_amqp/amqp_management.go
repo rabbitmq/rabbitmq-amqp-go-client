@@ -13,6 +13,10 @@ import (
 var ErrPreconditionFailed = errors.New("precondition Failed")
 var ErrDoesNotExist = errors.New("does not exist")
 
+/*
+AmqpManagement is the interface to the RabbitMQ /management endpoint
+The management interface is used to declare/delete exchanges, queues, and bindings
+*/
 type AmqpManagement struct {
 	session   *amqp.Session
 	sender    *amqp.Sender
@@ -28,34 +32,28 @@ func NewAmqpManagement() *AmqpManagement {
 }
 
 func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
-	if a.receiver == nil {
-		opts := createReceiverLinkOptions(managementNodeAddress, linkPairName, AtMostOnce)
-		receiver, err := a.session.NewReceiver(ctx, managementNodeAddress, opts)
-		if err != nil {
-			return err
-		}
-		a.receiver = receiver
-		return nil
+	opts := createReceiverLinkOptions(managementNodeAddress, linkPairName, AtMostOnce)
+	receiver, err := a.session.NewReceiver(ctx, managementNodeAddress, opts)
+	if err != nil {
+		return err
 	}
+	a.receiver = receiver
 	return nil
 }
 
 func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
-	if a.sender == nil {
-		sender, err := a.session.NewSender(ctx, managementNodeAddress,
-			createSenderLinkOptions(managementNodeAddress, linkPairName, AtMostOnce))
-		if err != nil {
-			return err
-		}
-
-		a.sender = sender
-		return nil
+	sender, err := a.session.NewSender(ctx, managementNodeAddress,
+		createSenderLinkOptions(managementNodeAddress, linkPairName, AtMostOnce))
+	if err != nil {
+		return err
 	}
+
+	a.sender = sender
 	return nil
 }
 
 func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) error {
-	session, err := connection.Connection.NewSession(ctx, nil)
+	session, err := connection.azureConnection.NewSession(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -89,6 +87,11 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	return err
 }
 
+/*
+Request sends a request to the /management endpoint.
+It is a generic method that can be used to send any request to the management endpoint.
+In most of the cases you don't need to use this method directly, instead use the standard methods
+*/
 func (a *AmqpManagement) Request(ctx context.Context, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
 	return a.request(ctx, uuid.New().String(), body, path, method, expectedResponseCodes)

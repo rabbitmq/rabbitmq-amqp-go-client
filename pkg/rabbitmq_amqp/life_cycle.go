@@ -31,6 +31,11 @@ func (c *StateClosing) getState() int {
 }
 
 type StateClosed struct {
+	error error
+}
+
+func (c *StateClosed) GetError() error {
+	return c.error
 }
 
 func (c *StateClosed) getState() int {
@@ -65,6 +70,7 @@ type StateChanged struct {
 }
 
 func (s StateChanged) String() string {
+
 	return fmt.Sprintf("From: %s, To: %s", statusToString(s.From), statusToString(s.To))
 }
 
@@ -100,6 +106,7 @@ func (l *LifeCycle) SetState(value LifeCycleState) {
 	if l.chStatusChanged == nil {
 		return
 	}
+
 	l.chStatusChanged <- &StateChanged{
 		From: oldState,
 		To:   value,

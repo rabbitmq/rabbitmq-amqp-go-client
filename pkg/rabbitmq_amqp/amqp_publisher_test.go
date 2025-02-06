@@ -95,14 +95,14 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Close(context.Background()))
 	})
 
-	It("Multi Targets Publisher should fail with StateReleased when the destination does not exist", func() {
+	It("Multi Targets NewPublisher should fail with StateReleased when the destination does not exist", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
-		qName := generateNameWithDateTime("Targets Publisher should fail when the destination does not exist")
+		qName := generateNameWithDateTime("Targets NewPublisher should fail when the destination does not exist")
 		msg := amqp.NewMessage([]byte("hello"))
 		Expect(MessageToAddressHelper(msg, &QueueAddress{Queue: qName})).To(BeNil())
 
@@ -113,7 +113,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("Multi Targets Publisher should success with StateReceived when the destination exists", func() {
+	It("Multi Targets NewPublisher should success with StateReceived when the destination exists", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
@@ -121,7 +121,7 @@ var _ = Describe("AMQP publisher ", func() {
 		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
-		name := generateNameWithDateTime("Targets Publisher should success with StateReceived when the destination exists")
+		name := generateNameWithDateTime("Targets NewPublisher should success with StateReceived when the destination exists")
 		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: name,
 		})
@@ -167,7 +167,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("Multi Targets Publisher should fail it TO is not set or not valid", func() {
+	It("Multi Targets NewPublisher should fail it TO is not set or not valid", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())

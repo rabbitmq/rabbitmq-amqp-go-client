@@ -6,15 +6,29 @@ import (
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
+	"sync/atomic"
 	"time"
 )
 
 func main() {
-	exchangeName := "getting-started-exchange"
-	queueName := "getting-started-queue"
-	routingKey := "routing-key"
+	queueName := "reliable-amqp10-go-queue"
+	var stateAccepted int32
+	var stateReleased int32
+	var stateRejected int32
 
-	rabbitmq_amqp.Info("Getting started with AMQP Go AMQP 1.0 Client")
+	var received int32
+	var failed int32
+
+	go func() {
+		for {
+			time.Sleep(1 * time.Second)
+			fmt.Printf("Messages sent: %d, accepted: %d, released: %d, rejected: %d, received: %d, failed: %d\n",
+				stateAccepted+stateReleased+stateRejected, stateAccepted, stateReleased, stateRejected, received, failed)
+
+		}
+	}()
+
+	rabbitmq_amqp.Info("How to deal with network disconnections")
 
 	/// Create a channel to receive state change notifications
 	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
@@ -25,7 +39,16 @@ func main() {
 	}(stateChanged)
 
 	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, nil)
+	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, &rabbitmq_amqp.AmqpConnOptions{
+		SASLType:    amqp.SASLTypeAnonymous(),
+		ContainerID: "reliable-amqp10-go",
+		RecoveryConfiguration: &rabbitmq_amqp.RecoveryConfiguration{
+			ActiveRecovery:           true,
+			BackOffReconnectInterval: 2 * time.Second, // we reduce the reconnect interval to speed up the test. The default is 5 seconds
+			// In production, you should avoid BackOffReconnectInterval with low values since it can cause a high number of reconnection attempts
+			MaxReconnectAttempts: 5,
+		},
+	})
 	if err != nil {
 		rabbitmq_amqp.Error("Error opening connection", err)
 		return
@@ -37,42 +60,19 @@ func main() {
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
-	exchangeInfo, err := management.DeclareExchange(context.TODO(), &rabbitmq_amqp.TopicExchangeSpecification{
-		Name: exchangeName,
-	})
-	if err != nil {
-		rabbitmq_amqp.Error("Error declaring exchange", err)
-		return
-	}
 
 	// Declare a Quorum queue
 	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QuorumQueueSpecification{
 		Name: queueName,
 	})
-
 	if err != nil {
 		rabbitmq_amqp.Error("Error declaring queue", err)
 		return
 	}
 
-	// Bind the queue to the exchange
-	bindingPath, err := management.Bind(context.TODO(), &rabbitmq_amqp.ExchangeToQueueBindingSpecification{
-		SourceExchange:   exchangeName,
-		DestinationQueue: queueName,
-		BindingKey:       routingKey,
-	})
-
-	if err != nil {
-		rabbitmq_amqp.Error("Error binding", err)
-		return
-	}
-
-	// Create a consumer to receive messages from the queue
-	// you need to build the address of the queue, but you can use the helper function
-
 	consumer, err := amqpConnection.NewConsumer(context.Background(), &rabbitmq_amqp.QueueAddress{
 		Queue: queueName,
-	}, "getting-started-consumer")
+	}, "reliable-consumer")
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating consumer", err)
 		return
@@ -86,56 +86,60 @@ func main() {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
-				rabbitmq_amqp.Info("[NewConsumer]", "consumer closed. Context", err)
 				return
 			}
 			if err != nil {
 				// An error occurred receiving the message
-				rabbitmq_amqp.Error("[NewConsumer]", "Error receiving message", err)
-				return
+				rabbitmq_amqp.Error("[NewConsumer]", "Error receiving message, retry in 2_500 ms", err, "queue", queueName)
+				// here the consumer could be disconnected from the server due to a network error
+				// in this specific case, we just wait for 2_500 ms and try again (2 seconds is the reconnect interval we defined + random 500 random ms)
+				// while the connection is reestablished
+				// you can use the stateChanged channel to be notified when the connection is reestablished
+				time.Sleep(2500 * time.Millisecond)
+				continue
 			}
 
-			rabbitmq_amqp.Info("[NewConsumer]", "Received message",
-				fmt.Sprintf("%s", deliveryContext.Message().Data))
-
+			atomic.AddInt32(&received, 1)
 			err = deliveryContext.Accept(context.Background())
 			if err != nil {
-				rabbitmq_amqp.Error("Error accepting message", err)
-				return
+				// same here the delivery could not be accepted due to a network error
+				// we wait for 2_500 ms and try again
+				time.Sleep(2500 * time.Millisecond)
+				continue
 			}
 		}
 	}(consumerContext)
 
-	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmq_amqp.ExchangeAddress{
-		Exchange: exchangeName,
-		Key:      routingKey,
-	}, "getting-started-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmq_amqp.QueueAddress{
+		Queue: queueName,
+	}, "reliable-publisher")
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating publisher", err)
 		return
 	}
 
-	for i := 0; i < 1_000; i++ {
-		// Publish a message to the exchange
+	for i := 0; i < 1_000_000; i++ {
 		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 		if err != nil {
 			rabbitmq_amqp.Error("Error publishing message", "error", err)
-			time.Sleep(1 * time.Second)
+			// here you need to deal with the error. You can store the message in a local in memory/persistent storage
+			// then retry to send the message as soon as the connection is reestablished
+			// in this specific case, we just wait for 2_500 ms and try again (2 seconds is the reconnect interval we defined + random 500 random ms)
+			// you can use the stateChanged channel to be notified when the connection is reestablished
+			// and use some signal to reactivate the message sending
+			atomic.AddInt32(&failed, 1)
+			time.Sleep(2500 * time.Millisecond)
 			continue
 		}
 		switch publishResult.Outcome.(type) {
 		case *amqp.StateAccepted:
-			rabbitmq_amqp.Info("[NewPublisher]", "Message accepted", publishResult.Message.Data[0])
+			atomic.AddInt32(&stateAccepted, 1)
 			break
 		case *amqp.StateReleased:
-			rabbitmq_amqp.Warn("[NewPublisher]", "Message was not routed", publishResult.Message.Data[0])
+			atomic.AddInt32(&stateReleased, 1)
 			break
 		case *amqp.StateRejected:
-			rabbitmq_amqp.Warn("[NewPublisher]", "Message rejected", publishResult.Message.Data[0])
-			stateType := publishResult.Outcome.(*amqp.StateRejected)
-			if stateType.Error != nil {
-				rabbitmq_amqp.Warn("[NewPublisher]", "Message rejected with error: %v", stateType.Error)
-			}
+			atomic.AddInt32(&stateRejected, 1)
 			break
 		default:
 			// these status are not supported. Leave it for AMQP 1.0 compatibility
@@ -160,20 +164,6 @@ func main() {
 	err = publisher.Close(context.Background())
 	if err != nil {
 		rabbitmq_amqp.Error("[NewPublisher]", err)
-		return
-	}
-
-	// Unbind the queue from the exchange
-	err = management.Unbind(context.TODO(), bindingPath)
-
-	if err != nil {
-		fmt.Printf("Error unbinding: %v\n", err)
-		return
-	}
-
-	err = management.DeleteExchange(context.TODO(), exchangeInfo.Name())
-	if err != nil {
-		fmt.Printf("Error deleting exchange: %v\n", err)
 		return
 	}
 
