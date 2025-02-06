@@ -13,6 +13,10 @@ import (
 var ErrPreconditionFailed = errors.New("precondition Failed")
 var ErrDoesNotExist = errors.New("does not exist")
 
+/*
+AmqpManagement is the interface to the RabbitMQ /management endpoint
+The management interface is used to declare/delete exchanges, queues, and bindings
+*/
 type AmqpManagement struct {
 	session   *amqp.Session
 	sender    *amqp.Sender
@@ -83,6 +87,11 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	return err
 }
 
+/*
+Request sends a request to the /management endpoint.
+It is a generic method that can be used to send any request to the management endpoint.
+In most of the cases you don't need to use this method directly, instead use the standard methods
+*/
 func (a *AmqpManagement) Request(ctx context.Context, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
 	return a.request(ctx, uuid.New().String(), body, path, method, expectedResponseCodes)

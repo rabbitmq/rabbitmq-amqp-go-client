@@ -65,13 +65,13 @@ func statusToString(status LifeCycleState) string {
 }
 
 type StateChanged struct {
-	From  LifeCycleState
-	To    LifeCycleState
-	Error error
+	From LifeCycleState
+	To   LifeCycleState
 }
 
 func (s StateChanged) String() string {
-	return fmt.Sprintf("From: %s, To: %s, Error: %v", statusToString(s.From), statusToString(s.To), s.Error)
+
+	return fmt.Sprintf("From: %s, To: %s", statusToString(s.From), statusToString(s.To))
 }
 
 type LifeCycle struct {
@@ -107,16 +107,8 @@ func (l *LifeCycle) SetState(value LifeCycleState) {
 		return
 	}
 
-	var stateError error
-	switch value.(type) {
-	case *StateClosed:
-		stateError = value.(*StateClosed).GetError()
-
-	}
-
 	l.chStatusChanged <- &StateChanged{
-		From:  oldState,
-		To:    value,
-		Error: stateError,
+		From: oldState,
+		To:   value,
 	}
 }

@@ -136,6 +136,7 @@ func Dial(ctx context.Context, addresses []string, connOptions *AmqpConnOptions,
 	}
 	conn.amqpConnOptions = connOptions
 	conn.amqpConnOptions.addresses = addresses
+	conn.lifeCycle.SetState(&StateOpen{})
 	return conn, nil
 
 }
@@ -204,6 +205,7 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 				if azureConnection.Err() != nil {
 					Error("connection closed unexpectedly", "error", azureConnection.Err())
 					a.maybeReconnect()
+
 					return
 				}
 				Debug("connection closed successfully")
@@ -220,7 +222,6 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 		return err
 	}
 
-	a.lifeCycle.SetState(&StateOpen{})
 	return nil
 }
 func (a *AmqpConnection) maybeReconnect() {
@@ -232,6 +233,7 @@ func (a *AmqpConnection) maybeReconnect() {
 	a.lifeCycle.SetState(&StateReconnecting{})
 	numberOfAttempts := 1
 	waitTime := a.amqpConnOptions.RecoveryConfiguration.BackOffReconnectInterval
+	reconnected := false
 	for numberOfAttempts <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts {
 		///wait for before reconnecting
 		Info("Waiting before reconnecting", "in", waitTime, "attempt", numberOfAttempts)
@@ -247,25 +249,29 @@ func (a *AmqpConnection) maybeReconnect() {
 			waitTime = waitTime * 2
 			Error("Failed to connection. ", "id", a.Id(), "error", err)
 		} else {
+			reconnected = true
 			break
 		}
 	}
 
-	var fails int32
-	Info("Reconnected successfully, restarting publishers and consumers")
-	a.entitiesTracker.publishers.Range(func(key, value any) bool {
-		publisher := value.(*Publisher)
-		// try to createSender
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		err := publisher.createSender(ctx)
-		if err != nil {
-			atomic.AddInt32(&fails, 1)
-			Error("Failed to createSender publisher", "ID", publisher.Id(), "error", err)
-		}
-		cancel()
-		return true
-	})
-	Info("Restarted publishers", "number of fails", fails)
+	if reconnected {
+		var fails int32
+		Info("Reconnected successfully, restarting publishers and consumers")
+		a.entitiesTracker.publishers.Range(func(key, value any) bool {
+			publisher := value.(*Publisher)
+			// try to createSender
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			err := publisher.createSender(ctx)
+			if err != nil {
+				atomic.AddInt32(&fails, 1)
+				Error("Failed to createSender publisher", "ID", publisher.Id(), "error", err)
+			}
+			cancel()
+			return true
+		})
+		Info("Restarted publishers", "number of fails", fails)
+		a.lifeCycle.SetState(&StateOpen{})
+	}
 
 }
 
