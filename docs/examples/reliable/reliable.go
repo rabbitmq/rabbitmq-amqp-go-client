@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
@@ -14,6 +15,7 @@ func main() {
 	var stateAccepted int32
 	var stateReleased int32
 	var stateRejected int32
+
 	var received int32
 	var failed int32
 
@@ -40,6 +42,12 @@ func main() {
 	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, &rabbitmq_amqp.AmqpConnOptions{
 		SASLType:    amqp.SASLTypeAnonymous(),
 		ContainerID: "reliable-amqp10-go",
+		RecoveryConfiguration: &rabbitmq_amqp.RecoveryConfiguration{
+			ActiveRecovery:           true,
+			BackOffReconnectInterval: 2 * time.Second, // we reduce the reconnect interval to speed up the test. The default is 5 seconds
+			// In production, you should avoid BackOffReconnectInterval with low values since it can cause a high number of reconnection attempts
+			MaxReconnectAttempts: 5,
+		},
 	})
 	if err != nil {
 		rabbitmq_amqp.Error("Error opening connection", err)
@@ -62,40 +70,45 @@ func main() {
 		return
 	}
 
-	//consumer, err := amqpConnection.NewConsumer(context.Background(), &rabbitmq_amqp.QueueAddress{
-	//	Queue: queueName,
-	//}, "reliable-consumer")
-	//if err != nil {
-	//	rabbitmq_amqp.Error("Error creating consumer", err)
-	//	return
-	//}
+	consumer, err := amqpConnection.NewConsumer(context.Background(), &rabbitmq_amqp.QueueAddress{
+		Queue: queueName,
+	}, "reliable-consumer")
+	if err != nil {
+		rabbitmq_amqp.Error("Error creating consumer", err)
+		return
+	}
 
-	//consumerContext, cancel := context.WithCancel(context.Background())
+	consumerContext, cancel := context.WithCancel(context.Background())
 
-	//// Consume messages from the queue
-	//go func(ctx context.Context) {
-	//	for {
-	//		deliveryContext, err := consumer.Receive(ctx)
-	//		if errors.Is(err, context.Canceled) {
-	//			// The consumer was closed correctly
-	//			return
-	//		}
-	//		if err != nil {
-	//			// An error occurred receiving the message
-	//			rabbitmq_amqp.Error("[Consumer]", "Error receiving message", err)
-	//			return
-	//		}
-	//
-	//		rabbitmq_amqp.Info("[Consumer]", "Received message",
-	//			fmt.Sprintf("%s", deliveryContext.Message().Data))
-	//
-	//		err = deliveryContext.Accept(context.Background())
-	//		if err != nil {
-	//			rabbitmq_amqp.Error("Error accepting message", err)
-	//			return
-	//		}
-	//	}
-	//}(consumerContext)
+	// Consume messages from the queue
+	go func(ctx context.Context) {
+		for {
+			deliveryContext, err := consumer.Receive(ctx)
+			if errors.Is(err, context.Canceled) {
+				// The consumer was closed correctly
+				return
+			}
+			if err != nil {
+				// An error occurred receiving the message
+				rabbitmq_amqp.Error("[NewConsumer]", "Error receiving message, retry in 2_500 ms", err, "queue", queueName)
+				// here the consumer could be disconnected from the server due to a network error
+				// in this specific case, we just wait for 2_500 ms and try again (2 seconds is the reconnect interval we defined + random 500 random ms)
+				// while the connection is reestablished
+				// you can use the stateChanged channel to be notified when the connection is reestablished
+				time.Sleep(2500 * time.Millisecond)
+				continue
+			}
+
+			atomic.AddInt32(&received, 1)
+			err = deliveryContext.Accept(context.Background())
+			if err != nil {
+				// same here the delivery could not be accepted due to a network error
+				// we wait for 2_500 ms and try again
+				time.Sleep(2500 * time.Millisecond)
+				continue
+			}
+		}
+	}(consumerContext)
 
 	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmq_amqp.QueueAddress{
 		Queue: queueName,
@@ -106,12 +119,16 @@ func main() {
 	}
 
 	for i := 0; i < 1_000_000; i++ {
-		// Publish a message to the exchange
 		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 		if err != nil {
 			rabbitmq_amqp.Error("Error publishing message", "error", err)
+			// here you need to deal with the error. You can store the message in a local in memory/persistent storage
+			// then retry to send the message as soon as the connection is reestablished
+			// in this specific case, we just wait for 2_500 ms and try again (2 seconds is the reconnect interval we defined + random 500 random ms)
+			// you can use the stateChanged channel to be notified when the connection is reestablished
+			// and use some signal to reactivate the message sending
 			atomic.AddInt32(&failed, 1)
-			time.Sleep(1 * time.Second)
+			time.Sleep(2500 * time.Millisecond)
 			continue
 		}
 		switch publishResult.Outcome.(type) {
@@ -136,17 +153,17 @@ func main() {
 	var input string
 	_, _ = fmt.Scanln(&input)
 
-	//cancel()
+	cancel()
 	//Close the consumer
-	//err = consumer.Close(context.Background())
-	//if err != nil {
-	//	rabbitmq_amqp.Error("[Consumer]", err)
-	//	return
-	//}
+	err = consumer.Close(context.Background())
+	if err != nil {
+		rabbitmq_amqp.Error("[NewConsumer]", err)
+		return
+	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
-		rabbitmq_amqp.Error("[Publisher]", err)
+		rabbitmq_amqp.Error("[NewPublisher]", err)
 		return
 	}
 

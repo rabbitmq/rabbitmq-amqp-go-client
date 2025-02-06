@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -93,14 +94,7 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, destination *QueueAddr
 	}
 	err = validateAddress(destinationAdd)
 
-	if err != nil {
-		return nil, err
-	}
-	receiver, err := a.session.NewReceiver(ctx, destinationAdd, createReceiverLinkOptions(destinationAdd, linkName, AtLeastOnce))
-	if err != nil {
-		return nil, err
-	}
-	return newConsumer(receiver), nil
+	return newConsumer(ctx, a, destinationAdd, linkName)
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
@@ -120,6 +114,16 @@ func Dial(ctx context.Context, addresses []string, connOptions *AmqpConnOptions,
 	if connOptions.RecoveryConfiguration == nil {
 		connOptions.RecoveryConfiguration = NewRecoveryConfiguration()
 	}
+
+	// validate the RecoveryConfiguration options
+	if connOptions.RecoveryConfiguration.MaxReconnectAttempts <= 0 && connOptions.RecoveryConfiguration.ActiveRecovery {
+		return nil, fmt.Errorf("MaxReconnectAttempts should be greater than 0")
+	}
+	if connOptions.RecoveryConfiguration.BackOffReconnectInterval <= 1*time.Second && connOptions.RecoveryConfiguration.ActiveRecovery {
+		return nil, fmt.Errorf("BackOffReconnectInterval should be greater than 1 second")
+	}
+
+	// create the connection
 
 	conn := &AmqpConnection{
 		management:      NewAmqpManagement(),
@@ -236,6 +240,10 @@ func (a *AmqpConnection) maybeReconnect() {
 	reconnected := false
 	for numberOfAttempts <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts {
 		///wait for before reconnecting
+		// add some random milliseconds to the wait time to avoid thundering herd
+		// the random time is between 0 and 500 milliseconds
+		waitTime = waitTime + time.Duration(rand.Intn(500))*time.Millisecond
+
 		Info("Waiting before reconnecting", "in", waitTime, "attempt", numberOfAttempts)
 		time.Sleep(waitTime)
 		// context with timeout
@@ -270,6 +278,21 @@ func (a *AmqpConnection) maybeReconnect() {
 			return true
 		})
 		Info("Restarted publishers", "number of fails", fails)
+		fails = 0
+		a.entitiesTracker.consumers.Range(func(key, value any) bool {
+			consumer := value.(*Consumer)
+			// try to createSender
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			err := consumer.createReceiver(ctx)
+			if err != nil {
+				atomic.AddInt32(&fails, 1)
+				Error("Failed to createReceiver consumer", "ID", consumer.Id(), "error", err)
+			}
+			cancel()
+			return true
+		})
+		Info("Restarted consumers", "number of fails", fails)
+
 		a.lifeCycle.SetState(&StateOpen{})
 	}
 

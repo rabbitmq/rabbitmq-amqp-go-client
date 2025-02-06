@@ -46,7 +46,7 @@ func (m *Publisher) createSender(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	m.sender.Store(sender)
+	m.sender.Swap(sender)
 	return nil
 }
 

@@ -43,6 +43,10 @@ var _ = Describe("Recovery connection test", func() {
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
 
+		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{
+			Queue: qName,
+		}, "test")
+
 		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{
 			Queue: qName,
 		}, "test")
@@ -89,10 +93,12 @@ var _ = Describe("Recovery connection test", func() {
 			Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
 		}
 
-		time.Sleep(500 * time.Millisecond)
-		purged, err := connection.Management().PurgeQueue(context.Background(), qName)
-		Expect(err).To(BeNil())
-		Expect(purged).To(Equal(5 + 5))
+		/// after the connection is reconnected the consumer should be able to receive the messages
+		for i := 0; i < 10; i++ {
+			deliveryContext, err := consumer.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(deliveryContext).NotTo(BeNil())
+		}
 
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 
@@ -109,4 +115,69 @@ var _ = Describe("Recovery connection test", func() {
 		// from open to closed (without error)
 		Expect(err).To(BeNil())
 	})
+
+	It("connection should not reconnect producers and consumers if the auto-recovery is disabled", func() {
+		name := "connection should reconnect producers and consumers if dropped by via REST API"
+		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+			SASLType:    amqp.SASLTypeAnonymous(),
+			ContainerID: name,
+			// reduced the reconnect interval to speed up the test
+			RecoveryConfiguration: &RecoveryConfiguration{
+				ActiveRecovery: false, // disabled
+			},
+		})
+		Expect(err).To(BeNil())
+		ch := make(chan *StateChanged, 1)
+		connection.NotifyStatusChange(ch)
+
+		Eventually(func() bool {
+			err := testhelper.DropConnectionContainerID(name)
+			return err == nil
+		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeTrue())
+		st1 := <-ch
+		Expect(st1.From).To(Equal(&StateOpen{}))
+		Expect(st1.To).To(BeAssignableToTypeOf(&StateClosed{}))
+
+		err = st1.To.(*StateClosed).GetError()
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("Connection forced"))
+
+		time.Sleep(1 * time.Second)
+
+		// the connection should not be reconnected
+		Consistently(func() bool {
+			conn, err := testhelper.GetConnectionByContainerID(name)
+			return err == nil && conn != nil
+		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeFalse())
+
+		err = connection.Close(context.Background())
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("validate the Recovery connection parameters", func() {
+
+		_, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+			SASLType: amqp.SASLTypeAnonymous(),
+			// reduced the reconnect interval to speed up the test
+			RecoveryConfiguration: &RecoveryConfiguration{
+				ActiveRecovery:           true,
+				BackOffReconnectInterval: 500 * time.Millisecond,
+				MaxReconnectAttempts:     5,
+			},
+		})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("BackOffReconnectInterval should be greater than"))
+
+		_, err = Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+			SASLType: amqp.SASLTypeAnonymous(),
+			RecoveryConfiguration: &RecoveryConfiguration{
+				ActiveRecovery:       true,
+				MaxReconnectAttempts: 0,
+			},
+		})
+
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("MaxReconnectAttempts should be greater than"))
+	})
+
 })
