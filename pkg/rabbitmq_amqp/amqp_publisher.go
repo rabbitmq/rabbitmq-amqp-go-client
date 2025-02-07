@@ -105,11 +105,10 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 	if err != nil {
 		return nil, err
 	}
-	publishResult := &PublishResult{
+	return &PublishResult{
 		Message: message,
 		Outcome: state,
-	}
-	return publishResult, err
+	}, err
 }
 
 // Close closes the publisher.

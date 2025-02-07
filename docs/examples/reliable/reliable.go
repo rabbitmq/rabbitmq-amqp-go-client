@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -19,22 +20,28 @@ func main() {
 	var received int32
 	var failed int32
 
+	startTime := time.Now()
 	go func() {
 		for {
-			time.Sleep(1 * time.Second)
-			fmt.Printf("Messages sent: %d, accepted: %d, released: %d, rejected: %d, received: %d, failed: %d\n",
-				stateAccepted+stateReleased+stateRejected, stateAccepted, stateReleased, stateRejected, received, failed)
+			time.Sleep(5 * time.Second)
+			total := stateAccepted + stateReleased + stateRejected
+			messagesPerSecond := float64(total) / time.Since(startTime).Seconds()
+			rabbitmq_amqp.Info("[Stats]", "sent", total, "received", received, "failed", failed, "messagesPerSecond", messagesPerSecond)
 
 		}
 	}()
 
 	rabbitmq_amqp.Info("How to deal with network disconnections")
-
+	signalBlock := sync.Cond{L: &sync.Mutex{}}
 	/// Create a channel to receive state change notifications
 	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
 	go func(ch chan *rabbitmq_amqp.StateChanged) {
 		for statusChanged := range ch {
 			rabbitmq_amqp.Info("[connection]", "Status changed", statusChanged)
+			switch statusChanged.To.(type) {
+			case *rabbitmq_amqp.StateOpen:
+				signalBlock.Broadcast()
+			}
 		}
 	}(stateChanged)
 
@@ -90,12 +97,13 @@ func main() {
 			}
 			if err != nil {
 				// An error occurred receiving the message
-				rabbitmq_amqp.Error("[NewConsumer]", "Error receiving message, retry in 2_500 ms", err, "queue", queueName)
 				// here the consumer could be disconnected from the server due to a network error
-				// in this specific case, we just wait for 2_500 ms and try again (2 seconds is the reconnect interval we defined + random 500 random ms)
-				// while the connection is reestablished
-				// you can use the stateChanged channel to be notified when the connection is reestablished
-				time.Sleep(2500 * time.Millisecond)
+				signalBlock.L.Lock()
+				rabbitmq_amqp.Info("[Consumer]", "Consumer is blocked, queue", queueName, "error", err)
+				signalBlock.Wait()
+				rabbitmq_amqp.Info("[Consumer]", "Consumer is unblocked, queue", queueName)
+
+				signalBlock.L.Unlock()
 				continue
 			}
 
@@ -118,35 +126,46 @@ func main() {
 		return
 	}
 
-	for i := 0; i < 1_000_000; i++ {
-		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
-		if err != nil {
-			rabbitmq_amqp.Error("Error publishing message", "error", err)
-			// here you need to deal with the error. You can store the message in a local in memory/persistent storage
-			// then retry to send the message as soon as the connection is reestablished
-			// in this specific case, we just wait for 2_500 ms and try again (2 seconds is the reconnect interval we defined + random 500 random ms)
-			// you can use the stateChanged channel to be notified when the connection is reestablished
-			// and use some signal to reactivate the message sending
-			atomic.AddInt32(&failed, 1)
-			time.Sleep(2500 * time.Millisecond)
-			continue
-		}
-		switch publishResult.Outcome.(type) {
-		case *amqp.StateAccepted:
-			atomic.AddInt32(&stateAccepted, 1)
-			break
-		case *amqp.StateReleased:
-			atomic.AddInt32(&stateReleased, 1)
-			break
-		case *amqp.StateRejected:
-			atomic.AddInt32(&stateRejected, 1)
-			break
-		default:
-			// these status are not supported. Leave it for AMQP 1.0 compatibility
-			// see: https://www.rabbitmq.com/docs/next/amqp#outcomes
-			rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
-		}
+	wg := &sync.WaitGroup{}
+	for i := 0; i < 1; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 500_000; i++ {
+				publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
+				if err != nil {
+					// here you need to deal with the error. You can store the message in a local in memory/persistent storage
+					// then retry to send the message as soon as the connection is reestablished
+
+					atomic.AddInt32(&failed, 1)
+					// block signalBlock until the connection is reestablished
+					signalBlock.L.Lock()
+					rabbitmq_amqp.Info("[Publisher]", "Publisher is blocked, queue", queueName, "error", err)
+					signalBlock.Wait()
+					rabbitmq_amqp.Info("[Publisher]", "Publisher is unblocked, queue", queueName)
+					signalBlock.L.Unlock()
+
+				} else {
+					switch publishResult.Outcome.(type) {
+					case *amqp.StateAccepted:
+						atomic.AddInt32(&stateAccepted, 1)
+						break
+					case *amqp.StateReleased:
+						atomic.AddInt32(&stateReleased, 1)
+						break
+					case *amqp.StateRejected:
+						atomic.AddInt32(&stateRejected, 1)
+						break
+					default:
+						// these status are not supported. Leave it for AMQP 1.0 compatibility
+						// see: https://www.rabbitmq.com/docs/next/amqp#outcomes
+						rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
+					}
+				}
+			}
+		}()
 	}
+	wg.Wait()
 
 	println("press any key to close the connection")
 

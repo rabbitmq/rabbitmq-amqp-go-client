@@ -70,8 +70,18 @@ type StateChanged struct {
 }
 
 func (s StateChanged) String() string {
+	switch s.From.(type) {
+	case *StateClosed:
 
+	}
+
+	switch s.To.(type) {
+	case *StateClosed:
+		return fmt.Sprintf("From: %s, To: %s, Error: %s", statusToString(s.From), statusToString(s.To), s.To.(*StateClosed).error)
+
+	}
 	return fmt.Sprintf("From: %s, To: %s", statusToString(s.From), statusToString(s.To))
+
 }
 
 type LifeCycle struct {
