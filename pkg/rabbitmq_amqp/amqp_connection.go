@@ -87,14 +87,17 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAdd
 }
 
 // NewConsumer creates a new Consumer that listens to the provided destination. Destination is a QueueAddress.
-func (a *AmqpConnection) NewConsumer(ctx context.Context, destination *QueueAddress, linkName string) (*Consumer, error) {
+func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options ConsumerOptions) (*Consumer, error) {
+	destination := &QueueAddress{
+		Queue: queueName,
+	}
+
 	destinationAdd, err := destination.toAddress()
 	if err != nil {
 		return nil, err
 	}
-	err = validateAddress(destinationAdd)
 
-	return newConsumer(ctx, a, destinationAdd, linkName)
+	return newConsumer(ctx, a, destinationAdd, options)
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings

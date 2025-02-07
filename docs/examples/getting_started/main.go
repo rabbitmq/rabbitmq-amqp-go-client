@@ -70,9 +70,7 @@ func main() {
 	// Create a consumer to receive messages from the queue
 	// you need to build the address of the queue, but you can use the helper function
 
-	consumer, err := amqpConnection.NewConsumer(context.Background(), &rabbitmq_amqp.QueueAddress{
-		Queue: queueName,
-	}, "getting-started-consumer")
+	consumer, err := amqpConnection.NewConsumer(context.Background(), queueName, nil)
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating consumer", err)
 		return
@@ -115,7 +113,7 @@ func main() {
 		return
 	}
 
-	for i := 0; i < 1_000; i++ {
+	for i := 0; i < 100; i++ {
 		// Publish a message to the exchange
 		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 		if err != nil {

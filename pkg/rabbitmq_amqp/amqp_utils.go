@@ -40,7 +40,7 @@ func createSenderLinkOptions(address string, linkName string, deliveryMode int) 
 // receiverLinkOptions returns the options for a receiver link
 // with the given address and link name.
 // That should be the same for all the links.
-func createReceiverLinkOptions(address string, linkName string, deliveryMode int) *amqp.ReceiverOptions {
+func createReceiverLinkOptions(address string, options ConsumerOptions, deliveryMode int) *amqp.ReceiverOptions {
 	prop := make(map[string]any)
 	prop["paired"] = true
 	receiverSettleMode := amqp.SenderSettleModeSettled.Ptr()
@@ -55,14 +55,14 @@ func createReceiverLinkOptions(address string, linkName string, deliveryMode int
 	return &amqp.ReceiverOptions{
 		TargetAddress:             address,
 		DynamicAddress:            false,
-		Name:                      linkName,
+		Name:                      getLinkName(options),
 		Properties:                prop,
 		Durability:                0,
 		ExpiryTimeout:             0,
 		SettlementMode:            amqp.ReceiverSettleModeFirst.Ptr(),
 		RequestedSenderSettleMode: receiverSettleMode,
 		ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
-		Credit:                    100,
+		Credit:                    getInitialCredits(options),
 	}
 }
 

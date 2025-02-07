@@ -43,9 +43,8 @@ var _ = Describe("Recovery connection test", func() {
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
 
-		consumer, err := connection.NewConsumer(context.Background(), &QueueAddress{
-			Queue: qName,
-		}, "test")
+		consumer, err := connection.NewConsumer(context.Background(),
+			qName, nil)
 
 		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{
 			Queue: qName,

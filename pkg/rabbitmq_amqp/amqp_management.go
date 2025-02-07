@@ -32,7 +32,7 @@ func NewAmqpManagement() *AmqpManagement {
 }
 
 func (a *AmqpManagement) ensureReceiverLink(ctx context.Context) error {
-	opts := createReceiverLinkOptions(managementNodeAddress, linkPairName, AtMostOnce)
+	opts := createReceiverLinkOptions(managementNodeAddress, &managementOptions{}, AtMostOnce)
 	receiver, err := a.session.NewReceiver(ctx, managementNodeAddress, opts)
 	if err != nil {
 		return err

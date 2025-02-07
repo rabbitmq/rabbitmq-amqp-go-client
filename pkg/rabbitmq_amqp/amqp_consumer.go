@@ -67,7 +67,7 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 type Consumer struct {
 	receiver       atomic.Pointer[amqp.Receiver]
 	connection     *AmqpConnection
-	linkName       string
+	options        ConsumerOptions
 	destinationAdd string
 	id             string
 }
@@ -76,12 +76,13 @@ func (c *Consumer) Id() string {
 	return c.id
 }
 
-func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, linkName string, args ...string) (*Consumer, error) {
+func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options ConsumerOptions, args ...string) (*Consumer, error) {
 	id := fmt.Sprintf("consumer-%s", uuid.New().String())
 	if len(args) > 0 {
 		id = args[0]
 	}
-	r := &Consumer{connection: connection, linkName: linkName, destinationAdd: destinationAdd, id: id}
+
+	r := &Consumer{connection: connection, options: options, destinationAdd: destinationAdd, id: id}
 	connection.entitiesTracker.storeOrReplaceConsumer(r)
 	err := r.createReceiver(ctx)
 	if err != nil {
@@ -91,7 +92,8 @@ func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd
 }
 
 func (c *Consumer) createReceiver(ctx context.Context) error {
-	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd, createReceiverLinkOptions(c.destinationAdd, c.linkName, AtLeastOnce))
+	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd,
+		createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce))
 	if err != nil {
 		return err
 	}

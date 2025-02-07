@@ -77,9 +77,7 @@ func main() {
 		return
 	}
 
-	consumer, err := amqpConnection.NewConsumer(context.Background(), &rabbitmq_amqp.QueueAddress{
-		Queue: queueName,
-	}, "reliable-consumer")
+	consumer, err := amqpConnection.NewConsumer(context.Background(), queueName, nil)
 	if err != nil {
 		rabbitmq_amqp.Error("Error creating consumer", err)
 		return
