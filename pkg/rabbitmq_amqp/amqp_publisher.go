@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
+	"sync/atomic"
 )
 
 type PublishResult struct {
@@ -13,12 +15,39 @@ type PublishResult struct {
 
 // Publisher is a publisher that sends messages to a specific destination address.
 type Publisher struct {
-	sender              *amqp.Sender
-	staticTargetAddress bool
+	sender         atomic.Pointer[amqp.Sender]
+	connection     *AmqpConnection
+	linkName       string
+	destinationAdd string
+	id             string
 }
 
-func newPublisher(sender *amqp.Sender, staticTargetAddress bool) *Publisher {
-	return &Publisher{sender: sender, staticTargetAddress: staticTargetAddress}
+func (m *Publisher) Id() string {
+	return m.id
+}
+
+func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAdd string, linkName string, args ...string) (*Publisher, error) {
+	id := fmt.Sprintf("publisher-%s", uuid.New().String())
+	if len(args) > 0 {
+		id = args[0]
+	}
+
+	r := &Publisher{connection: connection, linkName: linkName, destinationAdd: destinationAdd, id: id}
+	connection.entitiesTracker.storeOrReplaceProducer(r)
+	err := r.createSender(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (m *Publisher) createSender(ctx context.Context) error {
+	sender, err := m.connection.session.NewSender(ctx, m.destinationAdd, createSenderLinkOptions(m.destinationAdd, m.linkName, AtLeastOnce))
+	if err != nil {
+		return err
+	}
+	m.sender.Swap(sender)
+	return nil
 }
 
 /*
@@ -58,7 +87,7 @@ Create a new publisher that sends messages based on message destination address:
 </code>
 */
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
-	if !m.staticTargetAddress {
+	if m.destinationAdd == "" {
 		if message.Properties == nil || message.Properties.To == nil {
 			return nil, fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
 		}
@@ -68,7 +97,7 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 			return nil, err
 		}
 	}
-	r, err := m.sender.SendWithReceipt(ctx, message, nil)
+	r, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -76,14 +105,14 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 	if err != nil {
 		return nil, err
 	}
-	publishResult := &PublishResult{
+	return &PublishResult{
 		Message: message,
 		Outcome: state,
-	}
-	return publishResult, err
+	}, err
 }
 
 // Close closes the publisher.
 func (m *Publisher) Close(ctx context.Context) error {
-	return m.sender.Close(ctx)
+	m.connection.entitiesTracker.removeProducer(m)
+	return m.sender.Load().Close(ctx)
 }

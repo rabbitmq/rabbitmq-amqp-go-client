@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
-	"github.com/rabbitmq/rabbitmq-amqp-go-client/rabbitmq_amqp"
+	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
 	"time"
 )
 
@@ -20,7 +20,7 @@ func main() {
 	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
 	go func(ch chan *rabbitmq_amqp.StateChanged) {
 		for statusChanged := range ch {
-			rabbitmq_amqp.Info("[Connection]", "Status changed", statusChanged)
+			rabbitmq_amqp.Info("[connection]", "Status changed", statusChanged)
 		}
 	}(stateChanged)
 
@@ -33,7 +33,7 @@ func main() {
 	// Register the channel to receive status change notifications
 	amqpConnection.NotifyStatusChange(stateChanged)
 
-	fmt.Printf("AMQP Connection opened.\n")
+	fmt.Printf("AMQP connection opened.\n")
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
@@ -86,16 +86,16 @@ func main() {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
-				rabbitmq_amqp.Info("[Consumer]", "consumer closed. Context", err)
+				rabbitmq_amqp.Info("[NewConsumer]", "consumer closed. Context", err)
 				return
 			}
 			if err != nil {
 				// An error occurred receiving the message
-				rabbitmq_amqp.Error("[Consumer]", "Error receiving message", err)
+				rabbitmq_amqp.Error("[NewConsumer]", "Error receiving message", err)
 				return
 			}
 
-			rabbitmq_amqp.Info("[Consumer]", "Received message",
+			rabbitmq_amqp.Info("[NewConsumer]", "Received message",
 				fmt.Sprintf("%s", deliveryContext.Message().Data))
 
 			err = deliveryContext.Accept(context.Background())
@@ -115,26 +115,26 @@ func main() {
 		return
 	}
 
-	for i := 0; i < 10; i++ {
-
+	for i := 0; i < 1_000; i++ {
 		// Publish a message to the exchange
 		publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 		if err != nil {
-			rabbitmq_amqp.Error("Error publishing message", err)
-			return
+			rabbitmq_amqp.Error("Error publishing message", "error", err)
+			time.Sleep(1 * time.Second)
+			continue
 		}
 		switch publishResult.Outcome.(type) {
 		case *amqp.StateAccepted:
-			rabbitmq_amqp.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
+			rabbitmq_amqp.Info("[NewPublisher]", "Message accepted", publishResult.Message.Data[0])
 			break
 		case *amqp.StateReleased:
-			rabbitmq_amqp.Warn("[Publisher]", "Message was not routed", publishResult.Message.Data[0])
+			rabbitmq_amqp.Warn("[NewPublisher]", "Message was not routed", publishResult.Message.Data[0])
 			break
 		case *amqp.StateRejected:
-			rabbitmq_amqp.Warn("[Publisher]", "Message rejected", publishResult.Message.Data[0])
+			rabbitmq_amqp.Warn("[NewPublisher]", "Message rejected", publishResult.Message.Data[0])
 			stateType := publishResult.Outcome.(*amqp.StateRejected)
 			if stateType.Error != nil {
-				rabbitmq_amqp.Warn("[Publisher]", "Message rejected with error: %v", stateType.Error)
+				rabbitmq_amqp.Warn("[NewPublisher]", "Message rejected with error: %v", stateType.Error)
 			}
 			break
 		default:
@@ -153,13 +153,13 @@ func main() {
 	//Close the consumer
 	err = consumer.Close(context.Background())
 	if err != nil {
-		rabbitmq_amqp.Error("[Consumer]", err)
+		rabbitmq_amqp.Error("[NewConsumer]", err)
 		return
 	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
-		rabbitmq_amqp.Error("[Publisher]", err)
+		rabbitmq_amqp.Error("[NewPublisher]", err)
 		return
 	}
 
@@ -197,7 +197,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("AMQP Connection closed.\n")
+	fmt.Printf("AMQP connection closed.\n")
 	// not necessary. It waits for the status change to be printed
 	time.Sleep(100 * time.Millisecond)
 	close(stateChanged)
