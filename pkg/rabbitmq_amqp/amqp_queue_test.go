@@ -216,7 +216,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	})
 })
 
-func publishMessages(queueName string, count int) {
+func publishMessages(queueName string, count int, args ...string) {
 	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
 	Expect(err).To(BeNil())
 
@@ -225,7 +225,12 @@ func publishMessages(queueName string, count int) {
 	Expect(publisher).NotTo(BeNil())
 
 	for i := 0; i < count; i++ {
-		publishResult, err := publisher.Publish(context.TODO(), amqp.NewMessage([]byte("Message #"+strconv.Itoa(i))))
+		body := "Message #" + strconv.Itoa(i)
+		if len(args) > 0 {
+			body = args[0]
+		}
+
+		publishResult, err := publisher.Publish(context.TODO(), amqp.NewMessage([]byte(body)))
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))

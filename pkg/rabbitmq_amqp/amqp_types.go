@@ -1,6 +1,9 @@
 package rabbitmq_amqp
 
-import "github.com/google/uuid"
+import (
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
+)
 
 type linkerName interface {
 	linkName() string
@@ -18,13 +21,21 @@ func getLinkName(l linkerName) string {
 type ConsumerOptions interface {
 	linkName() string
 	initialCredits() int32
+	linkFilters() []amqp.LinkFilter
 }
 
 func getInitialCredits(co ConsumerOptions) int32 {
-	if co == nil {
-		return 100
+	if co == nil || co.initialCredits() == 0 {
+		return 10
 	}
 	return co.initialCredits()
+}
+
+func getLinkFilters(co ConsumerOptions) []amqp.LinkFilter {
+	if co == nil {
+		return nil
+	}
+	return co.linkFilters()
 }
 
 type managementOptions struct {
@@ -36,6 +47,10 @@ func (mo *managementOptions) linkName() string {
 
 func (mo *managementOptions) initialCredits() int32 {
 	return 10
+}
+
+func (mo *managementOptions) linkFilters() []amqp.LinkFilter {
+	return nil
 }
 
 type AMQPConsumerOptions struct {
@@ -51,35 +66,53 @@ func (aco *AMQPConsumerOptions) initialCredits() uint32 {
 	return aco.InitialCredits
 }
 
-type OffsetSpecification interface {
-	toMap() map[string]any
+func (aco *AMQPConsumerOptions) linkFilters() []amqp.LinkFilter {
+	return nil
 }
+
+type OffsetSpecification interface {
+	toLinkFilter() amqp.LinkFilter
+}
+
+const rmqStreamFilter = "rabbitmq:stream-filter"
+const rmqStreamOffsetSpec = "rabbitmq:stream-offset-spec"
+const rmqStreamMatchUnfiltered = "rabbitmq:stream-match-unfiltered"
+const offsetFirst = "first"
+const offsetNext = "next"
+const offsetLast = "last"
 
 type OffsetFirst struct {
 }
 
-func (of *OffsetFirst) toMap() map[string]any {
-	return map[string]any{"offset": "first"}
+func (of *OffsetFirst) toLinkFilter() amqp.LinkFilter {
+	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetFirst)
 }
 
 type OffsetLast struct {
 }
 
-func (ol *OffsetLast) toMap() map[string]any {
-	return map[string]any{"offset": "last"}
+func (ol *OffsetLast) toLinkFilter() amqp.LinkFilter {
+	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetLast)
 }
 
 type OffsetValue struct {
 	Offset uint64
 }
 
-func (o *OffsetValue) toMap() map[string]any {
-	return map[string]any{"offset": o.Offset}
+func (ov *OffsetValue) toLinkFilter() amqp.LinkFilter {
+	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, ov.Offset)
+}
+
+type OffsetNext struct {
+}
+
+func (on *OffsetNext) toLinkFilter() amqp.LinkFilter {
+	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetNext)
 }
 
 type StreamConsumerOptions struct {
 	ReceiverLinkName string
-	InitialCredits   uint32
+	InitialCredits   int32
 	Offset           OffsetSpecification
 }
 
@@ -87,8 +120,12 @@ func (sco *StreamConsumerOptions) linkName() string {
 	return sco.ReceiverLinkName
 }
 
-func (sco *StreamConsumerOptions) initialCredits() uint32 {
+func (sco *StreamConsumerOptions) initialCredits() int32 {
 	return sco.InitialCredits
+}
+
+func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
+	return []amqp.LinkFilter{sco.Offset.toLinkFilter()}
 }
 
 ///// ProducerOptions /////

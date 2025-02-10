@@ -63,6 +63,7 @@ func createReceiverLinkOptions(address string, options ConsumerOptions, delivery
 		RequestedSenderSettleMode: receiverSettleMode,
 		ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
 		Credit:                    getInitialCredits(options),
+		Filters:                   getLinkFilters(options),
 	}
 }
 
