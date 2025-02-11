@@ -70,6 +70,14 @@ type Consumer struct {
 	options        ConsumerOptions
 	destinationAdd string
 	id             string
+
+	/*
+		currentOffset is the current offset of the consumer. It is valid only for the stream consumers.
+		it is used to keep track of the last message that was consumed by the consumer.
+		so in case of restart the consumer can start from the last message that was consumed.
+		For the AMQP queues it is just ignored.
+	*/
+	currentOffset int64
 }
 
 func (c *Consumer) Id() string {
@@ -82,7 +90,10 @@ func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd
 		id = args[0]
 	}
 
-	r := &Consumer{connection: connection, options: options, destinationAdd: destinationAdd, id: id}
+	r := &Consumer{connection: connection, options: options,
+		destinationAdd: destinationAdd,
+		currentOffset:  -1,
+		id:             id}
 	connection.entitiesTracker.storeOrReplaceConsumer(r)
 	err := r.createReceiver(ctx)
 	if err != nil {
@@ -92,6 +103,22 @@ func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd
 }
 
 func (c *Consumer) createReceiver(ctx context.Context) error {
+	if c.currentOffset >= 0 {
+		// here it means that the consumer is a stream consumer and there is a restart.
+		// so we need to set the offset to the last consumed message in order to restart from there.
+		// In there is not a restart this code won't be executed.
+		if c.options != nil {
+			// here we assume it is a stream. So we recreate the options with the offset.
+			c.options = &StreamConsumerOptions{
+				ReceiverLinkName: c.options.linkName(),
+				InitialCredits:   c.options.initialCredits(),
+				// we increment the offset by one to start from the next message.
+				// because the current was already consumed.
+				Offset: &OffsetValue{Offset: uint64(c.currentOffset + 1)},
+			}
+		}
+	}
+
 	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd,
 		createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce))
 	if err != nil {
@@ -107,6 +134,12 @@ func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if msg != nil && msg.Annotations != nil && msg.Annotations["x-stream-offset"] != nil {
+		// keep track of the current offset of the consumer
+		c.currentOffset = msg.Annotations["x-stream-offset"].(int64)
+	}
+
 	return &DeliveryContext{receiver: c.receiver.Load(), message: msg}, nil
 }
 

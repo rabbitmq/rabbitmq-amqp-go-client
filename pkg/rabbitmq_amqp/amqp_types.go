@@ -10,17 +10,24 @@ type linkerName interface {
 }
 
 func getLinkName(l linkerName) string {
-	if l == nil {
+	if l == nil || l.linkName() == "" {
 		return uuid.New().String()
 	}
 	return l.linkName()
 }
 
-/// ConsumerOptions ///
+/// ConsumerOptions interface for the AMQP and Stream consumer///
 
 type ConsumerOptions interface {
+	// linkName returns the name of the link
+	// if not set it will return a random UUID
 	linkName() string
+	// initialCredits returns the initial credits for the link
+	// if not set it will return 10
 	initialCredits() int32
+
+	// linkFilters returns the link filters for the link.
+	// It is mostly used for the stream consumers.
 	linkFilters() []amqp.LinkFilter
 }
 
@@ -54,15 +61,17 @@ func (mo *managementOptions) linkFilters() []amqp.LinkFilter {
 }
 
 type AMQPConsumerOptions struct {
+	//ReceiverLinkName: see the ConsumerOptions interface
 	ReceiverLinkName string
-	InitialCredits   uint32
+	//InitialCredits: see the ConsumerOptions interface
+	InitialCredits int32
 }
 
 func (aco *AMQPConsumerOptions) linkName() string {
 	return aco.ReceiverLinkName
 }
 
-func (aco *AMQPConsumerOptions) initialCredits() uint32 {
+func (aco *AMQPConsumerOptions) initialCredits() int32 {
 	return aco.InitialCredits
 }
 
@@ -110,10 +119,16 @@ func (on *OffsetNext) toLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetNext)
 }
 
+/*
+StreamConsumerOptions represents the options that can be used to create a stream consumer.
+It is mandatory in case of creating a stream consumer.
+*/
 type StreamConsumerOptions struct {
+	//ReceiverLinkName: see the ConsumerOptions interface
 	ReceiverLinkName string
-	InitialCredits   int32
-	Offset           OffsetSpecification
+	//InitialCredits: see the ConsumerOptions interface
+	InitialCredits int32
+	Offset         OffsetSpecification
 }
 
 func (sco *StreamConsumerOptions) linkName() string {

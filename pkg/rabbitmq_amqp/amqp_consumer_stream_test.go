@@ -3,8 +3,11 @@ package rabbitmq_amqp
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
+	"time"
 )
 
 var _ = Describe("Consumer stream test", func() {
@@ -109,6 +112,76 @@ var _ = Describe("Consumer stream test", func() {
 		Expect(consumerLast.Close(context.Background())).To(BeNil())
 		Expect(consumerOffsetValue.Close(context.Background())).To(BeNil())
 		Expect(consumerFirst.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+	It("consumer should restart form the last offset in case of disconnection", func() {
+		/*
+			Test the consumer should restart form the last offset in case of disconnection
+			So we send 10 messages. Consume 5 then kill the connection and the consumer should restart form
+			the offset 5 to consume the messages
+		*/
+
+		qName := generateName("consumer should restart form the last offset in case of disconnection")
+		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+			SASLType:    amqp.SASLTypeAnonymous(),
+			ContainerID: qName,
+			RecoveryConfiguration: &RecoveryConfiguration{
+				ActiveRecovery: true,
+				// reduced the reconnect interval to speed up the test.
+				// don't use low values in production
+				BackOffReconnectInterval: 1_001 * time.Millisecond,
+				MaxReconnectAttempts:     5,
+			},
+		})
+		Expect(err).To(BeNil())
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.name).To(Equal(qName))
+		publishMessages(qName, 10)
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName: "consumer should restart form the last offset in case of disconnection",
+			InitialCredits:   5,
+			Offset:           &OffsetFirst{},
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 5; i++ {
+			dc, err := consumer.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		Eventually(func() bool {
+			err := testhelper.DropConnectionContainerID(qName)
+			return err == nil
+		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeTrue())
+		time.Sleep(1 * time.Second)
+
+		Eventually(func() bool {
+			conn, err := testhelper.GetConnectionByContainerID(qName)
+			return err == nil && conn != nil
+		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeTrue())
+		time.Sleep(500 * time.Millisecond)
+
+		// the consumer should restart from the last offset
+		for i := 5; i < 10; i++ {
+			dc, err := consumer.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
+		}
+
+		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
 
