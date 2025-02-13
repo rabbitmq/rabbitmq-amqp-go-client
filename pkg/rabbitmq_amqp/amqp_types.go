@@ -23,7 +23,7 @@ type ConsumerOptions interface {
 	// if not set it will return a random UUID
 	linkName() string
 	// initialCredits returns the initial credits for the link
-	// if not set it will return 10
+	// if not set it will return 256
 	initialCredits() int32
 
 	// linkFilters returns the link filters for the link.
@@ -33,7 +33,7 @@ type ConsumerOptions interface {
 
 func getInitialCredits(co ConsumerOptions) int32 {
 	if co == nil || co.initialCredits() == 0 {
-		return 10
+		return 256
 	}
 	return co.initialCredits()
 }
@@ -53,7 +53,8 @@ func (mo *managementOptions) linkName() string {
 }
 
 func (mo *managementOptions) initialCredits() int32 {
-	return 10
+	// by default i 256 but here we set it to 100. For the management is enough.
+	return 100
 }
 
 func (mo *managementOptions) linkFilters() []amqp.LinkFilter {
@@ -128,7 +129,14 @@ type StreamConsumerOptions struct {
 	ReceiverLinkName string
 	//InitialCredits: see the ConsumerOptions interface
 	InitialCredits int32
-	Offset         OffsetSpecification
+	// The offset specification for the stream consumer
+	// see the interface implementations
+	Offset OffsetSpecification
+	// Filter values.
+	// See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions for more details
+	Filters []string
+	//
+	FilterMatchUnfiltered bool
 }
 
 func (sco *StreamConsumerOptions) linkName() string {
@@ -140,7 +148,18 @@ func (sco *StreamConsumerOptions) initialCredits() int32 {
 }
 
 func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
-	return []amqp.LinkFilter{sco.Offset.toLinkFilter()}
+	var filters []amqp.LinkFilter
+	filters = append(filters, sco.Offset.toLinkFilter())
+	if sco.Filters != nil {
+		l := []any{}
+		for _, f := range sco.Filters {
+			l = append(l, f)
+		}
+
+		filters = append(filters, amqp.NewLinkFilter(rmqStreamFilter, 0, l))
+		filters = append(filters, amqp.NewLinkFilter(rmqStreamMatchUnfiltered, 0, sco.FilterMatchUnfiltered))
+	}
+	return filters
 }
 
 ///// ProducerOptions /////

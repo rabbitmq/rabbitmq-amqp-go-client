@@ -7,8 +7,33 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
+	"strconv"
 	"time"
 )
+
+func publishMessagesWithStreamTag(queueName string, filterValue string, count int) {
+	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
+	Expect(err).To(BeNil())
+
+	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, "producer_filter_stream")
+	Expect(err).To(BeNil())
+	Expect(publisher).NotTo(BeNil())
+
+	for i := 0; i < count; i++ {
+		body := filterValue + " #" + strconv.Itoa(i)
+		msg := amqp.NewMessage([]byte(body))
+		msg.Annotations = amqp.Annotations{
+			"x-stream-filter-value": filterValue,
+		}
+		publishResult, err := publisher.Publish(context.TODO(), msg)
+		Expect(err).To(BeNil())
+		Expect(publishResult).NotTo(BeNil())
+		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
+	}
+	err = conn.Close(context.TODO())
+	Expect(err).To(BeNil())
+
+}
 
 var _ = Describe("Consumer stream test", func() {
 
@@ -184,6 +209,110 @@ var _ = Describe("Consumer stream test", func() {
 		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
-
 	})
+	It("consumer should filter messages based on x-stream-filter", func() {
+		qName := generateName("consumer should filter messages based on x-stream-filter")
+		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		Expect(err).To(BeNil())
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.name).To(Equal(qName))
+		publishMessagesWithStreamTag(qName, "banana", 10)
+		publishMessagesWithStreamTag(qName, "apple", 10)
+		publishMessagesWithStreamTag(qName, "", 10)
+
+		consumerBanana, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName: "consumer banana should filter messages based on x-stream-filter",
+			InitialCredits:   200,
+			Offset:           &OffsetFirst{},
+			Filters:          []string{"banana"},
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumerBanana).NotTo(BeNil())
+		Expect(consumerBanana).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 10; i++ {
+			dc, err := consumerBanana.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		consumerApple, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName:      "consumer apple should filter messages based on x-stream-filter",
+			InitialCredits:        200,
+			Offset:                &OffsetFirst{},
+			Filters:               []string{"apple"},
+			FilterMatchUnfiltered: true,
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumerApple).NotTo(BeNil())
+		Expect(consumerApple).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 10; i++ {
+			dc, err := consumerApple.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		consumerAppleAndBanana, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName: "consumer apple and banana should filter messages based on x-stream-filter",
+			InitialCredits:   200,
+			Offset:           &OffsetFirst{},
+			Filters:          []string{"apple", "banana"},
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumerAppleAndBanana).NotTo(BeNil())
+		Expect(consumerAppleAndBanana).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 20; i++ {
+			dc, err := consumerAppleAndBanana.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			if i < 10 {
+				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
+			} else {
+				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i-10)))
+			}
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		consumerAppleMatchUnfiltered, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName:      "consumer apple should filter messages based on x-stream-filter and FilterMatchUnfiltered true",
+			InitialCredits:        200,
+			Offset:                &OffsetFirst{},
+			Filters:               []string{"apple"},
+			FilterMatchUnfiltered: true,
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumerAppleMatchUnfiltered).NotTo(BeNil())
+		Expect(consumerAppleMatchUnfiltered).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 20; i++ {
+			dc, err := consumerAppleMatchUnfiltered.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			if i < 10 {
+				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
+
+			} else {
+				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf(" #%d", i-10)))
+			}
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		Expect(consumerApple.Close(context.Background())).To(BeNil())
+		Expect(consumerBanana.Close(context.Background())).To(BeNil())
+		Expect(consumerAppleAndBanana.Close(context.Background())).To(BeNil())
+		Expect(consumerAppleMatchUnfiltered.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
 })

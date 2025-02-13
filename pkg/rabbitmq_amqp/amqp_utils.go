@@ -52,7 +52,7 @@ func createReceiverLinkOptions(address string, options ConsumerOptions, delivery
 		receiverSettleMode = amqp.SenderSettleModeUnsettled.Ptr()
 	}
 
-	return &amqp.ReceiverOptions{
+	result := &amqp.ReceiverOptions{
 		TargetAddress:             address,
 		DynamicAddress:            false,
 		Name:                      getLinkName(options),
@@ -65,6 +65,7 @@ func createReceiverLinkOptions(address string, options ConsumerOptions, delivery
 		Credit:                    getInitialCredits(options),
 		Filters:                   getLinkFilters(options),
 	}
+	return result
 }
 
 func random(max int) int {
