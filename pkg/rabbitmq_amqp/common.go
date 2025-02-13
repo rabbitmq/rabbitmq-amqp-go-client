@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+// public consts
+
+const StreamFilterValue = "x-stream-filter-value"
+
 const (
 	responseCode200       = 200
 	responseCode201       = 201

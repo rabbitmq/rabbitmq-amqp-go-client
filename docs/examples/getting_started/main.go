@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	exchangeName := "getting-started-exchange"
-	queueName := "getting-started-queue"
+	exchangeName := "getting-started-go-exchange"
+	queueName := "getting-started-go-queue"
 	routingKey := "routing-key"
 
 	rabbitmq_amqp.Info("Getting started with AMQP Go AMQP 1.0 Client")
@@ -24,16 +24,22 @@ func main() {
 		}
 	}(stateChanged)
 
-	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, nil)
+	// rabbitmq_amqp.NewEnvironment setups the environment.
+	// The environment is used to create connections
+	// given the same parameters
+	env := rabbitmq_amqp.NewEnvironment([]string{"amqp://"}, nil)
+
+	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
+	amqpConnection, err := env.NewConnection(context.Background())
 	if err != nil {
 		rabbitmq_amqp.Error("Error opening connection", err)
 		return
 	}
 	// Register the channel to receive status change notifications
+	// this is valid for the connection lifecycle
 	amqpConnection.NotifyStatusChange(stateChanged)
 
-	fmt.Printf("AMQP connection opened.\n")
+	rabbitmq_amqp.Info("AMQP connection opened.\n")
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
@@ -165,37 +171,39 @@ func main() {
 	err = management.Unbind(context.TODO(), bindingPath)
 
 	if err != nil {
-		fmt.Printf("Error unbinding: %v\n", err)
+		rabbitmq_amqp.Error("Error unbinding: %v\n", err)
 		return
 	}
 
 	err = management.DeleteExchange(context.TODO(), exchangeInfo.Name())
 	if err != nil {
-		fmt.Printf("Error deleting exchange: %v\n", err)
+		rabbitmq_amqp.Error("Error deleting exchange: %v\n", err)
 		return
 	}
 
 	// Purge the queue
 	purged, err := management.PurgeQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
-		fmt.Printf("Error purging queue: %v\n", err)
+		rabbitmq_amqp.Error("Error purging queue: %v\n", err)
 		return
 	}
-	fmt.Printf("Purged %d messages from the queue.\n", purged)
+	rabbitmq_amqp.Info("Purged %d messages from the queue.\n", purged)
 
 	err = management.DeleteQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
-		fmt.Printf("Error deleting queue: %v\n", err)
+		rabbitmq_amqp.Error("Error deleting queue: %v\n", err)
 		return
 	}
 
-	err = amqpConnection.Close(context.Background())
+	// Close all the connections. but you can still use the environment
+	// to create new connections
+	err = env.CloseConnections(context.Background())
 	if err != nil {
-		fmt.Printf("Error closing connection: %v\n", err)
+		rabbitmq_amqp.Error("Error closing connection: %v\n", err)
 		return
 	}
 
-	fmt.Printf("AMQP connection closed.\n")
+	rabbitmq_amqp.Info("AMQP connection closed.\n")
 	// not necessary. It waits for the status change to be printed
 	time.Sleep(100 * time.Millisecond)
 	close(stateChanged)
