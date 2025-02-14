@@ -6,11 +6,8 @@ Suitable for testing in pre-production environments.
 
 ## Getting Started
 
-You can find an example in: `docs/examples/getting_started`
-
-## Examples
-
-You can find more examples in: `docs/examples`
+- [Getting_started](docs/examples/getting_started)
+- [Examples](docs/examples)
 
 ## Build from source
 

@@ -105,11 +105,17 @@ var _ = Describe("AMQP publisher ", func() {
 		qName := generateNameWithDateTime("Targets NewPublisher should fail when the destination does not exist")
 		msg := amqp.NewMessage([]byte("hello"))
 		Expect(MessageToAddressHelper(msg, &QueueAddress{Queue: qName})).To(BeNil())
-
 		publishResult, err := publisher.Publish(context.Background(), msg)
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())
 		Expect(publishResult.Outcome).To(Equal(&amqp.StateReleased{}))
+		msg, err = NewMessageToAddress([]byte("hello"), &QueueAddress{Queue: qName})
+		Expect(err).To(BeNil())
+		publishResult, err = publisher.Publish(context.Background(), msg)
+		Expect(err).To(BeNil())
+		Expect(publishResult).NotTo(BeNil())
+		Expect(publishResult.Outcome).To(Equal(&amqp.StateReleased{}))
+
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 

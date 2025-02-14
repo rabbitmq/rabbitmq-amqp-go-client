@@ -65,6 +65,18 @@ func MessageToAddressHelper(msgRef *amqp.Message, target TargetAddress) error {
 	return nil
 }
 
+// NewMessageToAddress creates a new message with the given payload and sets the To property to the address of the target.
+// The target must be a QueueAddress or an ExchangeAddress.
+// This function is a helper that combines NewMessage and MessageToAddressHelper.
+func NewMessageToAddress(msg []byte, target TargetAddress) (*amqp.Message, error) {
+	message := amqp.NewMessage(msg)
+	err := MessageToAddressHelper(message, target)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
 // address Creates the address for the exchange or queue following the RabbitMQ conventions.
 // see: https://www.rabbitmq.com/docs/next/amqp#address-v2
 func address(exchange, key, queue *string, urlParameters *string) (string, error) {
