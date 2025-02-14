@@ -23,7 +23,7 @@ func publishMessagesWithStreamTag(queueName string, filterValue string, count in
 		body := filterValue + " #" + strconv.Itoa(i)
 		msg := amqp.NewMessage([]byte(body))
 		msg.Annotations = amqp.Annotations{
-			"x-stream-filter-value": filterValue,
+			StreamFilterValue: filterValue,
 		}
 		publishResult, err := publisher.Publish(context.TODO(), msg)
 		Expect(err).To(BeNil())

@@ -47,7 +47,7 @@ func (eas *ExchangeAddress) toAddress() (string, error) {
 
 // MessageToAddressHelper sets the To property of the message to the address of the target.
 // The target must be a QueueAddress or an ExchangeAddress.
-// Note: The field To will be overwritten if it is already set.
+// Note: The field msgRef.Properties.To will be overwritten if it is already set.
 func MessageToAddressHelper(msgRef *amqp.Message, target TargetAddress) error {
 	if target == nil {
 		return errors.New("target cannot be nil")
@@ -63,6 +63,18 @@ func MessageToAddressHelper(msgRef *amqp.Message, target TargetAddress) error {
 	}
 	msgRef.Properties.To = &address
 	return nil
+}
+
+// NewMessageToAddress creates a new message with the given payload and sets the To property to the address of the target.
+// The target must be a QueueAddress or an ExchangeAddress.
+// This function is a helper that combines NewMessage and MessageToAddressHelper.
+func NewMessageToAddress(msg []byte, target TargetAddress) (*amqp.Message, error) {
+	message := amqp.NewMessage(msg)
+	err := MessageToAddressHelper(message, target)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
 }
 
 // address Creates the address for the exchange or queue following the RabbitMQ conventions.
