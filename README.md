@@ -12,7 +12,7 @@ You can find an example in: `docs/examples/getting_started`
 
 You can find more examples in: `docs/examples`
 
-## How to Run
+## Build from source
 
 - Start the broker with `./.ci/ubuntu/gha-setup.sh start`. Note that this has been tested on Ubuntu 22 with docker.
 - `make test` to run the tests

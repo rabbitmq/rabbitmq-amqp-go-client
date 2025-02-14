@@ -47,7 +47,7 @@ func (eas *ExchangeAddress) toAddress() (string, error) {
 
 // MessageToAddressHelper sets the To property of the message to the address of the target.
 // The target must be a QueueAddress or an ExchangeAddress.
-// Note: The field To will be overwritten if it is already set.
+// Note: The field msgRef.Properties.To will be overwritten if it is already set.
 func MessageToAddressHelper(msgRef *amqp.Message, target TargetAddress) error {
 	if target == nil {
 		return errors.New("target cannot be nil")
