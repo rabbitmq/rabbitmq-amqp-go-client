@@ -5,6 +5,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// the following types are alias to the go-amqp package
+
+type DeliveryState = amqp.DeliveryState
 type StateAccepted = amqp.StateAccepted
 type StateRejected = amqp.StateRejected
 type StateReleased = amqp.StateReleased

@@ -9,7 +9,7 @@ import (
 )
 
 type PublishResult struct {
-	Outcome amqp.DeliveryState
+	Outcome DeliveryState
 	Message *amqp.Message
 }
 
