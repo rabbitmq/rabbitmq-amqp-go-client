@@ -8,6 +8,15 @@ Suitable for testing in pre-production environments.
 
 - [Getting Started](docs/examples/getting_started)
 - [Examples](docs/examples)
+- Getting started Video tutorial: </br>
+[![Getting Started](https://img.youtube.com/vi/iR1JUFh3udI/0.jpg)](https://youtu.be/iR1JUFh3udI)
+
+
+
+## Documentation
+
+- [Client Guide](https://www.rabbitmq.com/client-libraries/amqp-client-libraries) (work in progress for this client)
+
 
 
 # Packages
