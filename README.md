@@ -1,4 +1,4 @@
-# RabbitMQ AMQP 1.0 .Golang Client
+# RabbitMQ AMQP 1.0 Golang Client
 
 This library is meant to be used with RabbitMQ 4.0. 
 Suitable for testing in pre-production environments.
@@ -6,8 +6,18 @@ Suitable for testing in pre-production environments.
 
 ## Getting Started
 
-- [Getting_started](docs/examples/getting_started)
+- [Getting Started](docs/examples/getting_started)
 - [Examples](docs/examples)
+
+
+# Packages
+
+The rabbitmq amqp client is a wrapper around the azure amqp client.</b>
+You need the following packages to use the rabbitmq amqp client:
+
+- `rabbitmqamqp` - The main package for the rabbitmq amqp client.
+- `amqp` - The azure amqp client (You may not need to use this package directly).
+
 
 ## Build from source
 

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/go-amqp"
-	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,30 +26,30 @@ func main() {
 			time.Sleep(5 * time.Second)
 			total := stateAccepted + stateReleased + stateRejected
 			messagesPerSecond := float64(total) / time.Since(startTime).Seconds()
-			rabbitmq_amqp.Info("[Stats]", "sent", total, "received", received, "failed", failed, "messagesPerSecond", messagesPerSecond)
+			rmq.Info("[Stats]", "sent", total, "received", received, "failed", failed, "messagesPerSecond", messagesPerSecond)
 
 		}
 	}()
 
-	rabbitmq_amqp.Info("How to deal with network disconnections")
+	rmq.Info("How to deal with network disconnections")
 	signalBlock := sync.Cond{L: &sync.Mutex{}}
 	/// Create a channel to receive state change notifications
-	stateChanged := make(chan *rabbitmq_amqp.StateChanged, 1)
-	go func(ch chan *rabbitmq_amqp.StateChanged) {
+	stateChanged := make(chan *rmq.StateChanged, 1)
+	go func(ch chan *rmq.StateChanged) {
 		for statusChanged := range ch {
-			rabbitmq_amqp.Info("[connection]", "Status changed", statusChanged)
+			rmq.Info("[connection]", "Status changed", statusChanged)
 			switch statusChanged.To.(type) {
-			case *rabbitmq_amqp.StateOpen:
+			case *rmq.StateOpen:
 				signalBlock.Broadcast()
 			}
 		}
 	}(stateChanged)
 
 	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rabbitmq_amqp.Dial(context.Background(), []string{"amqp://"}, &rabbitmq_amqp.AmqpConnOptions{
+	amqpConnection, err := rmq.Dial(context.Background(), []string{"amqp://"}, &rmq.AmqpConnOptions{
 		SASLType:    amqp.SASLTypeAnonymous(),
 		ContainerID: "reliable-amqp10-go",
-		RecoveryConfiguration: &rabbitmq_amqp.RecoveryConfiguration{
+		RecoveryConfiguration: &rmq.RecoveryConfiguration{
 			ActiveRecovery:           true,
 			BackOffReconnectInterval: 2 * time.Second, // we reduce the reconnect interval to speed up the test. The default is 5 seconds
 			// In production, you should avoid BackOffReconnectInterval with low values since it can cause a high number of reconnection attempts
@@ -57,7 +57,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		rabbitmq_amqp.Error("Error opening connection", err)
+		rmq.Error("Error opening connection", err)
 		return
 	}
 	// Register the channel to receive status change notifications
@@ -69,17 +69,17 @@ func main() {
 	management := amqpConnection.Management()
 
 	// Declare a Quorum queue
-	queueInfo, err := management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QuorumQueueSpecification{
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 		Name: queueName,
 	})
 	if err != nil {
-		rabbitmq_amqp.Error("Error declaring queue", err)
+		rmq.Error("Error declaring queue", err)
 		return
 	}
 
 	consumer, err := amqpConnection.NewConsumer(context.Background(), queueName, nil)
 	if err != nil {
-		rabbitmq_amqp.Error("Error creating consumer", err)
+		rmq.Error("Error creating consumer", err)
 		return
 	}
 
@@ -97,9 +97,9 @@ func main() {
 				// An error occurred receiving the message
 				// here the consumer could be disconnected from the server due to a network error
 				signalBlock.L.Lock()
-				rabbitmq_amqp.Info("[Consumer]", "Consumer is blocked, queue", queueName, "error", err)
+				rmq.Info("[Consumer]", "Consumer is blocked, queue", queueName, "error", err)
 				signalBlock.Wait()
-				rabbitmq_amqp.Info("[Consumer]", "Consumer is unblocked, queue", queueName)
+				rmq.Info("[Consumer]", "Consumer is unblocked, queue", queueName)
 
 				signalBlock.L.Unlock()
 				continue
@@ -116,11 +116,11 @@ func main() {
 		}
 	}(consumerContext)
 
-	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmq_amqp.QueueAddress{
+	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.QueueAddress{
 		Queue: queueName,
 	}, "reliable-publisher")
 	if err != nil {
-		rabbitmq_amqp.Error("Error creating publisher", err)
+		rmq.Error("Error creating publisher", err)
 		return
 	}
 
@@ -130,7 +130,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 500_000; i++ {
-				publishResult, err := publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
+				publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 				if err != nil {
 					// here you need to deal with the error. You can store the message in a local in memory/persistent storage
 					// then retry to send the message as soon as the connection is reestablished
@@ -138,26 +138,26 @@ func main() {
 					atomic.AddInt32(&failed, 1)
 					// block signalBlock until the connection is reestablished
 					signalBlock.L.Lock()
-					rabbitmq_amqp.Info("[Publisher]", "Publisher is blocked, queue", queueName, "error", err)
+					rmq.Info("[Publisher]", "Publisher is blocked, queue", queueName, "error", err)
 					signalBlock.Wait()
-					rabbitmq_amqp.Info("[Publisher]", "Publisher is unblocked, queue", queueName)
+					rmq.Info("[Publisher]", "Publisher is unblocked, queue", queueName)
 					signalBlock.L.Unlock()
 
 				} else {
 					switch publishResult.Outcome.(type) {
-					case *amqp.StateAccepted:
+					case *rmq.StateAccepted:
 						atomic.AddInt32(&stateAccepted, 1)
 						break
-					case *amqp.StateReleased:
+					case *rmq.StateReleased:
 						atomic.AddInt32(&stateReleased, 1)
 						break
-					case *amqp.StateRejected:
+					case *rmq.StateRejected:
 						atomic.AddInt32(&stateRejected, 1)
 						break
 					default:
 						// these status are not supported. Leave it for AMQP 1.0 compatibility
 						// see: https://www.rabbitmq.com/docs/next/amqp#outcomes
-						rabbitmq_amqp.Warn("Message state: %v", publishResult.Outcome)
+						rmq.Warn("Message state: %v", publishResult.Outcome)
 					}
 				}
 			}
@@ -174,13 +174,13 @@ func main() {
 	//Close the consumer
 	err = consumer.Close(context.Background())
 	if err != nil {
-		rabbitmq_amqp.Error("[NewConsumer]", err)
+		rmq.Error("[NewConsumer]", err)
 		return
 	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
-		rabbitmq_amqp.Error("[NewPublisher]", err)
+		rmq.Error("[NewPublisher]", err)
 		return
 	}
 

@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"github.com/Azure/go-amqp"
-	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmq_amqp"
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func checkError(err error) {
 	if err != nil {
-		rabbitmq_amqp.Error("Error", err)
+		rmq.Error("Error", err)
 		// it should not happen for the example
 		// so panic just to make sure we catch it
 		panic(err)
@@ -16,15 +16,15 @@ func checkError(err error) {
 }
 func main() {
 
-	rabbitmq_amqp.Info("Define the publisher message targets")
+	rmq.Info("Define the publisher message targets")
 
-	env := rabbitmq_amqp.NewEnvironment([]string{"amqp://"}, nil)
+	env := rmq.NewEnvironment([]string{"amqp://"}, nil)
 	amqpConnection, err := env.NewConnection(context.Background())
 	checkError(err)
 	queues := []string{"queue1", "queue2", "queue3"}
 	management := amqpConnection.Management()
 	for _, queue := range queues {
-		_, err = management.DeclareQueue(context.TODO(), &rabbitmq_amqp.QuorumQueueSpecification{
+		_, err = management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 			Name: queue,
 		})
 		checkError(err)
@@ -40,24 +40,24 @@ func main() {
 		// with this helper function we create a message with a target
 		// that is the same to create a message with:
 		//    msg := amqp.NewMessage([]byte("hello"))
-		//    MessageToAddressHelper(msg, &QueueAddress{Queue: qName})
+		//    MessagePropertyToAddress(msg, &QueueAddress{Queue: qName})
 		//  same like:
 		//     msg := amqp.NewMessage([]byte("hello"))
 		//     msg.Properties = &amqp.MessageProperties{}
 		//     msg.Properties.To = &address
-		// NewMessageToAddress and MessageToAddressHelper helpers are provided to make the
+		// NewMessageWithAddress and MessagePropertyToAddress helpers are provided to make the
 		// code more readable and easier to use
-		msg, err := rabbitmq_amqp.NewMessageToAddress([]byte("Hello World"),
-			&rabbitmq_amqp.QueueAddress{Queue: queues[i%3]})
+		msg, err := rmq.NewMessageWithAddress([]byte("Hello World"),
+			&rmq.QueueAddress{Queue: queues[i%3]})
 		checkError(err)
 		publishResult, err := publisher.Publish(context.Background(), msg)
 		checkError(err)
 		switch publishResult.Outcome.(type) {
 		case *amqp.StateAccepted:
-			rabbitmq_amqp.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
+			rmq.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
 			break
 		default:
-			rabbitmq_amqp.Warn("[Publisher]", "Message not accepted", publishResult.Message.Data[0])
+			rmq.Warn("[Publisher]", "Message not accepted", publishResult.Message.Data[0])
 		}
 	}
 
