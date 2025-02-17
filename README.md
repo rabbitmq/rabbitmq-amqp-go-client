@@ -9,6 +9,16 @@ Suitable for testing in pre-production environments.
 - [Getting_started](docs/examples/getting_started)
 - [Examples](docs/examples)
 
+
+# Packages
+
+The rabbitmq amqp client is a wrapper around the azure amqp client.
+You need the following packages to use the rabbitmq amqp client:
+
+- `rabbitmqamqp` - The main package for the rabbitmq amqp client.
+- `amqp` - The azure amqp client ( you may not need to use this package directly).
+
+
 ## Build from source
 
 - Start the broker with `./.ci/ubuntu/gha-setup.sh start`. Note that this has been tested on Ubuntu 22 with docker.

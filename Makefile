@@ -4,10 +4,10 @@ format:
 	go fmt ./...
 
 vet:
-	go vet ./pkg/rabbitmq_amqp
+	go vet ./pkg/rabbitmqamqp
 
 test: format vet
-	cd ./pkg/rabbitmq_amqp && go run -mod=mod github.com/onsi/ginkgo/v2/ginkgo  \
+	cd ./pkg/rabbitmqamqp && go run -mod=mod github.com/onsi/ginkgo/v2/ginkgo  \
                 --randomize-all --randomize-suites \
                 --cover --coverprofile=coverage.txt --covermode=atomic \
                 --race
