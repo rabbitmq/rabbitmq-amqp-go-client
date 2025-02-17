@@ -45,7 +45,6 @@ var _ = Describe("AMQP Queue test ", func() {
 
 	It("AMQP Queue Declare With Parameters and Get/Delete should succeed", func() {
 		var queueName = generateName("AMQP Queue Declare With Parameters and Delete should succeed")
-
 		queueInfo, err := management.DeclareQueue(context.TODO(), &ClassicQueueSpecification{
 			Name:                 queueName,
 			IsAutoDelete:         true,
@@ -139,6 +138,30 @@ var _ = Describe("AMQP Queue test ", func() {
 
 		err = management.DeleteQueue(context.TODO(), queueName)
 		Expect(err).To(BeNil())
+	})
+
+	It("AMQP Classic should return queue info ", func() {
+		const queueName = "AMQP Classic should return queue info"
+		qName := generateName(queueName)
+		queueInfo, err := management.DeclareQueue(context.TODO(), &ClassicQueueSpecification{
+			Name:           qName,
+			MaxPriority:    32,
+			MaxLengthBytes: CapacityGB(1),
+			MaxLength:      CapacityKB(1024),
+			IsAutoDelete:   false,
+		})
+
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.Name()).To(Equal(qName))
+		Expect(queueInfo.IsDurable()).To(BeTrue())
+		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
+		Expect(queueInfo.IsExclusive()).To(BeFalse())
+		Expect(queueInfo.Type()).To(Equal(Classic))
+		qInfoReceived, err := management.QueueInfo(context.TODO(), qName)
+		Expect(err).To(BeNil())
+		Expect(qInfoReceived).To(Equal(queueInfo))
+		Expect(management.DeleteQueue(context.TODO(), qName))
 
 	})
 
