@@ -24,6 +24,8 @@ var _ = Describe("AMQP connection Test", func() {
 			SASLType: amqp.SASLTypePlain("guest", "guest")})
 
 		Expect(err).To(BeNil())
+		Expect(connection.Properties()["product"]).To(Equal("RabbitMQ"))
+
 		err = connection.Close(context.Background())
 		Expect(err).To(BeNil())
 	})

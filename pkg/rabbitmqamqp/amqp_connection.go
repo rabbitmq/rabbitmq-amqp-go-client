@@ -56,6 +56,9 @@ type AmqpConnOptions struct {
 }
 
 type AmqpConnection struct {
+	properties        map[string]any
+	featuresAvailable *featuresAvailable
+
 	azureConnection *amqp.Conn
 	id              string
 	management      *AmqpManagement
@@ -64,6 +67,11 @@ type AmqpConnection struct {
 	session         *amqp.Session
 	refMap          *sync.Map
 	entitiesTracker *entitiesTracker
+}
+
+func (a *AmqpConnection) Properties() map[string]any {
+	return a.properties
+
 }
 
 // NewPublisher creates a new Publisher that sends messages to the provided destination.
@@ -129,10 +137,11 @@ func Dial(ctx context.Context, addresses []string, connOptions *AmqpConnOptions,
 	// create the connection
 
 	conn := &AmqpConnection{
-		management:      NewAmqpManagement(),
-		lifeCycle:       NewLifeCycle(),
-		amqpConnOptions: connOptions,
-		entitiesTracker: newEntitiesTracker(),
+		management:        NewAmqpManagement(),
+		lifeCycle:         NewLifeCycle(),
+		amqpConnOptions:   connOptions,
+		entitiesTracker:   newEntitiesTracker(),
+		featuresAvailable: newFeaturesAvailable(),
 	}
 	tmp := make([]string, len(addresses))
 	copy(tmp, addresses)
@@ -188,6 +197,20 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 			Error("Failed to open connection", ExtractWithoutPassword(addr), err)
 			continue
 		}
+		a.properties = azureConnection.Properties()
+		err = a.featuresAvailable.ParseProperties(a.properties)
+		if err != nil {
+			Warn("Validate properties Error.", ExtractWithoutPassword(addr), err)
+		}
+
+		if !a.featuresAvailable.is4OrMore {
+			Warn("The server version is less than 4.0.0", ExtractWithoutPassword(addr))
+		}
+
+		if !a.featuresAvailable.isRabbitMQ {
+			Warn("The server is not RabbitMQ", ExtractWithoutPassword(addr))
+		}
+
 		Debug("Connected to", ExtractWithoutPassword(addr))
 		break
 	}
