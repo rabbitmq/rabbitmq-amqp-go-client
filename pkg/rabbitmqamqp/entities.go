@@ -330,9 +330,10 @@ func (s *StreamQueueSpecification) buildArguments() map[string]any {
 type TExchangeType string
 
 const (
-	Direct TExchangeType = "direct"
-	Topic  TExchangeType = "topic"
-	FanOut TExchangeType = "fanout"
+	Direct  TExchangeType = "direct"
+	Topic   TExchangeType = "topic"
+	FanOut  TExchangeType = "fanout"
+	Headers TExchangeType = "headers"
 )
 
 type ExchangeType struct {
@@ -413,6 +414,51 @@ func (f *FanOutExchangeSpecification) exchangeType() ExchangeType {
 func (f *FanOutExchangeSpecification) buildArguments() map[string]any {
 	return map[string]any{}
 }
+
+type HeadersExchangeSpecification struct {
+	Name         string
+	IsAutoDelete bool
+}
+
+func (h *HeadersExchangeSpecification) name() string {
+	return h.Name
+}
+
+func (h *HeadersExchangeSpecification) isAutoDelete() bool {
+	return h.IsAutoDelete
+}
+
+func (h *HeadersExchangeSpecification) exchangeType() ExchangeType {
+	return ExchangeType{Type: Headers}
+}
+
+func (h *HeadersExchangeSpecification) buildArguments() map[string]any {
+	return map[string]any{}
+}
+
+type CustomExchangeSpecification struct {
+	Name             string
+	IsAutoDelete     bool
+	ExchangeTypeName string
+}
+
+func (c *CustomExchangeSpecification) name() string {
+	return c.Name
+}
+
+func (c *CustomExchangeSpecification) isAutoDelete() bool {
+	return c.IsAutoDelete
+}
+
+func (c *CustomExchangeSpecification) exchangeType() ExchangeType {
+	return ExchangeType{Type: TExchangeType(c.ExchangeTypeName)}
+}
+
+func (c *CustomExchangeSpecification) buildArguments() map[string]any {
+	return map[string]any{}
+}
+
+// / **** Binding ****
 
 type BindingSpecification interface {
 	sourceExchange() string
