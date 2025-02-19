@@ -47,7 +47,9 @@ func (e *AmqpExchange) Declare(ctx context.Context) (*AmqpExchangeInfo, error) {
 	kv["auto_delete"] = e.isAutoDelete
 	kv["durable"] = true
 	kv["type"] = e.exchangeType.String()
-	kv["arguments"] = e.arguments
+	if e.arguments != nil {
+		kv["arguments"] = e.arguments
+	}
 	_, err = e.management.Request(ctx, kv, path, commandPut, []int{responseCode204, responseCode201, responseCode409})
 	if err != nil {
 		return nil, err
