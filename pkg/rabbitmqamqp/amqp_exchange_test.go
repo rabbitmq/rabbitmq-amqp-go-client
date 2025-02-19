@@ -57,6 +57,33 @@ var _ = Describe("AMQP Exchange test ", func() {
 		Expect(err).To(BeNil())
 	})
 
+	It("AMQP Exchange Declare with Custom Exchange and Delete should succeed", func() {
+		var exchangeName = generateName("AMQP Exchange Declare with Custom Exchange and Delete should succeed")
+
+		exchangeInfo, err := management.DeclareExchange(context.TODO(), &CustomExchangeSpecification{
+			Name:             exchangeName,
+			ExchangeTypeName: "x-local-random",
+		})
+		Expect(err).To(BeNil())
+		Expect(exchangeInfo).NotTo(BeNil())
+		Expect(exchangeInfo.Name()).To(Equal(exchangeName))
+		err = management.DeleteExchange(context.TODO(), exchangeName)
+		Expect(err).To(BeNil())
+	})
+
+	It("AMQP Exchange Declare with Headers Exchange and Delete should succeed", func() {
+		var exchangeName = generateName("AMQP Exchange Declare with Headers Exchange and Delete should succeed")
+
+		exchangeInfo, err := management.DeclareExchange(context.TODO(), &HeadersExchangeSpecification{
+			Name: exchangeName,
+		})
+		Expect(err).To(BeNil())
+		Expect(exchangeInfo).NotTo(BeNil())
+		Expect(exchangeInfo.Name()).To(Equal(exchangeName))
+		err = management.DeleteExchange(context.TODO(), exchangeName)
+		Expect(err).To(BeNil())
+	})
+
 	It("AMQP Exchange should fail when specification is nil", func() {
 		_, err := management.DeclareExchange(context.TODO(), nil)
 		Expect(err).NotTo(BeNil())
