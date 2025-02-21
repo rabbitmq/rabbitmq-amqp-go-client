@@ -49,6 +49,9 @@ var _ = Describe("AMQP Exchange test ", func() {
 		const exchangeName = "AMQP Exchange Declare with FanOut and Delete should succeed"
 		exchangeInfo, err := management.DeclareExchange(context.TODO(), &FanOutExchangeSpecification{
 			Name: exchangeName,
+			Arguments: map[string]any{
+				"x-foo": "bar",
+			},
 		})
 		Expect(err).To(BeNil())
 		Expect(exchangeInfo).NotTo(BeNil())
@@ -63,6 +66,9 @@ var _ = Describe("AMQP Exchange test ", func() {
 		exchangeInfo, err := management.DeclareExchange(context.TODO(), &CustomExchangeSpecification{
 			Name:             exchangeName,
 			ExchangeTypeName: "x-local-random",
+			Arguments: map[string]any{
+				"x-delayed-type": "direct",
+			},
 		})
 		Expect(err).To(BeNil())
 		Expect(exchangeInfo).NotTo(BeNil())

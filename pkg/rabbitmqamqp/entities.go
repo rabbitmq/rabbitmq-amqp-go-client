@@ -349,12 +349,13 @@ type ExchangeSpecification interface {
 	name() string
 	isAutoDelete() bool
 	exchangeType() ExchangeType
-	buildArguments() map[string]any
+	arguments() map[string]any
 }
 
 type DirectExchangeSpecification struct {
 	Name         string
 	IsAutoDelete bool
+	Arguments    map[string]any
 }
 
 func (d *DirectExchangeSpecification) name() string {
@@ -369,13 +370,14 @@ func (d *DirectExchangeSpecification) exchangeType() ExchangeType {
 	return ExchangeType{Type: Direct}
 }
 
-func (d *DirectExchangeSpecification) buildArguments() map[string]any {
-	return map[string]any{}
+func (d *DirectExchangeSpecification) arguments() map[string]any {
+	return d.Arguments
 }
 
 type TopicExchangeSpecification struct {
 	Name         string
 	IsAutoDelete bool
+	Arguments    map[string]any
 }
 
 func (t *TopicExchangeSpecification) name() string {
@@ -390,13 +392,14 @@ func (t *TopicExchangeSpecification) exchangeType() ExchangeType {
 	return ExchangeType{Type: Topic}
 }
 
-func (t *TopicExchangeSpecification) buildArguments() map[string]any {
-	return map[string]any{}
+func (t *TopicExchangeSpecification) arguments() map[string]any {
+	return t.Arguments
 }
 
 type FanOutExchangeSpecification struct {
 	Name         string
 	IsAutoDelete bool
+	Arguments    map[string]any
 }
 
 func (f *FanOutExchangeSpecification) name() string {
@@ -411,13 +414,14 @@ func (f *FanOutExchangeSpecification) exchangeType() ExchangeType {
 	return ExchangeType{Type: FanOut}
 }
 
-func (f *FanOutExchangeSpecification) buildArguments() map[string]any {
-	return map[string]any{}
+func (f *FanOutExchangeSpecification) arguments() map[string]any {
+	return f.Arguments
 }
 
 type HeadersExchangeSpecification struct {
 	Name         string
 	IsAutoDelete bool
+	Arguments    map[string]any
 }
 
 func (h *HeadersExchangeSpecification) name() string {
@@ -432,14 +436,15 @@ func (h *HeadersExchangeSpecification) exchangeType() ExchangeType {
 	return ExchangeType{Type: Headers}
 }
 
-func (h *HeadersExchangeSpecification) buildArguments() map[string]any {
-	return map[string]any{}
+func (h *HeadersExchangeSpecification) arguments() map[string]any {
+	return h.Arguments
 }
 
 type CustomExchangeSpecification struct {
 	Name             string
 	IsAutoDelete     bool
 	ExchangeTypeName string
+	Arguments        map[string]any
 }
 
 func (c *CustomExchangeSpecification) name() string {
@@ -454,8 +459,8 @@ func (c *CustomExchangeSpecification) exchangeType() ExchangeType {
 	return ExchangeType{Type: TExchangeType(c.ExchangeTypeName)}
 }
 
-func (c *CustomExchangeSpecification) buildArguments() map[string]any {
-	return map[string]any{}
+func (c *CustomExchangeSpecification) arguments() map[string]any {
+	return c.Arguments
 }
 
 // / **** Binding ****
