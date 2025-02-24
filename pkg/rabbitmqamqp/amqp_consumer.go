@@ -25,17 +25,23 @@ func (dc *DeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
 	return dc.receiver.RejectMessage(ctx, dc.message, e)
 }
 
-func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+// copyAnnotations helper function to copy annotations
+func copyAnnotations(annotations amqp.Annotations) (amqp.Annotations, error) {
 	if err := validateMessageAnnotations(annotations); err != nil {
+		return nil, err
+	}
+	destination := make(amqp.Annotations)
+	for key, value := range annotations {
+		destination[key] = value
+	}
+	return destination, nil
+}
+
+func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+	destination, err := copyAnnotations(annotations)
+	if err != nil {
 		return err
 	}
-	// copy the rabbitmq annotations  to amqp annotations
-	destination := make(amqp.Annotations)
-	for keyA, value := range annotations {
-		destination[keyA] = value
-
-	}
-
 	return dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
 		DeliveryFailed:    true,
 		UndeliverableHere: true,
@@ -48,14 +54,9 @@ func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 }
 
 func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
-	if err := validateMessageAnnotations(annotations); err != nil {
+	destination, err := copyAnnotations(annotations)
+	if err != nil {
 		return err
-	}
-	// copy the rabbitmq annotations  to amqp annotations
-	destination := make(amqp.Annotations)
-	for key, value := range annotations {
-		destination[key] = value
-
 	}
 	return dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
 		DeliveryFailed:    false,
