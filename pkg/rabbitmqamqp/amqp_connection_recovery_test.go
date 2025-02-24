@@ -118,6 +118,20 @@ var _ = Describe("Recovery connection test", func() {
 
 		Expect(consumer.Close(context.Background())).NotTo(BeNil())
 		Expect(publisher.Close(context.Background())).NotTo(BeNil())
+
+		entLen := 0
+		connection.entitiesTracker.consumers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(0))
+
+		entLen = 0
+		connection.entitiesTracker.publishers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(0))
 	})
 
 	It("connection should not reconnect producers and consumers if the auto-recovery is disabled", func() {
