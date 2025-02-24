@@ -2,11 +2,12 @@ package rabbitmqamqp
 
 import (
 	"context"
+	"time"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
-	"time"
 )
 
 var _ = Describe("Recovery connection test", func() {
@@ -45,6 +46,7 @@ var _ = Describe("Recovery connection test", func() {
 
 		consumer, err := connection.NewConsumer(context.Background(),
 			qName, nil)
+		Expect(err).To(BeNil())
 
 		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{
 			Queue: qName,
@@ -113,6 +115,23 @@ var _ = Describe("Recovery connection test", func() {
 		// from reconnecting to open
 		// from open to closed (without error)
 		Expect(err).To(BeNil())
+
+		Expect(consumer.Close(context.Background())).NotTo(BeNil())
+		Expect(publisher.Close(context.Background())).NotTo(BeNil())
+
+		entLen := 0
+		connection.entitiesTracker.consumers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(0))
+
+		entLen = 0
+		connection.entitiesTracker.publishers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(0))
 	})
 
 	It("connection should not reconnect producers and consumers if the auto-recovery is disabled", func() {

@@ -61,9 +61,9 @@ func address(exchange, key, queue *string, urlParameters *string) (string, error
 
 	if !isStringNilOrEmpty(exchange) {
 		if !isStringNilOrEmpty(key) {
-			return "/" + exchanges + "/" + encodePathSegments(*exchange) + "/" + encodePathSegments(*key) + urlAppend, nil
+			return fmt.Sprintf("/%s/%s/%s%s", exchanges, encodePathSegments(*exchange), encodePathSegments(*key), urlAppend), nil
 		}
-		return "/" + exchanges + "/" + encodePathSegments(*exchange) + urlAppend, nil
+		return fmt.Sprintf("/%s/%s%s", exchanges, encodePathSegments(*exchange), urlAppend), nil
 	}
 
 	if queue == nil {
@@ -73,8 +73,7 @@ func address(exchange, key, queue *string, urlParameters *string) (string, error
 	if isStringNilOrEmpty(queue) {
 		return "", errors.New("queue must be set")
 	}
-
-	return "/" + queues + "/" + encodePathSegments(*queue) + urlAppend, nil
+	return fmt.Sprintf("/%s/%s%s", queues, encodePathSegments(*queue), urlAppend), nil
 }
 
 // exchangeAddress Creates the address for the exchange

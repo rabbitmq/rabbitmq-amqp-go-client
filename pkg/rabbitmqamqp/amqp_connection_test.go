@@ -10,7 +10,6 @@ import (
 
 var _ = Describe("AMQP connection Test", func() {
 	It("AMQP SASLTypeAnonymous connection should succeed", func() {
-
 		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous()})
 		Expect(err).To(BeNil())
@@ -70,6 +69,64 @@ var _ = Describe("AMQP connection Test", func() {
 		Expect(recv).NotTo(BeNil())
 		Expect(recv.From).To(Equal(&StateOpen{}))
 		Expect(recv.To).To(Equal(&StateClosed{}))
+	})
+
+	It("Entity tracker should be aligned with consumers and publishers  ", func() {
+		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+			SASLType: amqp.SASLTypeAnonymous()})
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+
+		queueName := generateNameWithDateTime("Entity tracker should be aligned with consumers and publishers")
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: queueName,
+		})
+
+		Expect(err).To(BeNil())
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: queueName}, "test")
+		Expect(err).To(BeNil())
+		Expect(publisher).NotTo(BeNil())
+		consumer, err := connection.NewConsumer(context.Background(), queueName, nil)
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		// check the entity tracker
+		Expect(connection.entitiesTracker).NotTo(BeNil())
+		entLen := 0
+		connection.entitiesTracker.consumers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(1))
+
+		entLen = 0
+		connection.entitiesTracker.publishers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(1))
+		Expect(consumer.Close(context.Background())).To(BeNil())
+		Expect(publisher.Close(context.Background())).To(BeNil())
+
+		entLen = 0
+		connection.entitiesTracker.consumers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(0))
+
+		entLen = 0
+		connection.entitiesTracker.publishers.Range(func(key, value interface{}) bool {
+			entLen++
+			return true
+		})
+		Expect(entLen).To(Equal(0))
+
+		err = connection.Management().DeleteQueue(context.Background(), queueName)
+		Expect(err).To(BeNil())
+
+		Expect(connection.Close(context.Background())).To(BeNil())
+
 	})
 
 	//It("AMQP TLS connection should success with SASLTypeAnonymous ", func() {

@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 	"strconv"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
 
 var ErrPreconditionFailed = errors.New("precondition Failed")
@@ -22,7 +23,6 @@ type AmqpManagement struct {
 	sender    *amqp.Sender
 	receiver  *amqp.Receiver
 	lifeCycle *LifeCycle
-	cancel    context.CancelFunc
 }
 
 func NewAmqpManagement() *AmqpManagement {

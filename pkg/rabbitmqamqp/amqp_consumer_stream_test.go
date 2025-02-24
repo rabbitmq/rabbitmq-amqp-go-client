@@ -73,7 +73,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumerOffsetValue.Receive(context.Background())
 			Expect(err).To(BeNil())
 
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i+5)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i+5)))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
@@ -88,7 +88,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumerFirst.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
@@ -107,7 +107,7 @@ var _ = Describe("Consumer stream test", func() {
 		dc, err := consumerLast.Receive(context.Background())
 		Expect(err).To(BeNil())
 		Expect(dc.Message()).NotTo(BeNil())
-		Expect(fmt.Sprintf("%s", dc.Message().GetData())).NotTo(Equal(fmt.Sprintf("Message #%d", 0)))
+		Expect(string(dc.Message().GetData())).NotTo(Equal(fmt.Sprintf("Message #%d", 0)))
 		Expect(dc.Accept(context.Background())).To(BeNil())
 
 		consumerNext, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
@@ -125,7 +125,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err = consumerNext.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal("the next message"))
+			Expect(string(dc.Message().GetData())).To(Equal("the next message"))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 			signal <- struct{}{}
 		}()
@@ -179,7 +179,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumer.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
@@ -200,7 +200,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumer.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
 		}
 
 		Expect(consumer.Close(context.Background())).To(BeNil())
@@ -235,7 +235,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumerBanana.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
@@ -254,7 +254,7 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumerApple.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
@@ -273,9 +273,9 @@ var _ = Describe("Consumer stream test", func() {
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
 			if i < 10 {
-				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
 			} else {
-				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i-10)))
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i-10)))
 			}
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
@@ -296,10 +296,9 @@ var _ = Describe("Consumer stream test", func() {
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
 			if i < 10 {
-				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
-
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
 			} else {
-				Expect(fmt.Sprintf("%s", dc.Message().GetData())).To(Equal(fmt.Sprintf(" #%d", i-10)))
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf(" #%d", i-10)))
 			}
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}

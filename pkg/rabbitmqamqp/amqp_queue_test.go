@@ -37,6 +37,7 @@ var _ = Describe("AMQP Queue test ", func() {
 
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(err).To(BeNil())
 		Expect(queueInfoReceived).To(Equal(queueInfo))
 
 		err = management.DeleteQueue(context.TODO(), queueName)
@@ -84,6 +85,7 @@ var _ = Describe("AMQP Queue test ", func() {
 
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(err).To(BeNil())
 		Expect(queueInfoReceived).To(Equal(queueInfo))
 
 		err = management.DeleteQueue(context.TODO(), queueName)
@@ -108,6 +110,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.Type()).To(Equal(Quorum))
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(err).To(BeNil())
 		Expect(queueInfoReceived).To(Equal(queueInfo))
 
 		err = management.DeleteQueue(context.TODO(), queueName)
@@ -134,6 +137,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.Type()).To(Equal(Classic))
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(err).To(BeNil())
 		Expect(queueInfoReceived).To(Equal(queueInfo))
 
 		err = management.DeleteQueue(context.TODO(), queueName)
