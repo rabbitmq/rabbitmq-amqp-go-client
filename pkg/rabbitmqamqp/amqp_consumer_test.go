@@ -81,6 +81,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(err).To(BeNil())
 		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
+		Expect(err).To(BeNil())
 		Expect(nMessages).To(Equal(1))
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
@@ -116,6 +117,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(err).To(BeNil())
 		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
+		Expect(err).To(BeNil())
 		Expect(nMessages).To(Equal(1))
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
@@ -153,6 +155,7 @@ var _ = Describe("NewConsumer tests", func() {
 			Info:        nil,
 		})).To(BeNil())
 		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
+		Expect(err).To(BeNil())
 		Expect(nMessages).To(Equal(0))
 		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())

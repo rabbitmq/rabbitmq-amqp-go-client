@@ -91,6 +91,7 @@ var _ = Describe("AMQP publisher ", func() {
 		err = connection.management.DeleteQueue(context.Background(), qName)
 		Expect(err).To(BeNil())
 		publishResult, err = publisher.Publish(context.Background(), NewMessage([]byte("hello")))
+		Expect(publishResult).To(BeNil())
 		Expect(err).NotTo(BeNil())
 		Expect(connection.Close(context.Background()))
 	})
@@ -146,6 +147,8 @@ var _ = Describe("AMQP publisher ", func() {
 			Name:         name,
 			IsAutoDelete: false,
 		})
+		Expect(err).To(BeNil())
+
 		msg = NewMessage([]byte("hello"))
 		Expect(MessagePropertyToAddress(msg, &ExchangeAddress{Exchange: name})).To(BeNil())
 		// the status should be StateReleased since the exchange does not have any binding

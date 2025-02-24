@@ -228,19 +228,18 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 	var err error
 	a.session, err = a.azureConnection.NewSession(ctx, nil)
 	go func() {
-		select {
-		case <-azureConnection.Done():
-			{
-				a.lifeCycle.SetState(&StateClosed{error: azureConnection.Err()})
-				if azureConnection.Err() != nil {
-					Error("connection closed unexpectedly", "error", azureConnection.Err())
-					a.maybeReconnect()
+		<-azureConnection.Done()
+		{
+			a.lifeCycle.SetState(&StateClosed{error: azureConnection.Err()})
+			if azureConnection.Err() != nil {
+				Error("connection closed unexpectedly", "error", azureConnection.Err())
+				a.maybeReconnect()
 
-					return
-				}
-				Debug("connection closed successfully")
+				return
 			}
+			Debug("connection closed successfully")
 		}
+
 	}()
 
 	if err != nil {
@@ -261,67 +260,74 @@ func (a *AmqpConnection) maybeReconnect() {
 		return
 	}
 	a.lifeCycle.SetState(&StateReconnecting{})
-	numberOfAttempts := 1
-	waitTime := a.amqpConnOptions.RecoveryConfiguration.BackOffReconnectInterval
-	reconnected := false
-	for numberOfAttempts <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts {
+	// Add exponential backoff with jitter
+	baseDelay := a.amqpConnOptions.RecoveryConfiguration.BackOffReconnectInterval
+	maxDelay := 1 * time.Minute
+
+	for attempt := 1; attempt <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts; attempt++ {
+
 		///wait for before reconnecting
 		// add some random milliseconds to the wait time to avoid thundering herd
 		// the random time is between 0 and 500 milliseconds
-		waitTime = waitTime + time.Duration(rand.Intn(500))*time.Millisecond
+		// Calculate delay with exponential backoff and jitter
+		jitter := time.Duration(rand.Intn(500)) * time.Millisecond
+		delay := baseDelay + jitter
+		if delay > maxDelay {
+			delay = maxDelay
+		}
 
-		Info("Waiting before reconnecting", "in", waitTime, "attempt", numberOfAttempts)
-		time.Sleep(waitTime)
+		Info("Attempting reconnection", "attempt", attempt, "delay", delay)
+		time.Sleep(delay)
 		// context with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		// try to createSender
 		err := a.open(ctx, a.amqpConnOptions.addresses, a.amqpConnOptions)
 		cancel()
 
-		if err != nil {
-			numberOfAttempts++
-			waitTime = waitTime * 2
-			Error("Failed to connection. ", "id", a.Id(), "error", err)
-		} else {
-			reconnected = true
-			break
+		if err == nil {
+			a.restartEntities()
+			a.lifeCycle.SetState(&StateOpen{})
+			return
 		}
+		baseDelay *= 2
+		Error("Reconnection attempt failed", "attempt", attempt, "error", err)
 	}
 
-	if reconnected {
-		var fails int32
-		Info("Reconnected successfully, restarting publishers and consumers")
-		a.entitiesTracker.publishers.Range(func(key, value any) bool {
-			publisher := value.(*Publisher)
-			// try to createSender
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			err := publisher.createSender(ctx)
-			if err != nil {
-				atomic.AddInt32(&fails, 1)
-				Error("Failed to createSender publisher", "ID", publisher.Id(), "error", err)
-			}
-			cancel()
-			return true
-		})
-		Info("Restarted publishers", "number of fails", fails)
-		fails = 0
-		a.entitiesTracker.consumers.Range(func(key, value any) bool {
-			consumer := value.(*Consumer)
-			// try to createSender
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			err := consumer.createReceiver(ctx)
-			if err != nil {
-				atomic.AddInt32(&fails, 1)
-				Error("Failed to createReceiver consumer", "ID", consumer.Id(), "error", err)
-			}
-			cancel()
-			return true
-		})
-		Info("Restarted consumers", "number of fails", fails)
+}
 
-		a.lifeCycle.SetState(&StateOpen{})
-	}
+// restartEntities attempts to restart all publishers and consumers after a reconnection
+func (a *AmqpConnection) restartEntities() {
+	var publisherFails, consumerFails int32
 
+	// Restart publishers
+	a.entitiesTracker.publishers.Range(func(key, value any) bool {
+		publisher := value.(*Publisher)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		if err := publisher.createSender(ctx); err != nil {
+			atomic.AddInt32(&publisherFails, 1)
+			Error("Failed to restart publisher", "ID", publisher.Id(), "error", err)
+		}
+		return true
+	})
+
+	// Restart consumers
+	a.entitiesTracker.consumers.Range(func(key, value any) bool {
+		consumer := value.(*Consumer)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		if err := consumer.createReceiver(ctx); err != nil {
+			atomic.AddInt32(&consumerFails, 1)
+			Error("Failed to restart consumer", "ID", consumer.Id(), "error", err)
+		}
+		return true
+	})
+
+	Info("Entity restart complete",
+		"publisherFails", publisherFails,
+		"consumerFails", consumerFails)
 }
 
 func (a *AmqpConnection) close() {

@@ -34,15 +34,15 @@ var _ = Describe("Converters", func() {
 	})
 
 	It("Converts from string logError", func() {
-		v, err := CapacityFrom("10LL")
+		_, err := CapacityFrom("10LL")
 		Expect(fmt.Sprintf("%s", err)).
 			To(ContainSubstring("Invalid unit size format"))
 
-		v, err = CapacityFrom("aGB")
+		_, err = CapacityFrom("aGB")
 		Expect(fmt.Sprintf("%s", err)).
 			To(ContainSubstring("Invalid number format"))
 
-		v, err = CapacityFrom("")
+		v, err := CapacityFrom("")
 		Expect(v).To(Equal(int64(0)))
 		Expect(err).To(BeNil())
 

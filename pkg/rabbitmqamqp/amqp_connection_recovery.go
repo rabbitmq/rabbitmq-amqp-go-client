@@ -53,28 +53,12 @@ func (e *entitiesTracker) storeOrReplaceProducer(entity entityIdentifier) {
 	e.publishers.Store(entity.Id(), entity)
 }
 
-func (e *entitiesTracker) getProducer(id string) (*Publisher, bool) {
-	producer, ok := e.publishers.Load(id)
-	if !ok {
-		return nil, false
-	}
-	return producer.(*Publisher), true
-}
-
 func (e *entitiesTracker) removeProducer(entity entityIdentifier) {
 	e.publishers.Delete(entity.Id())
 }
 
 func (e *entitiesTracker) storeOrReplaceConsumer(entity entityIdentifier) {
 	e.consumers.Store(entity.Id(), entity)
-}
-
-func (e *entitiesTracker) getConsumer(id string) (*Consumer, bool) {
-	consumer, ok := e.consumers.Load(id)
-	if !ok {
-		return nil, false
-	}
-	return consumer.(*Consumer), true
 }
 
 func (e *entitiesTracker) removeConsumer(entity entityIdentifier) {

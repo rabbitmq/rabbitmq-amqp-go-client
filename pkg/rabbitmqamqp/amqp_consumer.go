@@ -144,5 +144,6 @@ func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
 }
 
 func (c *Consumer) Close(ctx context.Context) error {
+	c.connection.entitiesTracker.removeConsumer(c)
 	return c.receiver.Load().Close(ctx)
 }

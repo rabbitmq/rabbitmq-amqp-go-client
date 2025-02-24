@@ -2,9 +2,10 @@ package rabbitmqamqp
 
 import (
 	"fmt"
-	"github.com/Azure/go-amqp"
 	"math/rand"
 	"time"
+
+	"github.com/Azure/go-amqp"
 )
 
 const AtMostOnce = 0
@@ -74,7 +75,7 @@ func random(max int) int {
 }
 
 func validateMessageAnnotations(annotations amqp.Annotations) error {
-	for k, _ := range annotations {
+	for k := range annotations {
 		switch tp := k.(type) {
 		case string:
 			if err := validateMessageAnnotationKey(tp); err != nil {
