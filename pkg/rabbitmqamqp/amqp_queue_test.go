@@ -69,6 +69,8 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.IsAutoDelete()).To(BeTrue())
 		Expect(queueInfo.IsExclusive()).To(BeTrue())
 		Expect(queueInfo.Type()).To(Equal(Classic))
+		Expect(queueInfo.messageCount).To(BeZero())
+		Expect(queueInfo.consumerCount).To(BeZero())
 		Expect(queueInfo.Leader()).To(ContainSubstring("rabbit"))
 		Expect(len(queueInfo.Members())).To(BeNumerically(">", 0))
 
