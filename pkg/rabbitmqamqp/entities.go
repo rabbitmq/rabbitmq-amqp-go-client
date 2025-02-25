@@ -79,18 +79,19 @@ QuorumQueueSpecification represents the specification of the quorum queue
 */
 
 type QuorumQueueSpecification struct {
-	Name                 string
-	AutoExpire           int64
-	MessageTTL           int64
-	OverflowStrategy     OverflowStrategy
-	SingleActiveConsumer bool
-	DeadLetterExchange   string
-	DeadLetterRoutingKey string
-	MaxLength            int64
-	MaxLengthBytes       int64
-	DeliveryLimit        int64
-	TargetClusterSize    int64
-	LeaderLocator        LeaderLocator
+	Name                   string
+	AutoExpire             int64
+	MessageTTL             int64
+	OverflowStrategy       OverflowStrategy
+	SingleActiveConsumer   bool
+	DeadLetterExchange     string
+	DeadLetterRoutingKey   string
+	MaxLength              int64
+	MaxLengthBytes         int64
+	DeliveryLimit          int64
+	TargetClusterSize      int64
+	LeaderLocator          LeaderLocator
+	QuorumInitialGroupSize int
 }
 
 func (q *QuorumQueueSpecification) name() string {
@@ -153,6 +154,10 @@ func (q *QuorumQueueSpecification) buildArguments() map[string]any {
 
 	if q.LeaderLocator != nil {
 		result["x-queue-leader-locator"] = q.LeaderLocator.leaderLocator()
+	}
+
+	if q.QuorumInitialGroupSize != 0 {
+		result["x-quorum-initial-group-size"] = q.QuorumInitialGroupSize
 	}
 
 	result["x-queue-type"] = q.queueType().String()
