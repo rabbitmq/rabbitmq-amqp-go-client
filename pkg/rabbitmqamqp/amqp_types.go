@@ -95,6 +95,9 @@ type OffsetSpecification interface {
 const rmqStreamFilter = "rabbitmq:stream-filter"
 const rmqStreamOffsetSpec = "rabbitmq:stream-offset-spec"
 const rmqStreamMatchUnfiltered = "rabbitmq:stream-match-unfiltered"
+const amqpApplicationPropertiesFilter = "amqp:application-properties-filter"
+const amqpPropertiesFilter = "amqp:properties-filter"
+
 const offsetFirst = "first"
 const offsetNext = "next"
 const offsetLast = "last"
@@ -128,6 +131,20 @@ func (on *OffsetNext) toLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetNext)
 }
 
+type StreamFilterOptions struct {
+	// Filter values.
+	// See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions for more details
+	Values []string
+	//
+	MatchUnfiltered bool
+
+	// Application Property
+	ApplicationProperties map[string]any
+
+	// properties
+	Properties *amqp.MessageProperties
+}
+
 /*
 StreamConsumerOptions represents the options that can be used to create a stream consumer.
 It is mandatory in case of creating a stream consumer.
@@ -139,12 +156,8 @@ type StreamConsumerOptions struct {
 	InitialCredits int32
 	// The offset specification for the stream consumer
 	// see the interface implementations
-	Offset OffsetSpecification
-	// Filter values.
-	// See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions for more details
-	Filters []string
-	//
-	FilterMatchUnfiltered bool
+	Offset              OffsetSpecification
+	StreamFilterOptions *StreamFilterOptions
 }
 
 func (sco *StreamConsumerOptions) linkName() string {
@@ -157,16 +170,85 @@ func (sco *StreamConsumerOptions) initialCredits() int32 {
 
 func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
 	var filters []amqp.LinkFilter
+
 	filters = append(filters, sco.Offset.toLinkFilter())
-	if sco.Filters != nil {
-		l := []any{}
-		for _, f := range sco.Filters {
+	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Values != nil {
+		var l []any
+		for _, f := range sco.StreamFilterOptions.Values {
 			l = append(l, f)
 		}
 
 		filters = append(filters, amqp.NewLinkFilter(rmqStreamFilter, 0, l))
-		filters = append(filters, amqp.NewLinkFilter(rmqStreamMatchUnfiltered, 0, sco.FilterMatchUnfiltered))
+		filters = append(filters, amqp.NewLinkFilter(rmqStreamMatchUnfiltered, 0, sco.StreamFilterOptions.MatchUnfiltered))
 	}
+
+	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.ApplicationProperties != nil {
+		l := map[string]any{}
+		for k, v := range sco.StreamFilterOptions.ApplicationProperties {
+			l[k] = v
+		}
+		filters = append(filters, amqp.NewLinkFilter(amqpApplicationPropertiesFilter, 0, l))
+	}
+
+	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Properties != nil {
+		l := map[amqp.Symbol]any{}
+		if sco.StreamFilterOptions.Properties.ContentType != nil {
+			l["content-type"] = amqp.Symbol(*sco.StreamFilterOptions.Properties.ContentType)
+		}
+
+		if sco.StreamFilterOptions.Properties.ContentEncoding != nil {
+			l["content-encoding"] = amqp.Symbol(*sco.StreamFilterOptions.Properties.ContentEncoding)
+		}
+
+		if sco.StreamFilterOptions.Properties.CorrelationID != nil {
+			l["correlation-id"] = sco.StreamFilterOptions.Properties.CorrelationID
+		}
+
+		if sco.StreamFilterOptions.Properties.MessageID != nil {
+			l["message-id"] = sco.StreamFilterOptions.Properties.MessageID
+		}
+
+		if sco.StreamFilterOptions.Properties.Subject != nil {
+			l["subject"] = *sco.StreamFilterOptions.Properties.Subject
+		}
+
+		if sco.StreamFilterOptions.Properties.ReplyTo != nil {
+			l["reply-to"] = *sco.StreamFilterOptions.Properties.ReplyTo
+		}
+
+		if sco.StreamFilterOptions.Properties.To != nil {
+			l["to"] = *sco.StreamFilterOptions.Properties.To
+		}
+
+		if sco.StreamFilterOptions.Properties.GroupID != nil {
+			l["group-id"] = *sco.StreamFilterOptions.Properties.GroupID
+		}
+
+		if sco.StreamFilterOptions.Properties.UserID != nil {
+			l["user-id"] = sco.StreamFilterOptions.Properties.UserID
+		}
+
+		if sco.StreamFilterOptions.Properties.AbsoluteExpiryTime != nil {
+			l["absolute-expiry-time"] = sco.StreamFilterOptions.Properties.AbsoluteExpiryTime
+		}
+
+		if sco.StreamFilterOptions.Properties.CreationTime != nil {
+			l["creation-time"] = sco.StreamFilterOptions.Properties.CreationTime
+		}
+
+		if sco.StreamFilterOptions.Properties.GroupSequence != nil {
+			l["group-sequence"] = *sco.StreamFilterOptions.Properties.GroupSequence
+		}
+
+		if sco.StreamFilterOptions.Properties.ReplyToGroupID != nil {
+			l["reply-to-group-id"] = *sco.StreamFilterOptions.Properties.ReplyToGroupID
+		}
+
+		if len(l) > 0 {
+			filters = append(filters, amqp.NewLinkFilter(amqpPropertiesFilter, 0, l))
+		}
+	}
+
 	return filters
 }
 
