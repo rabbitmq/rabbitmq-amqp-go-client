@@ -562,7 +562,7 @@ func publishMessagesWithMessageLogic(queue string, label string, count int, logi
 	Expect(err).To(BeNil())
 
 	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queue},
-		"producer_filter_stream_application_properties")
+		nil)
 	Expect(err).To(BeNil())
 	Expect(publisher).NotTo(BeNil())
 

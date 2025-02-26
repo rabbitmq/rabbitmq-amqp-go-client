@@ -118,7 +118,7 @@ func main() {
 
 	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.QueueAddress{
 		Queue: queueName,
-	}, "reliable-publisher")
+	}, nil)
 	if err != nil {
 		rmq.Error("Error creating publisher", err)
 		return

@@ -1,6 +1,6 @@
 package rabbitmqamqp
 
-type entityIdentifier interface {
+type iEntityIdentifier interface {
 	Id() string
 }
 
@@ -21,9 +21,9 @@ func (e QueueType) String() string {
 }
 
 /*
-QueueSpecification represents the specification of a queue
+IQueueSpecification represents the specification of a queue
 */
-type QueueSpecification interface {
+type IQueueSpecification interface {
 	name() string
 	isAutoDelete() bool
 	isExclusive() bool
@@ -31,7 +31,7 @@ type QueueSpecification interface {
 	buildArguments() map[string]any
 }
 
-type OverflowStrategy interface {
+type IOverflowStrategy interface {
 	overflowStrategy() string
 }
 
@@ -56,7 +56,7 @@ func (r *RejectPublishDlxOverflowStrategy) overflowStrategy() string {
 	return "reject-publish-dlx"
 }
 
-type LeaderLocator interface {
+type ILeaderLocator interface {
 	leaderLocator() string
 }
 
@@ -82,7 +82,7 @@ type QuorumQueueSpecification struct {
 	Name                   string
 	AutoExpire             int64
 	MessageTTL             int64
-	OverflowStrategy       OverflowStrategy
+	OverflowStrategy       IOverflowStrategy
 	SingleActiveConsumer   bool
 	DeadLetterExchange     string
 	DeadLetterRoutingKey   string
@@ -90,7 +90,7 @@ type QuorumQueueSpecification struct {
 	MaxLengthBytes         int64
 	DeliveryLimit          int64
 	TargetClusterSize      int64
-	LeaderLocator          LeaderLocator
+	LeaderLocator          ILeaderLocator
 	QuorumInitialGroupSize int
 }
 
@@ -173,14 +173,14 @@ type ClassicQueueSpecification struct {
 	IsExclusive          bool
 	AutoExpire           int64
 	MessageTTL           int64
-	OverflowStrategy     OverflowStrategy
+	OverflowStrategy     IOverflowStrategy
 	SingleActiveConsumer bool
 	DeadLetterExchange   string
 	DeadLetterRoutingKey string
 	MaxLength            int64
 	MaxLengthBytes       int64
 	MaxPriority          int64
-	LeaderLocator        LeaderLocator
+	LeaderLocator        ILeaderLocator
 }
 
 func (q *ClassicQueueSpecification) name() string {
@@ -349,8 +349,8 @@ func (e ExchangeType) String() string {
 	return string(e.Type)
 }
 
-// ExchangeSpecification represents the specification of an exchange
-type ExchangeSpecification interface {
+// IExchangeSpecification represents the specification of an exchange
+type IExchangeSpecification interface {
 	name() string
 	isAutoDelete() bool
 	exchangeType() ExchangeType
@@ -470,7 +470,7 @@ func (c *CustomExchangeSpecification) arguments() map[string]any {
 
 // / **** Binding ****
 
-type BindingSpecification interface {
+type IBindingSpecification interface {
 	sourceExchange() string
 	destination() string
 	bindingKey() string

@@ -112,7 +112,7 @@ func main() {
 	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.ExchangeAddress{
 		Exchange: exchangeName,
 		Key:      routingKey,
-	}, "getting-started-publisher")
+	}, nil)
 	if err != nil {
 		rmq.Error("Error creating publisher", err)
 		return

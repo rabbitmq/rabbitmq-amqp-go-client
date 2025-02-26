@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type LifeCycleState interface {
+type ILifeCycleState interface {
 	getState() int
 }
 
@@ -49,7 +49,7 @@ const (
 	closed       = iota
 )
 
-func statusToString(status LifeCycleState) string {
+func statusToString(status ILifeCycleState) string {
 	switch status.getState() {
 	case open:
 		return "open"
@@ -65,8 +65,8 @@ func statusToString(status LifeCycleState) string {
 }
 
 type StateChanged struct {
-	From LifeCycleState
-	To   LifeCycleState
+	From ILifeCycleState
+	To   ILifeCycleState
 }
 
 func (s StateChanged) String() string {
@@ -85,7 +85,7 @@ func (s StateChanged) String() string {
 }
 
 type LifeCycle struct {
-	state           LifeCycleState
+	state           ILifeCycleState
 	chStatusChanged chan *StateChanged
 	mutex           *sync.Mutex
 }
@@ -97,13 +97,13 @@ func NewLifeCycle() *LifeCycle {
 	}
 }
 
-func (l *LifeCycle) State() LifeCycleState {
+func (l *LifeCycle) State() ILifeCycleState {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	return l.state
 }
 
-func (l *LifeCycle) SetState(value LifeCycleState) {
+func (l *LifeCycle) SetState(value ILifeCycleState) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	if l.state == value {

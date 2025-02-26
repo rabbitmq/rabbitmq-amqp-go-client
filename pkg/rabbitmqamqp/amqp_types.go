@@ -13,20 +13,20 @@ type StateRejected = amqp.StateRejected
 type StateReleased = amqp.StateReleased
 type StateModified = amqp.StateModified
 
-type linkerName interface {
+type iLinkerName interface {
 	linkName() string
 }
 
-func getLinkName(l linkerName) string {
+func getLinkName(l iLinkerName) string {
 	if l == nil || l.linkName() == "" {
 		return uuid.New().String()
 	}
 	return l.linkName()
 }
 
-/// ConsumerOptions interface for the AMQP and Stream consumer///
+/// IConsumerOptions interface for the AMQP and Stream consumer///
 
-type ConsumerOptions interface {
+type IConsumerOptions interface {
 	// linkName returns the name of the link
 	// if not set it will return a random UUID
 	linkName() string
@@ -37,16 +37,19 @@ type ConsumerOptions interface {
 	// linkFilters returns the link filters for the link.
 	// It is mostly used for the stream consumers.
 	linkFilters() []amqp.LinkFilter
+
+	// id returns the id of the consumer
+	id() string
 }
 
-func getInitialCredits(co ConsumerOptions) int32 {
+func getInitialCredits(co IConsumerOptions) int32 {
 	if co == nil || co.initialCredits() == 0 {
 		return 256
 	}
 	return co.initialCredits()
 }
 
-func getLinkFilters(co ConsumerOptions) []amqp.LinkFilter {
+func getLinkFilters(co IConsumerOptions) []amqp.LinkFilter {
 	if co == nil {
 		return nil
 	}
@@ -69,26 +72,37 @@ func (mo *managementOptions) linkFilters() []amqp.LinkFilter {
 	return nil
 }
 
-type AMQPConsumerOptions struct {
-	//ReceiverLinkName: see the ConsumerOptions interface
-	ReceiverLinkName string
-	//InitialCredits: see the ConsumerOptions interface
-	InitialCredits int32
+func (mo *managementOptions) id() string {
+	return "management"
 }
 
-func (aco *AMQPConsumerOptions) linkName() string {
+// ConsumerOptions represents the options for quorum and classic queues
+type ConsumerOptions struct {
+	//ReceiverLinkName: see the IConsumerOptions interface
+	ReceiverLinkName string
+	//InitialCredits: see the IConsumerOptions interface
+	InitialCredits int32
+	// The id of the consumer
+	Id string
+}
+
+func (aco *ConsumerOptions) linkName() string {
 	return aco.ReceiverLinkName
 }
 
-func (aco *AMQPConsumerOptions) initialCredits() int32 {
+func (aco *ConsumerOptions) initialCredits() int32 {
 	return aco.InitialCredits
 }
 
-func (aco *AMQPConsumerOptions) linkFilters() []amqp.LinkFilter {
+func (aco *ConsumerOptions) linkFilters() []amqp.LinkFilter {
 	return nil
 }
 
-type OffsetSpecification interface {
+func (aco *ConsumerOptions) id() string {
+	return aco.Id
+}
+
+type IOffsetSpecification interface {
 	toLinkFilter() amqp.LinkFilter
 }
 
@@ -148,18 +162,20 @@ type StreamFilterOptions struct {
 }
 
 /*
-StreamConsumerOptions represents the options that can be used to create a stream consumer.
+StreamConsumerOptions represents the options for stream queues
 It is mandatory in case of creating a stream consumer.
 */
 type StreamConsumerOptions struct {
-	//ReceiverLinkName: see the ConsumerOptions interface
+	//ReceiverLinkName: see the IConsumerOptions interface
 	ReceiverLinkName string
-	//InitialCredits: see the ConsumerOptions interface
+	//InitialCredits: see the IConsumerOptions interface
 	InitialCredits int32
 	// The offset specification for the stream consumer
 	// see the interface implementations
-	Offset              OffsetSpecification
+	Offset              IOffsetSpecification
 	StreamFilterOptions *StreamFilterOptions
+
+	Id string
 }
 
 func (sco *StreamConsumerOptions) linkName() string {
@@ -254,16 +270,26 @@ func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
 	return filters
 }
 
-///// ProducerOptions /////
-
-type ProducerOptions interface {
-	linkName() string
+func (sco *StreamConsumerOptions) id() string {
+	return sco.Id
 }
 
-type AMQPProducerOptions struct {
+///// PublisherOptions /////
+
+type IPublisherOptions interface {
+	linkName() string
+	id() string
+}
+
+type PublisherOptions struct {
+	Id             string
 	SenderLinkName string
 }
 
-func (apo *AMQPProducerOptions) linkName() string {
+func (apo *PublisherOptions) linkName() string {
 	return apo.SenderLinkName
+}
+
+func (apo *PublisherOptions) id() string {
+	return apo.Id
 }

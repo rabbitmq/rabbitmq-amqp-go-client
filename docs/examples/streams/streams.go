@@ -35,7 +35,7 @@ func main() {
 
 	// create a stream publisher. In this case we use the QueueAddress to make the example
 	// simple. So we use the default exchange here.
-	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{Queue: queueStream}, "stream-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{Queue: queueStream}, nil)
 	checkError(err)
 
 	// publish messages to the stream

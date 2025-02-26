@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// create a publisher without a target
-	publisher, err := amqpConnection.NewPublisher(context.TODO(), nil, "stream-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), nil, nil)
 	checkError(err)
 
 	// publish messages to the stream

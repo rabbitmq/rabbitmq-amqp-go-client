@@ -247,7 +247,7 @@ func publishMessages(queueName string, count int, args ...string) {
 	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
 	Expect(err).To(BeNil())
 
-	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, "test")
+	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, nil)
 	Expect(err).To(BeNil())
 	Expect(publisher).NotTo(BeNil())
 

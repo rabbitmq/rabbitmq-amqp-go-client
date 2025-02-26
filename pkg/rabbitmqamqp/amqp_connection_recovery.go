@@ -49,19 +49,19 @@ func newEntitiesTracker() *entitiesTracker {
 	}
 }
 
-func (e *entitiesTracker) storeOrReplaceProducer(entity entityIdentifier) {
+func (e *entitiesTracker) storeOrReplaceProducer(entity iEntityIdentifier) {
 	e.publishers.Store(entity.Id(), entity)
 }
 
-func (e *entitiesTracker) removeProducer(entity entityIdentifier) {
+func (e *entitiesTracker) removeProducer(entity iEntityIdentifier) {
 	e.publishers.Delete(entity.Id())
 }
 
-func (e *entitiesTracker) storeOrReplaceConsumer(entity entityIdentifier) {
+func (e *entitiesTracker) storeOrReplaceConsumer(entity iEntityIdentifier) {
 	e.consumers.Store(entity.Id(), entity)
 }
 
-func (e *entitiesTracker) removeConsumer(entity entityIdentifier) {
+func (e *entitiesTracker) removeConsumer(entity iEntityIdentifier) {
 	e.consumers.Delete(entity.Id())
 }
 

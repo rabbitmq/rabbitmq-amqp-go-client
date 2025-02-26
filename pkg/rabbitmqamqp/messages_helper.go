@@ -8,7 +8,7 @@ import (
 // MessagePropertyToAddress sets the To property of the message to the address of the target.
 // The target must be a QueueAddress or an ExchangeAddress.
 // Note: The field msgRef.Properties.To will be overwritten if it is already set.
-func MessagePropertyToAddress(msgRef *amqp.Message, target TargetAddress) error {
+func MessagePropertyToAddress(msgRef *amqp.Message, target ITargetAddress) error {
 	if target == nil {
 		return errors.New("target cannot be nil")
 	}
@@ -33,7 +33,7 @@ func NewMessage(body []byte) *amqp.Message {
 // NewMessageWithAddress creates a new AMQP 1.0  new message with the given payload and sets the To property to the address of the target.
 // The target must be a QueueAddress or an ExchangeAddress.
 // This function is a helper that combines NewMessage and MessagePropertyToAddress.
-func NewMessageWithAddress(body []byte, target TargetAddress) (*amqp.Message, error) {
+func NewMessageWithAddress(body []byte, target ITargetAddress) (*amqp.Message, error) {
 	message := amqp.NewMessage(body)
 	err := MessagePropertyToAddress(message, target)
 	if err != nil {
