@@ -131,17 +131,19 @@ func (on *OffsetNext) toLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetNext)
 }
 
+// StreamFilterOptions represents the options that can be used to filter the stream data.
+// It is used in the StreamConsumerOptions.
+// See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions/
 type StreamFilterOptions struct {
 	// Filter values.
-	// See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions for more details
 	Values []string
 	//
 	MatchUnfiltered bool
 
-	// Application Property
+	// Filter the data based on Application Property
 	ApplicationProperties map[string]any
 
-	// properties
+	// Filter the data based on Message Properties
 	Properties *amqp.MessageProperties
 }
 
