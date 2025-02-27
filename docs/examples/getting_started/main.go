@@ -112,7 +112,7 @@ func main() {
 	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.ExchangeAddress{
 		Exchange: exchangeName,
 		Key:      routingKey,
-	}, "getting-started-publisher")
+	}, nil)
 	if err != nil {
 		rmq.Error("Error creating publisher", err)
 		return
@@ -129,17 +129,14 @@ func main() {
 		switch publishResult.Outcome.(type) {
 		case *rmq.StateAccepted:
 			rmq.Info("[NewPublisher]", "Message accepted", publishResult.Message.Data[0])
-			break
 		case *rmq.StateReleased:
 			rmq.Warn("[NewPublisher]", "Message was not routed", publishResult.Message.Data[0])
-			break
 		case *rmq.StateRejected:
 			rmq.Warn("[NewPublisher]", "Message rejected", publishResult.Message.Data[0])
 			stateType := publishResult.Outcome.(*rmq.StateRejected)
 			if stateType.Error != nil {
 				rmq.Warn("[NewPublisher]", "Message rejected with error: %v", stateType.Error)
 			}
-			break
 		default:
 			// these status are not supported. Leave it for AMQP 1.0 compatibility
 			// see: https://www.rabbitmq.com/docs/next/amqp#outcomes

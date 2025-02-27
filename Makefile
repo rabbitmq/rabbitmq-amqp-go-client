@@ -12,6 +12,7 @@ format:
 
 vet:
 	go vet ./pkg/rabbitmqamqp
+	go vet ./docs/examples/...
 
 STATICCHECK ?= $(GOBIN)/staticcheck
 STATICCHECK_VERSION ?= latest
@@ -19,6 +20,7 @@ $(STATICCHECK):
 	go install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
 check: $(STATICCHECK)
 	$(STATICCHECK) ./pkg/rabbitmqamqp
+	$(STATICCHECK) ./docs/examples/...
 
 
 

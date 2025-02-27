@@ -84,7 +84,11 @@ var _ = Describe("AMQP connection Test", func() {
 		})
 
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: queueName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: queueName},
+			&PublisherOptions{
+				Id:             "my_id",
+				SenderLinkName: "my_sender_link",
+			})
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		consumer, err := connection.NewConsumer(context.Background(), queueName, nil)

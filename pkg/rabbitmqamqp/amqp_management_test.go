@@ -49,15 +49,19 @@ var _ = Describe("Management tests", func() {
 		management := connection.Management()
 		kv := make(map[string]any)
 		kv["durable"] = true
-		kv["auto_delete"] = false
+		kv["auto_delete"] = true
 		_queueArguments := make(map[string]any)
-		_queueArguments["x-queue-type"] = "quorum"
+		_queueArguments["x-queue-type"] = "classic"
 		kv["arguments"] = _queueArguments
 		path := "/queues/test"
 		result, err := management.Request(context.Background(), kv, path, "PUT", []int{200})
 		Expect(err).To(BeNil())
 		Expect(result).NotTo(BeNil())
+		result, err = management.Request(context.Background(), amqp.Null{}, path, "DELETE", []int{responseCode200})
+		Expect(err).To(BeNil())
+		Expect(result).NotTo(BeNil())
 		Expect(management.Close(context.Background())).To(BeNil())
+
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 

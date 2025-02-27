@@ -35,7 +35,7 @@ func main() {
 
 	// create a stream publisher. In this case we use the QueueAddress to make the example
 	// simple. So we use the default exchange here.
-	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{Queue: queueStream}, "stream-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{Queue: queueStream}, nil)
 	checkError(err)
 
 	// publish messages to the stream
@@ -47,17 +47,14 @@ func main() {
 		switch publishResult.Outcome.(type) {
 		case *rmq.StateAccepted:
 			rmq.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
-			break
 		case *rmq.StateReleased:
 			rmq.Warn("[Publisher]", "Message was not routed", publishResult.Message.Data[0])
-			break
 		case *rmq.StateRejected:
 			rmq.Warn("[Publisher]", "Message rejected", publishResult.Message.Data[0])
 			stateType := publishResult.Outcome.(*rmq.StateRejected)
 			if stateType.Error != nil {
 				rmq.Warn("[Publisher]", "Message rejected with error: %v", stateType.Error)
 			}
-			break
 		default:
 			// these status are not supported. Leave it for AMQP 1.0 compatibility
 			// see: https://www.rabbitmq.com/docs/next/amqp#outcomes

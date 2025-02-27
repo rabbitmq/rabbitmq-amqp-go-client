@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// create a publisher without a target
-	publisher, err := amqpConnection.NewPublisher(context.TODO(), nil, "stream-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), nil, nil)
 	checkError(err)
 
 	// publish messages to the stream
@@ -55,7 +55,6 @@ func main() {
 		switch publishResult.Outcome.(type) {
 		case *amqp.StateAccepted:
 			rmq.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
-			break
 		default:
 			rmq.Warn("[Publisher]", "Message not accepted", publishResult.Message.Data[0])
 		}

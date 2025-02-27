@@ -60,8 +60,3 @@ var _ = Describe("address builder test ", func() {
 		})
 	})
 })
-
-// Helper function to create string pointers
-func stringPtr(s string) *string {
-	return &s
-}

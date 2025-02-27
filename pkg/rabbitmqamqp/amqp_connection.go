@@ -75,9 +75,10 @@ func (a *AmqpConnection) Properties() map[string]any {
 }
 
 // NewPublisher creates a new Publisher that sends messages to the provided destination.
-// The destination is a TargetAddress that can be a Queue or an Exchange with a routing key.
+// The destination is a ITargetAddress that can be a Queue or an Exchange with a routing key.
+// options is an IPublisherOptions that can be used to configure the publisher.
 // See QueueAddress and ExchangeAddress for more information.
-func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAddress, linkName string) (*Publisher, error) {
+func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAddress, options IPublisherOptions) (*Publisher, error) {
 	destinationAdd := ""
 	err := error(nil)
 	if destination != nil {
@@ -91,11 +92,11 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAdd
 		}
 	}
 
-	return newPublisher(ctx, a, destinationAdd, linkName)
+	return newPublisher(ctx, a, destinationAdd, options)
 }
 
-// NewConsumer creates a new Consumer that listens to the provided destination. Destination is a QueueAddress.
-func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options ConsumerOptions) (*Consumer, error) {
+// NewConsumer creates a new Consumer that listens to the provided Queue
+func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options IConsumerOptions) (*Consumer, error) {
 	destination := &QueueAddress{
 		Queue: queueName,
 	}
@@ -362,7 +363,7 @@ func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpConnection) State() LifeCycleState {
+func (a *AmqpConnection) State() ILifeCycleState {
 	return a.lifeCycle.State()
 }
 

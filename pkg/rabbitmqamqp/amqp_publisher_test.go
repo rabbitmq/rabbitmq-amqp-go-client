@@ -18,7 +18,7 @@ var _ = Describe("AMQP publisher ", func() {
 		})
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
-		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, nil)
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		Expect(publisher).To(BeAssignableToTypeOf(&Publisher{}))
@@ -40,7 +40,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		exchangeName := "Nope"
-		publisher, err := connection.NewPublisher(context.Background(), &ExchangeAddress{Exchange: exchangeName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &ExchangeAddress{Exchange: exchangeName}, nil)
 		Expect(err).NotTo(BeNil())
 		Expect(publisher).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
@@ -62,7 +62,7 @@ var _ = Describe("AMQP publisher ", func() {
 		publisher, err := connection.NewPublisher(context.Background(), &ExchangeAddress{
 			Exchange: eName,
 			Key:      routingKeyNope,
-		}, "test")
+		}, nil)
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		publishResult, err := publisher.Publish(context.Background(), NewMessage([]byte("hello")))
@@ -82,7 +82,7 @@ var _ = Describe("AMQP publisher ", func() {
 			Name: qName,
 		})
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, "test")
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, nil)
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		publishResult, err := publisher.Publish(context.Background(), NewMessage([]byte("hello")))
@@ -100,7 +100,7 @@ var _ = Describe("AMQP publisher ", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
-		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
+		publisher, err := connection.NewPublisher(context.Background(), nil, nil)
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		qName := generateNameWithDateTime("Targets NewPublisher should fail when the destination does not exist")
@@ -125,7 +125,7 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		Expect(err).To(BeNil())
-		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
+		publisher, err := connection.NewPublisher(context.Background(), nil, nil)
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		name := generateNameWithDateTime("Targets NewPublisher should success with StateReceived when the destination exists")
@@ -180,7 +180,7 @@ var _ = Describe("AMQP publisher ", func() {
 		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
-		publisher, err := connection.NewPublisher(context.Background(), nil, "test")
+		publisher, err := connection.NewPublisher(context.Background(), nil, nil)
 		Expect(err).To(BeNil())
 		Expect(publisher).NotTo(BeNil())
 		msg := NewMessage([]byte("hello"))

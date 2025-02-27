@@ -8,14 +8,16 @@ import (
 )
 
 type AmqpQueueInfo struct {
-	name         string
-	isDurable    bool
-	isAutoDelete bool
-	isExclusive  bool
-	leader       string
-	members      []string
-	arguments    map[string]any
-	queueType    TQueueType
+	name          string
+	isDurable     bool
+	isAutoDelete  bool
+	isExclusive   bool
+	leader        string
+	members       []string
+	arguments     map[string]any
+	queueType     TQueueType
+	consumerCount uint32
+	messageCount  uint64
 }
 
 func (a *AmqpQueueInfo) Leader() string {
@@ -28,14 +30,16 @@ func (a *AmqpQueueInfo) Members() []string {
 
 func newAmqpQueueInfo(response map[string]any) *AmqpQueueInfo {
 	return &AmqpQueueInfo{
-		name:         response["name"].(string),
-		isDurable:    response["durable"].(bool),
-		isAutoDelete: response["auto_delete"].(bool),
-		isExclusive:  response["exclusive"].(bool),
-		queueType:    TQueueType(response["type"].(string)),
-		leader:       response["leader"].(string),
-		members:      response["replicas"].([]string),
-		arguments:    response["arguments"].(map[string]any),
+		name:          response["name"].(string),
+		isDurable:     response["durable"].(bool),
+		isAutoDelete:  response["auto_delete"].(bool),
+		isExclusive:   response["exclusive"].(bool),
+		queueType:     TQueueType(response["type"].(string)),
+		leader:        response["leader"].(string),
+		members:       response["replicas"].([]string),
+		arguments:     response["arguments"].(map[string]any),
+		consumerCount: response["consumer_count"].(uint32),
+		messageCount:  response["message_count"].(uint64),
 	}
 }
 
@@ -61,6 +65,14 @@ func (a *AmqpQueueInfo) Name() string {
 
 func (a *AmqpQueueInfo) Arguments() map[string]any {
 	return a.arguments
+}
+
+func (a *AmqpQueueInfo) ConsumerCount() uint32 {
+	return a.consumerCount
+}
+
+func (a *AmqpQueueInfo) MessageCount() uint64 {
+	return a.messageCount
 }
 
 type AmqpQueue struct {

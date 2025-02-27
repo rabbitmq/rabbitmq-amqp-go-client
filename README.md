@@ -15,7 +15,7 @@ Suitable for testing in pre-production environments.
 
 ## Documentation
 
-- [Client Guide](https://www.rabbitmq.com/client-libraries/amqp-client-libraries) (work in progress for this client)
+- [Client Guide](https://www.rabbitmq.com/client-libraries/amqp-client-libraries)
 
 
 

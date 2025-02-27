@@ -68,7 +68,7 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 type Consumer struct {
 	receiver       atomic.Pointer[amqp.Receiver]
 	connection     *AmqpConnection
-	options        ConsumerOptions
+	options        IConsumerOptions
 	destinationAdd string
 	id             string
 
@@ -85,10 +85,10 @@ func (c *Consumer) Id() string {
 	return c.id
 }
 
-func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options ConsumerOptions, args ...string) (*Consumer, error) {
+func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IConsumerOptions) (*Consumer, error) {
 	id := fmt.Sprintf("consumer-%s", uuid.New().String())
-	if len(args) > 0 {
-		id = args[0]
+	if options != nil && options.id() != "" {
+		id = options.id()
 	}
 
 	r := &Consumer{connection: connection, options: options,

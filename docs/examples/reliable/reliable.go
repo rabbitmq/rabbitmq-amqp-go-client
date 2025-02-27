@@ -118,7 +118,7 @@ func main() {
 
 	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.QueueAddress{
 		Queue: queueName,
-	}, "reliable-publisher")
+	}, nil)
 	if err != nil {
 		rmq.Error("Error creating publisher", err)
 		return
@@ -147,13 +147,10 @@ func main() {
 					switch publishResult.Outcome.(type) {
 					case *rmq.StateAccepted:
 						atomic.AddInt32(&stateAccepted, 1)
-						break
 					case *rmq.StateReleased:
 						atomic.AddInt32(&stateReleased, 1)
-						break
 					case *rmq.StateRejected:
 						atomic.AddInt32(&stateRejected, 1)
-						break
 					default:
 						// these status are not supported. Leave it for AMQP 1.0 compatibility
 						// see: https://www.rabbitmq.com/docs/next/amqp#outcomes

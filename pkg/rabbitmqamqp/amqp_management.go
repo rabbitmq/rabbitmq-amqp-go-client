@@ -173,9 +173,9 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
-func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification QueueSpecification) (*AmqpQueueInfo, error) {
+func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueSpecification) (*AmqpQueueInfo, error) {
 	if specification == nil {
-		return nil, fmt.Errorf("queue specification cannot be nil. You need to provide a valid QueueSpecification")
+		return nil, fmt.Errorf("queue specification cannot be nil. You need to provide a valid IQueueSpecification")
 	}
 
 	amqpQueue := newAmqpQueue(a, specification.name())
@@ -192,9 +192,9 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	return q.Delete(ctx)
 }
 
-func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification ExchangeSpecification) (*AmqpExchangeInfo, error) {
+func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification IExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
-		return nil, errors.New("exchange specification cannot be nil. You need to provide a valid ExchangeSpecification")
+		return nil, errors.New("exchange specification cannot be nil. You need to provide a valid IExchangeSpecification")
 	}
 
 	exchange := newAmqpExchange(a, exchangeSpecification.name())
@@ -208,9 +208,9 @@ func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error 
 	return e.Delete(ctx)
 }
 
-func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification BindingSpecification) (string, error) {
+func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBindingSpecification) (string, error) {
 	if bindingSpecification == nil {
-		return "", fmt.Errorf("binding specification cannot be nil. You need to provide a valid BindingSpecification")
+		return "", fmt.Errorf("binding specification cannot be nil. You need to provide a valid IBindingSpecification")
 	}
 
 	bind := newAMQPBinding(a)
@@ -220,9 +220,9 @@ func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification BindingS
 	return bind.Bind(ctx)
 
 }
-func (a *AmqpManagement) Unbind(ctx context.Context, bindingPath string) error {
+func (a *AmqpManagement) Unbind(ctx context.Context, path string) error {
 	bind := newAMQPBinding(a)
-	return bind.Unbind(ctx, bindingPath)
+	return bind.Unbind(ctx, path)
 }
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*AmqpQueueInfo, error) {
 	path, err := queueAddress(&queueName)
@@ -236,8 +236,10 @@ func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*Amqp
 	return newAmqpQueueInfo(result), nil
 }
 
-func (a *AmqpManagement) PurgeQueue(ctx context.Context, queueName string) (int, error) {
-	purge := newAmqpQueue(a, queueName)
+// PurgeQueue purges the queue
+// returns the number of messages purged
+func (a *AmqpManagement) PurgeQueue(ctx context.Context, name string) (int, error) {
+	purge := newAmqpQueue(a, name)
 	return purge.Purge(ctx)
 }
 
@@ -245,6 +247,6 @@ func (a *AmqpManagement) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
-func (a *AmqpManagement) State() LifeCycleState {
+func (a *AmqpManagement) State() ILifeCycleState {
 	return a.lifeCycle.State()
 }

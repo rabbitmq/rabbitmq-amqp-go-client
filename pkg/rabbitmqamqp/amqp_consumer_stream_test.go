@@ -7,30 +7,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
-	"strconv"
+	"sync"
 	"time"
 )
-
-func publishMessagesWithStreamTag(queueName string, filterValue string, count int) {
-	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
-	Expect(err).To(BeNil())
-
-	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, "producer_filter_stream")
-	Expect(err).To(BeNil())
-	Expect(publisher).NotTo(BeNil())
-
-	for i := 0; i < count; i++ {
-		body := filterValue + " #" + strconv.Itoa(i)
-		msg := NewMessageWithFilter([]byte(body), filterValue)
-		publishResult, err := publisher.Publish(context.TODO(), msg)
-		Expect(err).To(BeNil())
-		Expect(publishResult).NotTo(BeNil())
-		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
-	}
-	err = conn.Close(context.TODO())
-	Expect(err).To(BeNil())
-
-}
 
 var _ = Describe("Consumer stream test", func() {
 
@@ -217,15 +196,34 @@ var _ = Describe("Consumer stream test", func() {
 		Expect(err).To(BeNil())
 		Expect(queueInfo).NotTo(BeNil())
 		Expect(queueInfo.name).To(Equal(qName))
-		publishMessagesWithStreamTag(qName, "banana", 10)
-		publishMessagesWithStreamTag(qName, "apple", 10)
-		publishMessagesWithStreamTag(qName, "", 10)
+		publishMessagesWithMessageLogic(qName, "banana", 10, func(msg *amqp.Message) {
+			msg.Annotations = amqp.Annotations{
+				// here we set the filter value taken from the filters array
+				StreamFilterValue: "banana",
+			}
+
+		})
+		publishMessagesWithMessageLogic(qName, "apple", 10, func(msg *amqp.Message) {
+			msg.Annotations = amqp.Annotations{
+				// here we set the filter value taken from the filters array
+				StreamFilterValue: "apple",
+			}
+		})
+
+		publishMessagesWithMessageLogic(qName, "", 10, func(msg *amqp.Message) {
+			msg.Annotations = amqp.Annotations{
+				// here we set the filter value taken from the filters array
+				StreamFilterValue: "",
+			}
+		})
 
 		consumerBanana, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
 			ReceiverLinkName: "consumer banana should filter messages based on x-stream-filter",
 			InitialCredits:   200,
 			Offset:           &OffsetFirst{},
-			Filters:          []string{"banana"},
+			StreamFilterOptions: &StreamFilterOptions{
+				Values: []string{"banana"},
+			},
 		})
 
 		Expect(err).To(BeNil())
@@ -235,16 +233,18 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumerBanana.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, "banana")))
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
 		consumerApple, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
-			ReceiverLinkName:      "consumer apple should filter messages based on x-stream-filter",
-			InitialCredits:        200,
-			Offset:                &OffsetFirst{},
-			Filters:               []string{"apple"},
-			FilterMatchUnfiltered: true,
+			ReceiverLinkName: "consumer apple should filter messages based on x-stream-filter",
+			InitialCredits:   200,
+			Offset:           &OffsetFirst{},
+			StreamFilterOptions: &StreamFilterOptions{
+				Values:          []string{"apple"},
+				MatchUnfiltered: true,
+			},
 		})
 
 		Expect(err).To(BeNil())
@@ -254,7 +254,8 @@ var _ = Describe("Consumer stream test", func() {
 			dc, err := consumerApple.Receive(context.Background())
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
-			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, "apple")))
+
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
@@ -262,7 +263,9 @@ var _ = Describe("Consumer stream test", func() {
 			ReceiverLinkName: "consumer apple and banana should filter messages based on x-stream-filter",
 			InitialCredits:   200,
 			Offset:           &OffsetFirst{},
-			Filters:          []string{"apple", "banana"},
+			StreamFilterOptions: &StreamFilterOptions{
+				Values: []string{"apple", "banana"},
+			},
 		})
 
 		Expect(err).To(BeNil())
@@ -273,19 +276,23 @@ var _ = Describe("Consumer stream test", func() {
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
 			if i < 10 {
-				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("banana #%d", i)))
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, "banana")))
 			} else {
-				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i-10)))
+
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i-10, "apple")))
+
 			}
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
 
 		consumerAppleMatchUnfiltered, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
-			ReceiverLinkName:      "consumer apple should filter messages based on x-stream-filter and FilterMatchUnfiltered true",
-			InitialCredits:        200,
-			Offset:                &OffsetFirst{},
-			Filters:               []string{"apple"},
-			FilterMatchUnfiltered: true,
+			ReceiverLinkName: "consumer apple should filter messages based on x-stream-filter and MatchUnfiltered true",
+			InitialCredits:   200,
+			Offset:           &OffsetFirst{},
+			StreamFilterOptions: &StreamFilterOptions{
+				Values:          []string{"apple"},
+				MatchUnfiltered: true,
+			},
 		})
 
 		Expect(err).To(BeNil())
@@ -296,9 +303,9 @@ var _ = Describe("Consumer stream test", func() {
 			Expect(err).To(BeNil())
 			Expect(dc.Message()).NotTo(BeNil())
 			if i < 10 {
-				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("apple #%d", i)))
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, "apple")))
 			} else {
-				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf(" #%d", i-10)))
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i-10, "")))
 			}
 			Expect(dc.Accept(context.Background())).To(BeNil())
 		}
@@ -311,4 +318,263 @@ var _ = Describe("Consumer stream test", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
+	Describe("consumer should filter messages based on application properties", func() {
+		qName := generateName("consumer should filter messages based on application properties")
+		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		Expect(err).To(BeNil())
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+
+		publishMessagesWithMessageLogic(qName, "ignoredKey", 7, func(msg *amqp.Message) {
+			msg.ApplicationProperties = map[string]interface{}{"ignoredKey": "ignoredValue"}
+		})
+
+		publishMessagesWithMessageLogic(qName, "key1", 10, func(msg *amqp.Message) {
+			msg.ApplicationProperties = map[string]interface{}{"key1": "value1", "constFilterKey": "constFilterValue"}
+		})
+
+		publishMessagesWithMessageLogic(qName, "key2", 10, func(msg *amqp.Message) {
+			msg.ApplicationProperties = map[string]interface{}{"key2": "value2", "constFilterKey": "constFilterValue"}
+		})
+
+		publishMessagesWithMessageLogic(qName, "key3", 10, func(msg *amqp.Message) {
+			msg.ApplicationProperties = map[string]interface{}{"key3": "value3", "constFilterKey": "constFilterValue"}
+		})
+
+		var wg sync.WaitGroup
+		wg.Add(3)
+		DescribeTable("consumer should filter messages based on application properties", func(key string, value any, label string) {
+
+			consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+				InitialCredits: 200,
+				Offset:         &OffsetFirst{},
+				StreamFilterOptions: &StreamFilterOptions{
+					ApplicationProperties: map[string]any{
+						key: value,
+						// this is a constant filter append during the publishMessagesWithApplicationProperties
+						// to test the multiple filters
+						"constFilterKey": "constFilterValue",
+					},
+				},
+			})
+
+			Expect(err).To(BeNil())
+			Expect(consumer).NotTo(BeNil())
+			Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
+			for i := 0; i < 10; i++ {
+				dc, err := consumer.Receive(context.Background())
+				Expect(err).To(BeNil())
+				Expect(dc.Message()).NotTo(BeNil())
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, label)))
+
+				Expect(dc.message.ApplicationProperties).To(HaveKeyWithValue(key, value))
+				Expect(dc.Accept(context.Background())).To(BeNil())
+			}
+			Expect(consumer.Close(context.Background())).To(BeNil())
+			wg.Done()
+		},
+			Entry("key1 value1", "key1", "value1", "key1"),
+			Entry("key2 value2", "key2", "value2", "key2"),
+			Entry("key3 value3", "key3", "value3", "key3"),
+		)
+		go func() {
+			wg.Wait()
+			Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+			Expect(connection.Close(context.Background())).To(BeNil())
+		}()
+
+	})
+
+	Describe("consumer should filter messages based on properties", func() {
+		/*
+			Test the consumer should filter messages based on properties
+		*/
+		qName := generateName("consumer should filter messages based on properties")
+		qName += time.Now().String()
+		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		Expect(err).To(BeNil())
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+
+		publishMessagesWithMessageLogic(qName, "MessageID", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{MessageID: "MessageID"}
+		})
+
+		publishMessagesWithMessageLogic(qName, "Subject", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{Subject: stringPtr("Subject")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "ReplyTo", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{ReplyTo: stringPtr("ReplyTo")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "ContentType", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{ContentType: stringPtr("ContentType")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "ContentEncoding", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{ContentEncoding: stringPtr("ContentEncoding")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "GroupID", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{GroupID: stringPtr("GroupID")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}
+		})
+
+		// GroupSequence
+		publishMessagesWithMessageLogic(qName, "GroupSequence", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{GroupSequence: uint32Ptr(137)}
+		})
+
+		// ReplyToGroupID
+		publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}
+		})
+
+		// CreationTime
+
+		publishMessagesWithMessageLogic(qName, "CreationTime", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{CreationTime: timePtr(createDateTime())}
+		})
+
+		// AbsoluteExpiryTime
+
+		publishMessagesWithMessageLogic(qName, "AbsoluteExpiryTime", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{AbsoluteExpiryTime: timePtr(createDateTime())}
+		})
+
+		// CorrelationID
+
+		publishMessagesWithMessageLogic(qName, "CorrelationID", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{CorrelationID: "CorrelationID"}
+		})
+
+		var wg sync.WaitGroup
+		wg.Add(12)
+		DescribeTable("consumer should filter messages based on properties", func(properties *amqp.MessageProperties, label string) {
+
+			consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+				InitialCredits: 200,
+				Offset:         &OffsetFirst{},
+				StreamFilterOptions: &StreamFilterOptions{
+					Properties: properties,
+				},
+			})
+
+			Expect(err).To(BeNil())
+			Expect(consumer).NotTo(BeNil())
+			Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
+			for i := 0; i < 10; i++ {
+				dc, err := consumer.Receive(context.Background())
+				Expect(err).To(BeNil())
+				Expect(dc.Message()).NotTo(BeNil())
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, label)))
+				// we test one by one because of the date time fields
+				// It is not possible to compare the whole structure due of the time
+				// It is not perfect but it is enough for the test
+				if dc.message.Properties.MessageID != nil {
+					Expect(dc.message.Properties.MessageID).To(Equal(properties.MessageID))
+				}
+				if dc.message.Properties.Subject != nil {
+					Expect(dc.message.Properties.Subject).To(Equal(properties.Subject))
+				}
+				if dc.message.Properties.ReplyTo != nil {
+					Expect(dc.message.Properties.ReplyTo).To(Equal(properties.ReplyTo))
+				}
+				if dc.message.Properties.ContentType != nil {
+					Expect(dc.message.Properties.ContentType).To(Equal(properties.ContentType))
+				}
+				if dc.message.Properties.ContentEncoding != nil {
+					Expect(dc.message.Properties.ContentEncoding).To(Equal(properties.ContentEncoding))
+				}
+				if dc.message.Properties.GroupID != nil {
+					Expect(dc.message.Properties.GroupID).To(Equal(properties.GroupID))
+				}
+				if dc.message.Properties.ReplyToGroupID != nil {
+					Expect(dc.message.Properties.ReplyToGroupID).To(Equal(properties.ReplyToGroupID))
+				}
+				if dc.message.Properties.GroupSequence != nil {
+					Expect(dc.message.Properties.GroupSequence).To(Equal(properties.GroupSequence))
+				}
+
+				if dc.message.Properties.ReplyToGroupID != nil {
+					Expect(dc.message.Properties.ReplyToGroupID).To(Equal(properties.ReplyToGroupID))
+				}
+
+				// here we compare only the year, month and day
+				// it is not perfect but it is enough for the test
+				if dc.message.Properties.CreationTime != nil {
+					Expect(dc.message.Properties.CreationTime.Year()).To(Equal(properties.CreationTime.Year()))
+					Expect(dc.message.Properties.CreationTime.Month()).To(Equal(properties.CreationTime.Month()))
+					Expect(dc.message.Properties.CreationTime.Day()).To(Equal(properties.CreationTime.Day()))
+				}
+
+				if dc.message.Properties.AbsoluteExpiryTime != nil {
+					Expect(dc.message.Properties.AbsoluteExpiryTime.Year()).To(Equal(properties.AbsoluteExpiryTime.Year()))
+					Expect(dc.message.Properties.AbsoluteExpiryTime.Month()).To(Equal(properties.AbsoluteExpiryTime.Month()))
+					Expect(dc.message.Properties.AbsoluteExpiryTime.Day()).To(Equal(properties.AbsoluteExpiryTime.Day()))
+				}
+
+				if dc.message.Properties.CorrelationID != nil {
+					Expect(dc.message.Properties.CorrelationID).To(Equal(properties.CorrelationID))
+				}
+
+				Expect(dc.Accept(context.Background())).To(BeNil())
+			}
+			Expect(consumer.Close(context.Background())).To(BeNil())
+			wg.Done()
+		},
+			Entry("MessageID", &amqp.MessageProperties{MessageID: "MessageID"}, "MessageID"),
+			Entry("Subject", &amqp.MessageProperties{Subject: stringPtr("Subject")}, "Subject"),
+			Entry("ReplyTo", &amqp.MessageProperties{ReplyTo: stringPtr("ReplyTo")}, "ReplyTo"),
+			Entry("ContentType", &amqp.MessageProperties{ContentType: stringPtr("ContentType")}, "ContentType"),
+			Entry("ContentEncoding", &amqp.MessageProperties{ContentEncoding: stringPtr("ContentEncoding")}, "ContentEncoding"),
+			Entry("GroupID", &amqp.MessageProperties{GroupID: stringPtr("GroupID")}, "GroupID"),
+			Entry("ReplyToGroupID", &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}, "ReplyToGroupID"),
+			Entry("GroupSequence", &amqp.MessageProperties{GroupSequence: uint32Ptr(137)}, "GroupSequence"),
+			Entry("ReplyToGroupID", &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}, "ReplyToGroupID"),
+			Entry("CreationTime", &amqp.MessageProperties{CreationTime: timePtr(createDateTime())}, "CreationTime"),
+			Entry("AbsoluteExpiryTime", &amqp.MessageProperties{AbsoluteExpiryTime: timePtr(createDateTime())}, "AbsoluteExpiryTime"),
+			Entry("CorrelationID", &amqp.MessageProperties{CorrelationID: "CorrelationID"}, "CorrelationID"),
+		)
+		go func() {
+			wg.Wait()
+			Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+			Expect(connection.Close(context.Background())).To(BeNil())
+		}()
+	})
+
 })
+
+type msgLogic = func(*amqp.Message)
+
+func publishMessagesWithMessageLogic(queue string, label string, count int, logic msgLogic) {
+	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
+	Expect(err).To(BeNil())
+
+	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queue},
+		nil)
+	Expect(err).To(BeNil())
+	Expect(publisher).NotTo(BeNil())
+
+	for i := 0; i < count; i++ {
+		body := fmt.Sprintf("Message_id:%d_label:%s", i, label)
+		msg := NewMessage([]byte(body))
+		logic(msg)
+		publishResult, err := publisher.Publish(context.TODO(), msg)
+		Expect(err).To(BeNil())
+		Expect(publishResult).NotTo(BeNil())
+		Expect(publishResult.Outcome).To(Equal(&amqp.StateAccepted{}))
+	}
+	err = conn.Close(context.TODO())
+	Expect(err).To(BeNil())
+}

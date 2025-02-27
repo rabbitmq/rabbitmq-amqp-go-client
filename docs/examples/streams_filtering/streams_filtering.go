@@ -17,6 +17,7 @@ func checkError(err error) {
 
 func main() {
 
+	// see also: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions
 	rmq.Info("Golang AMQP 1.0 Streams example with filtering")
 	queueStream := "stream-go-queue-filtering-" + time.Now().String()
 	env := rmq.NewEnvironment([]string{"amqp://"}, nil)
@@ -35,7 +36,7 @@ func main() {
 
 	// create a stream publisher. In this case we use the QueueAddress to make the example
 	// simple. So we use the default exchange here.
-	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{Queue: queueStream}, "stream-publisher")
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{Queue: queueStream}, nil)
 	checkError(err)
 
 	filters := []string{"MyFilter1", "MyFilter2", "MyFilter3", "MyFilter4"}
@@ -50,17 +51,14 @@ func main() {
 		switch publishResult.Outcome.(type) {
 		case *rmq.StateAccepted:
 			rmq.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
-			break
 		case *rmq.StateReleased:
 			rmq.Warn("[Publisher]", "Message was not routed", publishResult.Message.Data[0])
-			break
 		case *rmq.StateRejected:
 			rmq.Warn("[Publisher]", "Message rejected", publishResult.Message.Data[0])
 			stateType := publishResult.Outcome.(*rmq.StateRejected)
 			if stateType.Error != nil {
 				rmq.Warn("[Publisher]", "Message rejected with error: %v", stateType.Error)
 			}
-			break
 		default:
 			// these status are not supported. Leave it for AMQP 1.0 compatibility
 			// see: https://www.rabbitmq.com/docs/next/amqp#outcomes
@@ -76,7 +74,25 @@ func main() {
 
 		// add a filter to the consumer, in this case we use only the filter values
 		// MyFilter1 and MyFilter2. So all other messages won't be received
-		Filters: []string{"MyFilter1", "MyFilter2"},
+		StreamFilterOptions: &rmq.StreamFilterOptions{
+			Values: []string{"MyFilter1", "MyFilter2"},
+			// it is also possible to filter by application properties or message properties
+			// you can create filters like:
+			// 	msg.ApplicationProperties = map[string]interface{}{"key3": "value3"}
+			// during the publish you can do something like:
+			// 	msg.ApplicationProperties = map[string]interface{}{"key1": "value1"}
+			// publisher.Publish(context.Background(), msg)
+			//ApplicationProperties: nil,
+
+			// or here you can filter by message properties
+			// like:
+			// 	msg.Properties = &amqp.MessageProperties{Subject: "MySubject"}
+			// during the publish you can do something like:
+			// 	msg.Properties = &amqp.MessageProperties{Subject: "MySubject"}
+			// publisher.Publish(context.Background(), msg)
+			//Properties:            nil,
+			// see amqp_consumer_stream_test.go for more examples
+		},
 	})
 	checkError(err)
 

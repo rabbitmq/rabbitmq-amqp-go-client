@@ -69,6 +69,8 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.IsAutoDelete()).To(BeTrue())
 		Expect(queueInfo.IsExclusive()).To(BeTrue())
 		Expect(queueInfo.Type()).To(Equal(Classic))
+		Expect(queueInfo.messageCount).To(BeZero())
+		Expect(queueInfo.consumerCount).To(BeZero())
 		Expect(queueInfo.Leader()).To(ContainSubstring("rabbit"))
 		Expect(len(queueInfo.Members())).To(BeNumerically(">", 0))
 
@@ -245,7 +247,7 @@ func publishMessages(queueName string, count int, args ...string) {
 	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
 	Expect(err).To(BeNil())
 
-	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, "test")
+	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, nil)
 	Expect(err).To(BeNil())
 	Expect(publisher).NotTo(BeNil())
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// TargetAddress is an interface that represents an address that can be used to send messages to.
+// ITargetAddress is an interface that represents an address that can be used to send messages to.
 // It can be either a Queue or an Exchange with a routing key.
-type TargetAddress interface {
+type ITargetAddress interface {
 	toAddress() (string, error)
 }
 

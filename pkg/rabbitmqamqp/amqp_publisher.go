@@ -26,13 +26,13 @@ func (m *Publisher) Id() string {
 	return m.id
 }
 
-func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAdd string, linkName string, args ...string) (*Publisher, error) {
+func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IPublisherOptions) (*Publisher, error) {
 	id := fmt.Sprintf("publisher-%s", uuid.New().String())
-	if len(args) > 0 {
-		id = args[0]
+	if options != nil && options.id() != "" {
+		id = options.id()
 	}
 
-	r := &Publisher{connection: connection, linkName: linkName, destinationAdd: destinationAdd, id: id}
+	r := &Publisher{connection: connection, linkName: getLinkName(options), destinationAdd: destinationAdd, id: id}
 	connection.entitiesTracker.storeOrReplaceProducer(r)
 	err := r.createSender(ctx)
 	if err != nil {
