@@ -34,8 +34,8 @@ test: format vet check
 
 
 
-rabbitmq-server-start-arm:
-	 ./.ci/ubuntu/gha-setup.sh start pull arm 
+rabbitmq-server-start:
+	 ./.ci/ubuntu/gha-setup.sh start pull
 
 rabbitmq-server-stop:
 	 ./.ci/ubuntu/gha-setup.sh stop

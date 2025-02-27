@@ -2,9 +2,12 @@ package rabbitmqamqp
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"os"
 	"time"
 )
 
@@ -131,6 +134,41 @@ var _ = Describe("AMQP connection Test", func() {
 
 		Expect(connection.Close(context.Background())).To(BeNil())
 
+	})
+
+	It("AMQP TLS connection should succeed with SASLTypeAnonymous", func() {
+		// Load CA cert
+
+		caCert, err := os.ReadFile("../../.ci/certs/ca_certificate.pem")
+		Expect(err).To(BeNil())
+
+		// Create a CA certificate pool and add the CA certificate to it
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		// Load client cert
+		clientCert, err := tls.LoadX509KeyPair("../../.ci/certs/client_localhost_certificate.pem",
+			"../../.ci/certs/client_localhost_key.pem")
+		Expect(err).To(BeNil())
+
+		// Create a TLS configuration
+		tlsConfig := &tls.Config{
+			Certificates:       []tls.Certificate{clientCert},
+			RootCAs:            caCertPool,
+			InsecureSkipVerify: false, // Set to false in production
+		}
+
+		// Dial the AMQP server with TLS configuration
+		connection, err := Dial(context.Background(), []string{"amqps://localhost:5671"}, &AmqpConnOptions{
+			SASLType:  amqp.SASLTypeAnonymous(),
+			TLSConfig: tlsConfig,
+		})
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+
+		// Close the connection
+		err = connection.Close(context.Background())
+		Expect(err).To(BeNil())
 	})
 
 	//It("AMQP TLS connection should success with SASLTypeAnonymous ", func() {
