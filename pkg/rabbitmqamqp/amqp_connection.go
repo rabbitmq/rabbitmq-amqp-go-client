@@ -138,7 +138,7 @@ func Dial(ctx context.Context, addresses []string, connOptions *AmqpConnOptions,
 	// create the connection
 
 	conn := &AmqpConnection{
-		management:        NewAmqpManagement(),
+		management:        newAmqpManagement(),
 		lifeCycle:         NewLifeCycle(),
 		amqpConnOptions:   connOptions,
 		entitiesTracker:   newEntitiesTracker(),
@@ -360,7 +360,7 @@ func (a *AmqpConnection) Close(ctx context.Context) error {
 // NotifyStatusChange registers a channel to receive getState change notifications
 // from the connection.
 func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
-	a.lifeCycle.chStatusChanged = channel
+	a.lifeCycle.notifyStatusChange(channel)
 }
 
 func (a *AmqpConnection) State() ILifeCycleState {
@@ -377,6 +377,18 @@ func (a *AmqpConnection) Id() string {
 // The management interface is used to declare and delete exchanges, queues, and bindings.
 func (a *AmqpConnection) Management() *AmqpManagement {
 	return a.management
+}
+
+func (a *AmqpConnection) RefreshToken(background context.Context, token string) error {
+	err := a.Management().refreshToken(background, token)
+	if err != nil {
+		return err
+	}
+	// update the SASLType in case of reconnect after token refresh
+	// it should use the new token
+	a.amqpConnOptions.SASLType = amqp.SASLTypePlain("token", token)
+	return nil
+
 }
 
 //*** end management section ***

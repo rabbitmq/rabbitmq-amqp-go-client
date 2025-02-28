@@ -29,6 +29,7 @@ const (
 	key                   = "key"
 	queues                = "queues"
 	bindings              = "bindings"
+	authTokens            = "/auth/tokens"
 )
 
 func validatePositive(label string, value int64) error {
