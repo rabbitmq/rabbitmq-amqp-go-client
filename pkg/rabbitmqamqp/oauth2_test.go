@@ -5,11 +5,10 @@ package rabbitmqamqp
 import (
 	"context"
 	"encoding/base64"
-	"github.com/Azure/go-amqp"
 	"github.com/golang-jwt/jwt/v5"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	test_helper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
+	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
 	"math/rand"
 	"time"
 )
@@ -35,10 +34,12 @@ var _ = Describe("OAuth2 Tests", func() {
 		tokenString := token(time.Now().Add(time.Duration(2500) * time.Millisecond))
 		Expect(tokenString).NotTo(BeEmpty())
 
-		conn, err := Dial(context.TODO(), []string{"amqp://localhost:5672"},
+		conn, err := Dial(context.TODO(), "amqp://localhost:5672",
 			&AmqpConnOptions{
 				ContainerID: "oAuth2Test",
-				SASLType:    amqp.SASLTypePlain("", tokenString),
+				OAuth2Options: &OAuth2Options{
+					Token: tokenString,
+				},
 			})
 		Expect(err).To(BeNil())
 		Expect(conn).NotTo(BeNil())
@@ -53,13 +54,15 @@ var _ = Describe("OAuth2 Tests", func() {
 
 	It("OAuth2 Connection should disconnect after the timeout", func() {
 
-		tokenString := token(time.Now().Add(time.Duration(900) * time.Millisecond))
+		tokenString := token(time.Now().Add(time.Duration(1_000) * time.Millisecond))
 		Expect(tokenString).NotTo(BeEmpty())
 
-		conn, err := Dial(context.TODO(), []string{"amqp://localhost:5672"},
+		conn, err := Dial(context.TODO(), "amqp://localhost:5672",
 			&AmqpConnOptions{
 				ContainerID: "oAuth2TestTimeout",
-				SASLType:    amqp.SASLTypePlain("", tokenString),
+				OAuth2Options: &OAuth2Options{
+					Token: tokenString,
+				},
 				RecoveryConfiguration: &RecoveryConfiguration{
 					ActiveRecovery: false,
 				},
@@ -84,10 +87,12 @@ var _ = Describe("OAuth2 Tests", func() {
 		tokenString := token(time.Now().Add(time.Duration(1) * time.Second))
 		Expect(tokenString).NotTo(BeEmpty())
 
-		conn, err := Dial(context.TODO(), []string{"amqp://localhost:5672"},
+		conn, err := Dial(context.TODO(), "amqp://localhost:5672",
 			&AmqpConnOptions{
 				ContainerID: "oAuth2Test",
-				SASLType:    amqp.SASLTypePlain("", tokenString),
+				OAuth2Options: &OAuth2Options{
+					Token: tokenString,
+				},
 				RecoveryConfiguration: &RecoveryConfiguration{
 					ActiveRecovery: false,
 				},
@@ -104,8 +109,10 @@ var _ = Describe("OAuth2 Tests", func() {
 	It("OAuth2 Connection should use the new token to reconnect", func() {
 		name := "oAuth2TestReconnect_" + time.Now().String()
 		startToken := token(time.Now().Add(time.Duration(1) * time.Second))
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
-			SASLType:    amqp.SASLTypePlain("", startToken),
+		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
+			OAuth2Options: &OAuth2Options{
+				Token: startToken,
+			},
 			ContainerID: name,
 			// reduced the reconnect interval to speed up the test
 			RecoveryConfiguration: &RecoveryConfiguration{
@@ -127,7 +134,7 @@ var _ = Describe("OAuth2 Tests", func() {
 		// The test is to validate that the client uses the new token to reconnect
 		// The RefreshToken requests a new token and updates the connection with the new token
 		Eventually(func() bool {
-			err := test_helper.DropConnectionContainerID(name)
+			err := testhelper.DropConnectionContainerID(name)
 			return err == nil
 		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeTrue())
 		st1 := <-ch
@@ -138,12 +145,10 @@ var _ = Describe("OAuth2 Tests", func() {
 
 		// the connection should not be reconnected
 		Eventually(func() bool {
-			conn, err := test_helper.GetConnectionByContainerID(name)
+			conn, err := testhelper.GetConnectionByContainerID(name)
 			return err == nil && conn != nil
 		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeTrue())
-
 		Expect(connection.Close(context.Background())).To(BeNil())
-
 	})
 
 })

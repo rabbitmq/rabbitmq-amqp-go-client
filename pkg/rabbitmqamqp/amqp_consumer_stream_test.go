@@ -28,7 +28,7 @@ var _ = Describe("Consumer stream test", func() {
 		*/
 
 		qName := generateName("start consuming with different offset types")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
 			Name: qName,
@@ -125,7 +125,7 @@ var _ = Describe("Consumer stream test", func() {
 		*/
 
 		qName := generateName("consumer should restart form the last offset in case of disconnection")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType:    amqp.SASLTypeAnonymous(),
 			ContainerID: qName,
 			RecoveryConfiguration: &RecoveryConfiguration{
@@ -188,7 +188,7 @@ var _ = Describe("Consumer stream test", func() {
 	})
 	It("consumer should filter messages based on x-stream-filter", func() {
 		qName := generateName("consumer should filter messages based on x-stream-filter")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
 			Name: qName,
@@ -320,7 +320,7 @@ var _ = Describe("Consumer stream test", func() {
 
 	Describe("consumer should filter messages based on application properties", func() {
 		qName := generateName("consumer should filter messages based on application properties")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
 			Name: qName,
@@ -394,7 +394,7 @@ var _ = Describe("Consumer stream test", func() {
 		*/
 		qName := generateName("consumer should filter messages based on properties")
 		qName += time.Now().String()
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
 			Name: qName,
@@ -558,7 +558,7 @@ var _ = Describe("Consumer stream test", func() {
 type msgLogic = func(*amqp.Message)
 
 func publishMessagesWithMessageLogic(queue string, label string, count int, logic msgLogic) {
-	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
+	conn, err := Dial(context.TODO(), "amqp://guest:guest@localhost", nil)
 	Expect(err).To(BeNil())
 
 	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queue},

@@ -2,10 +2,9 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+	"github.com/Azure/go-amqp"
 	"math/rand"
 	"time"
-
-	"github.com/Azure/go-amqp"
 )
 
 const AtMostOnce = 0

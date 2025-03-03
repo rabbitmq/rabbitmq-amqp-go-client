@@ -11,7 +11,7 @@ import (
 
 var _ = Describe("Management tests", func() {
 	It("AMQP Management should fail due to context cancellation", func() {
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -23,7 +23,7 @@ var _ = Describe("Management tests", func() {
 
 	It("AMQP Management should receive events", func() {
 		ch := make(chan *StateChanged, 2)
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous(),
 			RecoveryConfiguration: &RecoveryConfiguration{
 				ActiveRecovery: false,
@@ -43,7 +43,7 @@ var _ = Describe("Management tests", func() {
 
 	It("Request", func() {
 
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 
 		management := connection.Management()
@@ -67,7 +67,7 @@ var _ = Describe("Management tests", func() {
 
 	It("GET on non-existing queue returns ErrDoesNotExist", func() {
 
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 
 		management := connection.Management()

@@ -18,8 +18,8 @@ func main() {
 
 	rmq.Info("Define the publisher message targets")
 
-	env := rmq.NewEnvironment([]string{"amqp://"}, nil)
-	amqpConnection, err := env.NewConnection(context.Background())
+	env := rmq.NewEnvironment(rmq.DefaultEndpoints())
+	amqpConnection, err := env.NewConnection(context.Background(), "publisher-msg-targets")
 	checkError(err)
 	queues := []string{"queue1", "queue2", "queue3"}
 	management := amqpConnection.Management()
