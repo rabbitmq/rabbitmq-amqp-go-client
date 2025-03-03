@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -30,6 +31,14 @@ type AmqpAddress struct {
 
 type OAuth2Options struct {
 	Token string
+}
+
+func (o OAuth2Options) Clone() *OAuth2Options {
+	cloned := &OAuth2Options{
+		Token: o.Token,
+	}
+	return cloned
+
 }
 
 type AmqpConnOptions struct {
@@ -72,6 +81,31 @@ type AmqpConnOptions struct {
 
 func (a *AmqpConnOptions) isOAuth2() bool {
 	return a.OAuth2Options != nil
+}
+
+func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
+
+	cloned := &AmqpConnOptions{
+		ContainerID:  a.ContainerID,
+		hostName:     a.hostName,
+		IdleTimeout:  a.IdleTimeout,
+		MaxFrameSize: a.MaxFrameSize,
+		MaxSessions:  a.MaxSessions,
+		Properties:   a.Properties,
+		SASLType:     a.SASLType,
+		TLSConfig:    a.TLSConfig,
+		WriteTimeout: a.WriteTimeout,
+		Id:           a.Id,
+	}
+	if a.OAuth2Options != nil {
+		cloned.OAuth2Options = a.OAuth2Options.Clone()
+	}
+	if a.RecoveryConfiguration != nil {
+		cloned.RecoveryConfiguration = a.RecoveryConfiguration.Clone()
+	}
+
+	return cloned
+
 }
 
 type AmqpConnection struct {
@@ -130,8 +164,6 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
 // Returns a pointer to the new AmqpConnection if successful else an error.
-// addresses is a list of addresses to connect to. It picks one randomly.
-// It is enough that one of the addresses is reachable.
 func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*AmqpConnection, error) {
 	if connOptions == nil {
 		connOptions = &AmqpConnOptions{
@@ -140,6 +172,10 @@ func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*A
 			// So this is mandatory and default in case not defined.
 			SASLType: amqp.SASLTypeAnonymous(),
 		}
+	}
+
+	if connOptions.Id == "" {
+		connOptions.Id = uuid.New().String()
 	}
 
 	// In case of OAuth2 token, the SASLType should be set to SASLTypePlain

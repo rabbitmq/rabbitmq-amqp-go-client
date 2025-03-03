@@ -134,7 +134,7 @@ var _ = Describe("AMQP connection Test", func() {
 		tlsConfig := &tls.Config{
 			Certificates:       []tls.Certificate{clientCert},
 			RootCAs:            caCertPool,
-			InsecureSkipVerify: false, // Set to false in production
+			InsecureSkipVerify: false,
 		}
 
 		// Dial the AMQP server with TLS configuration

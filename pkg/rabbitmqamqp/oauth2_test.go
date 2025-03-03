@@ -29,7 +29,6 @@ func randomString(length int) string {
 }
 
 var _ = Describe("OAuth2 Tests", func() {
-
 	It("OAuth2 Connection should success", func() {
 		tokenString := token(time.Now().Add(time.Duration(2500) * time.Millisecond))
 		Expect(tokenString).NotTo(BeEmpty())
@@ -148,6 +147,36 @@ var _ = Describe("OAuth2 Tests", func() {
 			conn, err := testhelper.GetConnectionByContainerID(name)
 			return err == nil && conn != nil
 		}).WithTimeout(5 * time.Second).WithPolling(400 * time.Millisecond).Should(BeTrue())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+	It("Setting OAuth2 on the Environment should work", func() {
+		env := NewEnvironment([]Endpoint{
+			{Address: "amqp://", Options: &AmqpConnOptions{
+				OAuth2Options: &OAuth2Options{
+					Token: token(time.Now().Add(time.Duration(10) * time.Second)),
+				},
+			},
+			}})
+
+		Expect(env).NotTo(BeNil())
+		Expect(env.Connections()).NotTo(BeNil())
+		Expect(len(env.Connections())).To(Equal(0))
+		connection, err := env.NewConnection(context.Background())
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+		Expect(len(env.Connections())).To(Equal(1))
+		Expect(connection.Close(context.Background())).To(BeNil())
+		Expect(len(env.Connections())).To(Equal(0))
+	})
+
+	It("Can't use refresh token if not OAuth2 is enabled ", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+		err = connection.RefreshToken(context.Background(), token(time.Now().Add(time.Duration(10)*time.Second)))
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("is not configured to use OAuth2 token"))
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 

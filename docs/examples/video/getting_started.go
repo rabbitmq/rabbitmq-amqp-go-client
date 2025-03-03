@@ -14,7 +14,7 @@ func main() {
 	env := rmq.NewEnvironment(rmq.DefaultEndpoints())
 
 	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
-	amqpConnection, err := env.NewConnection(context.Background(), "getting-started")
+	amqpConnection, err := env.NewConnection(context.Background())
 	if err != nil {
 		rmq.Error("Error opening connection", err)
 		return

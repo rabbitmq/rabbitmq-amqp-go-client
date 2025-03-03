@@ -4,8 +4,15 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 	"sync"
+	"sync/atomic"
+)
+
+type TEndPointStrategy int
+
+const (
+	StrategyRandom     TEndPointStrategy = iota
+	StrategySequential TEndPointStrategy = iota
 )
 
 type Endpoint struct {
@@ -13,69 +20,76 @@ type Endpoint struct {
 	Options *AmqpConnOptions
 }
 
-func (e *Endpoint) toAddress() string {
-	return e.Address
-}
-
-func (e *Endpoint) options() *AmqpConnOptions {
-	return e.Options
-}
-
-func DefaultEndpoints() []*Endpoint {
-	ep := &Endpoint{
+func DefaultEndpoints() []Endpoint {
+	ep := Endpoint{
 		Address: "amqp://",
 		Options: &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous(),
 		},
 	}
 
-	return []*Endpoint{ep}
-
+	return []Endpoint{ep}
 }
 
 type Environment struct {
-	connections sync.Map
-	endPoints   []*Endpoint
+	connections      sync.Map
+	endPoints        []Endpoint
+	EndPointStrategy TEndPointStrategy
+	nextConnectionId int32
 }
 
-func NewEnvironment(endPoints []*Endpoint) *Environment {
+func NewEnvironment(endPoints []Endpoint) *Environment {
+	return NewEnvironmentWithStrategy(endPoints, StrategyRandom)
+}
+
+func NewEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointStrategy) *Environment {
 	return &Environment{
-		connections: sync.Map{},
-		endPoints:   endPoints,
+		connections:      sync.Map{},
+		endPoints:        endPoints,
+		EndPointStrategy: strategy,
+		nextConnectionId: 0,
 	}
 }
 
 // NewConnection get a new connection from the environment.
-// If the connection id is provided, it will be used as the connection id.
-// If the connection id is not provided, a new connection id will be generated.
-// The connection id is unique in the environment.
+// It picks an endpoint from the list of endpoints, based on EndPointStrategy, and tries to open a connection.
+// It fails if all the endpoints are not reachable.
 // The Environment will keep track of the connection and close it when the environment is closed.
-func (e *Environment) NewConnection(ctx context.Context, id string) (*AmqpConnection, error) {
-	if id == "" {
-		id = fmt.Sprintf("connection-%s", uuid.New().String())
-	}
-	if _, ok := e.connections.Load(id); ok {
-		return nil, fmt.Errorf("connection with id %s already exists", id)
-	}
+func (e *Environment) NewConnection(ctx context.Context) (*AmqpConnection, error) {
 
-	tmp := make([]*Endpoint, len(e.endPoints))
+	tmp := make([]Endpoint, len(e.endPoints))
 	copy(tmp, e.endPoints)
 	lastError := error(nil)
 	for len(tmp) > 0 {
-		idx := random(len(tmp))
+		idx := 0
+
+		switch e.EndPointStrategy {
+		case StrategyRandom:
+			idx = random(len(tmp))
+		case StrategySequential:
+			idx = 0
+		}
+
 		addr := tmp[idx]
 		// remove the index from the tmp list
 		tmp = append(tmp[:idx], tmp[idx+1:]...)
-
-		connection, err := Dial(ctx, addr.toAddress(), addr.options())
+		if addr.Options == nil {
+			addr.Options = &AmqpConnOptions{
+				SASLType: amqp.SASLTypeAnonymous(),
+			}
+		}
+		connection, err := Dial(ctx, addr.Address, addr.Options.Clone())
 		if err != nil {
-			Error("Failed to open connection", ExtractWithoutPassword(addr.toAddress()), err)
+			Error("Failed to open connection", ExtractWithoutPassword(addr.Address), err)
 			lastError = err
 			continue
 		}
 
-		connection.amqpConnOptions.Id = id
+		// here we use it to make each connection unique
+		atomic.AddInt32(&e.nextConnectionId, 1)
+		connection.amqpConnOptions.Id = fmt.Sprintf("%s_%d", connection.amqpConnOptions.Id, e.nextConnectionId)
 		e.connections.Store(connection.Id(), connection)
+
 		connection.refMap = &e.connections
 		return connection, nil
 	}
@@ -83,7 +97,6 @@ func (e *Environment) NewConnection(ctx context.Context, id string) (*AmqpConnec
 }
 
 // Connections gets the active connections in the environment
-
 func (e *Environment) Connections() []*AmqpConnection {
 	connections := make([]*AmqpConnection, 0)
 	e.connections.Range(func(key, value interface{}) bool {
