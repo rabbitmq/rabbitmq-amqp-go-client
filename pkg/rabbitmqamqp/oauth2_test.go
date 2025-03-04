@@ -105,6 +105,9 @@ var _ = Describe("OAuth2 Tests", func() {
 		Expect(conn.Close(context.Background())).To(BeNil())
 	})
 
+	// this test is a bit flaky, it may fail if the connection is not closed in time
+	// that should mark as flakes
+
 	It("OAuth2 Connection should use the new token to reconnect", func() {
 		name := "oAuth2TestReconnect_" + time.Now().String()
 		startToken := token(time.Now().Add(time.Duration(1) * time.Second))
@@ -151,7 +154,7 @@ var _ = Describe("OAuth2 Tests", func() {
 	})
 
 	It("Setting OAuth2 on the Environment should work", func() {
-		env := NewEnvironment([]Endpoint{
+		env := NewClusterEnvironment([]Endpoint{
 			{Address: "amqp://", Options: &AmqpConnOptions{
 				OAuth2Options: &OAuth2Options{
 					Token: token(time.Now().Add(time.Duration(10) * time.Second)),

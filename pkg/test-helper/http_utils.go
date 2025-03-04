@@ -74,32 +74,12 @@ func DropConnection(name string, port string) error {
 	return nil
 }
 
-func CreateVirtualHost(name string) error {
-	_, err := httpPut("http://localhost:15672/api/vhosts/"+name, "guest", "guest")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func DeleteVirtualHost(name string) error {
-	_, err := httpDelete("http://localhost:15672/api/vhosts/"+name, "guest", "guest")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func httpGet(url, username, password string) (string, error) {
 	return baseCall(url, username, password, "GET")
 }
 
 func httpDelete(url, username, password string) (string, error) {
 	return baseCall(url, username, password, "DELETE")
-}
-
-func httpPut(url, username, password string) (string, error) {
-	return baseCall(url, username, password, "PUT")
 }
 
 func baseCall(url, username, password string, method string) (string, error) {

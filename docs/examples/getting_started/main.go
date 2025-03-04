@@ -23,11 +23,10 @@ func main() {
 		}
 	}(stateChanged)
 
-	// rmq.NewEnvironment setups the environment.
+	// rmq.NewClusterEnvironment setups the environment.
 	// The environment is used to create connections
 	// given the same parameters
-	//env := rmq.NewEnvironment(rmq.DefaultEndpoints())
-	env := rmq.NewEnvironment([]rmq.Endpoint{{Address: "amqp://guest:guest@localhost:5672/vhost1"}})
+	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 
 	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
 	amqpConnection, err := env.NewConnection(context.Background())

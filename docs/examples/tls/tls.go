@@ -38,7 +38,7 @@ func main() {
 		ServerName:         "localhost", // the server name should match the name on the certificate
 	}
 
-	env := rmq.NewEnvironment([]rmq.Endpoint{
+	env := rmq.NewClusterEnvironment([]rmq.Endpoint{
 		{Address: "amqps://localhost:5671", Options: &rmq.AmqpConnOptions{
 			SASLType:  amqp.SASLTypeAnonymous(),
 			TLSConfig: tlsConfig,

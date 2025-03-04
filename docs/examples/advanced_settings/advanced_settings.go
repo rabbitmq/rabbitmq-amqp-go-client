@@ -12,10 +12,10 @@ func main() {
 
 	rmq.Info("Golang AMQP 1.0 Advanced connection settings")
 
-	// rmq.NewEnvironment setups the environment.
+	// rmq.NewClusterEnvironment setups the environment.
 	// define multiple endpoints with different connection settings
 	// the connection will be created based on the strategy Sequential
-	env := rmq.NewEnvironmentWithStrategy([]rmq.Endpoint{
+	env := rmq.NewClusterEnvironmentWithStrategy([]rmq.Endpoint{
 
 		//this is correct
 		{Address: "amqp://localhost:5672", Options: &rmq.AmqpConnOptions{

@@ -38,11 +38,15 @@ type Environment struct {
 	nextConnectionId int32
 }
 
-func NewEnvironment(endPoints []Endpoint) *Environment {
-	return NewEnvironmentWithStrategy(endPoints, StrategyRandom)
+func NewEnvironment(address string, options *AmqpConnOptions) *Environment {
+	return NewClusterEnvironmentWithStrategy([]Endpoint{{Address: address, Options: options}}, StrategyRandom)
 }
 
-func NewEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointStrategy) *Environment {
+func NewClusterEnvironment(endPoints []Endpoint) *Environment {
+	return NewClusterEnvironmentWithStrategy(endPoints, StrategyRandom)
+}
+
+func NewClusterEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointStrategy) *Environment {
 	return &Environment{
 		connections:      sync.Map{},
 		endPoints:        endPoints,

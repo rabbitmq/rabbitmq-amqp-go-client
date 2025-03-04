@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
 	"os"
 	"sync"
 	"time"
@@ -115,15 +114,12 @@ var _ = Describe("AMQP connection Test", func() {
 		Expect(err).To(BeNil())
 
 		Expect(connection.Close(context.Background())).To(BeNil())
-
 	})
 
-	Describe("AMQP TLS connection should succeed with SASLTypeAnonymous", func() {
-		vhostTls := fmt.Sprintf("tls_%d", random(10_000_000))
-		Expect(testhelper.CreateVirtualHost(vhostTls)).To(BeNil())
+	Describe("AMQP TLS connection should succeed with in different vhosts with Anonymous and External.", func() {
 		wg := &sync.WaitGroup{}
-		wg.Add(2)
-		DescribeTable("TLS connection should succeed with SASLTypeAnonymous", func(virtualHost string) {
+		wg.Add(4)
+		DescribeTable("TLS connection should success in different vhosts ", func(virtualHost string, sasl amqp.SASLType) {
 			// Load CA cert
 			caCert, err := os.ReadFile("../../.ci/certs/ca_certificate.pem")
 			Expect(err).To(BeNil())
@@ -147,7 +143,7 @@ var _ = Describe("AMQP connection Test", func() {
 
 			// Dial the AMQP server with TLS configuration
 			connection, err := Dial(context.Background(), fmt.Sprintf("amqps://localhost:5671/%s", virtualHost), &AmqpConnOptions{
-				SASLType:  amqp.SASLTypeAnonymous(),
+				SASLType:  sasl,
 				TLSConfig: tlsConfig,
 			})
 			Expect(err).To(BeNil())
@@ -158,14 +154,14 @@ var _ = Describe("AMQP connection Test", func() {
 			Expect(err).To(BeNil())
 			wg.Done()
 		},
-			Entry("with virtual host", "/"),
-			Entry("with a not default virtual host", vhostTls),
+			Entry("with virtual host. External", "/", amqp.SASLTypeExternal("")),
+			Entry("with a not default virtual host. External", "tls", amqp.SASLTypeExternal("")),
+			Entry("with virtual host. Anonymous", "/", amqp.SASLTypeAnonymous()),
+			Entry("with a not default virtual host. Anonymous", "tls", amqp.SASLTypeAnonymous()),
 		)
 		go func() {
 			wg.Wait()
-			Expect(testhelper.DeleteVirtualHost(vhostTls)).To(BeNil())
 		}()
-
 	})
 
 })
