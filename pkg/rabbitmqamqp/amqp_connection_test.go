@@ -154,9 +154,9 @@ var _ = Describe("AMQP connection Test", func() {
 			Expect(err).To(BeNil())
 			wg.Done()
 		},
-			Entry("with virtual host. External", "/", amqp.SASLTypeExternal("")),
+			Entry("with virtual host. External", "%2F", amqp.SASLTypeExternal("")),
 			Entry("with a not default virtual host. External", "tls", amqp.SASLTypeExternal("")),
-			Entry("with virtual host. Anonymous", "/", amqp.SASLTypeAnonymous()),
+			Entry("with virtual host. Anonymous", "%2F", amqp.SASLTypeAnonymous()),
 			Entry("with a not default virtual host. Anonymous", "tls", amqp.SASLTypeAnonymous()),
 		)
 		go func() {
