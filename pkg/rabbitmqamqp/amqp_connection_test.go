@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -19,7 +22,7 @@ var _ = Describe("AMQP connection Test", func() {
 		err = connection.Close(context.Background())
 		Expect(err).To(BeNil())
 	})
-
+	//
 	It("AMQP SASLTypePlain connection should succeed", func() {
 
 		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
@@ -31,14 +34,14 @@ var _ = Describe("AMQP connection Test", func() {
 		err = connection.Close(context.Background())
 		Expect(err).To(BeNil())
 	})
-
+	//
 	It("AMQP connection should fail due to context cancellation", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 		cancel()
 		_, err := Dial(ctx, "amqp://", nil)
 		Expect(err).NotTo(BeNil())
 	})
-
+	//
 	It("AMQP connection should receive events", func() {
 		ch := make(chan *StateChanged, 1)
 		connection, err := Dial(context.Background(), "amqp://", nil)
@@ -115,39 +118,54 @@ var _ = Describe("AMQP connection Test", func() {
 
 	})
 
-	It("AMQP TLS connection should succeed with SASLTypeAnonymous", func() {
-		// Load CA cert
+	Describe("AMQP TLS connection should succeed with SASLTypeAnonymous", func() {
+		vhostTls := fmt.Sprintf("tls_%d", random(10_000_000))
+		Expect(testhelper.CreateVirtualHost(vhostTls)).To(BeNil())
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+		DescribeTable("TLS connection should succeed with SASLTypeAnonymous", func(virtualHost string) {
+			// Load CA cert
+			caCert, err := os.ReadFile("../../.ci/certs/ca_certificate.pem")
+			Expect(err).To(BeNil())
 
-		caCert, err := os.ReadFile("../../.ci/certs/ca_certificate.pem")
-		Expect(err).To(BeNil())
+			// Create a CA certificate pool and add the CA certificate to it
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
 
-		// Create a CA certificate pool and add the CA certificate to it
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
+			// Load client cert
+			clientCert, err := tls.LoadX509KeyPair("../../.ci/certs/client_localhost_certificate.pem",
+				"../../.ci/certs/client_localhost_key.pem")
+			Expect(err).To(BeNil())
 
-		// Load client cert
-		clientCert, err := tls.LoadX509KeyPair("../../.ci/certs/client_localhost_certificate.pem",
-			"../../.ci/certs/client_localhost_key.pem")
-		Expect(err).To(BeNil())
+			// Create a TLS configuration
+			tlsConfig := &tls.Config{
+				Certificates:       []tls.Certificate{clientCert},
+				RootCAs:            caCertPool,
+				InsecureSkipVerify: false,
+				ServerName:         "localhost",
+			}
 
-		// Create a TLS configuration
-		tlsConfig := &tls.Config{
-			Certificates:       []tls.Certificate{clientCert},
-			RootCAs:            caCertPool,
-			InsecureSkipVerify: false,
-		}
+			// Dial the AMQP server with TLS configuration
+			connection, err := Dial(context.Background(), fmt.Sprintf("amqps://localhost:5671/%s", virtualHost), &AmqpConnOptions{
+				SASLType:  amqp.SASLTypeAnonymous(),
+				TLSConfig: tlsConfig,
+			})
+			Expect(err).To(BeNil())
+			Expect(connection).NotTo(BeNil())
 
-		// Dial the AMQP server with TLS configuration
-		connection, err := Dial(context.Background(), "amqps://localhost:5671", &AmqpConnOptions{
-			SASLType:  amqp.SASLTypeAnonymous(),
-			TLSConfig: tlsConfig,
-		})
-		Expect(err).To(BeNil())
-		Expect(connection).NotTo(BeNil())
+			// Close the connection
+			err = connection.Close(context.Background())
+			Expect(err).To(BeNil())
+			wg.Done()
+		},
+			Entry("with virtual host", "/"),
+			Entry("with a not default virtual host", vhostTls),
+		)
+		go func() {
+			wg.Wait()
+			Expect(testhelper.DeleteVirtualHost(vhostTls)).To(BeNil())
+		}()
 
-		// Close the connection
-		err = connection.Close(context.Background())
-		Expect(err).To(BeNil())
 	})
 
 })

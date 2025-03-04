@@ -15,7 +15,7 @@ func main() {
 
 	rmq.Info("Getting started with AMQP Go AMQP 1.0 Client")
 
-	/// Create a channel to receive state change notifications
+	/// Create a channel to receive connection state change notifications
 	stateChanged := make(chan *rmq.StateChanged, 1)
 	go func(ch chan *rmq.StateChanged) {
 		for statusChanged := range ch {
@@ -26,7 +26,8 @@ func main() {
 	// rmq.NewEnvironment setups the environment.
 	// The environment is used to create connections
 	// given the same parameters
-	env := rmq.NewEnvironment(rmq.DefaultEndpoints())
+	//env := rmq.NewEnvironment(rmq.DefaultEndpoints())
+	env := rmq.NewEnvironment([]rmq.Endpoint{{Address: "amqp://guest:guest@localhost:5672/vhost1"}})
 
 	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
 	amqpConnection, err := env.NewConnection(context.Background())
@@ -74,7 +75,6 @@ func main() {
 
 	// Create a consumer to receive messages from the queue
 	// you need to build the address of the queue, but you can use the helper function
-
 	consumer, err := amqpConnection.NewConsumer(context.Background(), queueName, nil)
 	if err != nil {
 		rmq.Error("Error creating consumer", err)
@@ -89,16 +89,16 @@ func main() {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
-				rmq.Info("[NewConsumer]", "consumer closed. Context", err)
+				rmq.Info("[Consumer]", "consumer closed. Context", err)
 				return
 			}
 			if err != nil {
 				// An error occurred receiving the message
-				rmq.Error("[NewConsumer]", "Error receiving message", err)
+				rmq.Error("[Consumer]", "Error receiving message", err)
 				return
 			}
 
-			rmq.Info("[NewConsumer]", "Received message",
+			rmq.Info("[Consumer]", "Received message",
 				fmt.Sprintf("%s", deliveryContext.Message().Data))
 
 			err = deliveryContext.Accept(context.Background())
@@ -128,14 +128,14 @@ func main() {
 		}
 		switch publishResult.Outcome.(type) {
 		case *rmq.StateAccepted:
-			rmq.Info("[NewPublisher]", "Message accepted", publishResult.Message.Data[0])
+			rmq.Info("[Publisher]", "Message accepted", publishResult.Message.Data[0])
 		case *rmq.StateReleased:
-			rmq.Warn("[NewPublisher]", "Message was not routed", publishResult.Message.Data[0])
+			rmq.Warn("[Publisher]", "Message was not routed", publishResult.Message.Data[0])
 		case *rmq.StateRejected:
-			rmq.Warn("[NewPublisher]", "Message rejected", publishResult.Message.Data[0])
+			rmq.Warn("[Publisher]", "Message rejected", publishResult.Message.Data[0])
 			stateType := publishResult.Outcome.(*rmq.StateRejected)
 			if stateType.Error != nil {
-				rmq.Warn("[NewPublisher]", "Message rejected with error: %v", stateType.Error)
+				rmq.Warn("[Publisher]", "Message rejected with error: %v", stateType.Error)
 			}
 		default:
 			// these status are not supported. Leave it for AMQP 1.0 compatibility
@@ -153,13 +153,13 @@ func main() {
 	//Close the consumer
 	err = consumer.Close(context.Background())
 	if err != nil {
-		rmq.Error("[NewConsumer]", err)
+		rmq.Error("[Consumer]", err)
 		return
 	}
 	// Close the publisher
 	err = publisher.Close(context.Background())
 	if err != nil {
-		rmq.Error("[NewPublisher]", err)
+		rmq.Error("[Publisher]", err)
 		return
 	}
 

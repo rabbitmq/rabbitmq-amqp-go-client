@@ -73,12 +73,11 @@ func (e *Environment) NewConnection(ctx context.Context) (*AmqpConnection, error
 		addr := tmp[idx]
 		// remove the index from the tmp list
 		tmp = append(tmp[:idx], tmp[idx+1:]...)
-		if addr.Options == nil {
-			addr.Options = &AmqpConnOptions{
-				SASLType: amqp.SASLTypeAnonymous(),
-			}
+		var cloned *AmqpConnOptions
+		if addr.Options != nil {
+			cloned = addr.Options.Clone()
 		}
-		connection, err := Dial(ctx, addr.Address, addr.Options.Clone())
+		connection, err := Dial(ctx, addr.Address, cloned)
 		if err != nil {
 			Error("Failed to open connection", ExtractWithoutPassword(addr.Address), err)
 			lastError = err

@@ -62,4 +62,22 @@ var _ = Describe("AMQP Environment Test", func() {
 		Expect(err).NotTo(BeNil())
 	})
 
+	Describe("Environment strategy", func() {
+		DescribeTable("Environment with strategy should success", func(strategy TEndPointStrategy) {
+			env := NewEnvironmentWithStrategy([]Endpoint{{Address: "amqp://", Options: &AmqpConnOptions{Id: "my"}}, {Address: "amqp://nohost:555"}, {Address: "amqp://nono"}}, StrategyRandom)
+			//env := NewEnvironmentWithStrategy([]Endpoint{{Address: "amqp://", Options: &AmqpConnOptions{Id: "my"}}}, strategy)
+			Expect(env).NotTo(BeNil())
+			Expect(env.Connections()).NotTo(BeNil())
+			Expect(len(env.Connections())).To(Equal(0))
+			conn, err := env.NewConnection(context.Background())
+			Expect(err).To(BeNil())
+			Expect(conn.Id()).To(Equal("my_1"))
+			Expect(conn.Close(context.Background()))
+		},
+			Entry("StrategyRandom", StrategyRandom),
+			Entry("StrategySequential", StrategySequential),
+		)
+
+	})
+
 })

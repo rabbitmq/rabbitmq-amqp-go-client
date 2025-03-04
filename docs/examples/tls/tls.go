@@ -35,6 +35,7 @@ func main() {
 		Certificates:       []tls.Certificate{clientCert},
 		RootCAs:            caCertPool,
 		InsecureSkipVerify: false,
+		ServerName:         "localhost", // the server name should match the name on the certificate
 	}
 
 	env := rmq.NewEnvironment([]rmq.Endpoint{

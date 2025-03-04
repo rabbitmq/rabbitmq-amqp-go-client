@@ -32,6 +32,7 @@ var _ = Describe("Recovery connection test", func() {
 				BackOffReconnectInterval: 2 * time.Second,
 				MaxReconnectAttempts:     5,
 			},
+			Id: "reconnect producers and consumers",
 		})
 		Expect(err).To(BeNil())
 		ch := make(chan *StateChanged, 1)
