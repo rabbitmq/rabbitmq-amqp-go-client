@@ -17,8 +17,7 @@ func checkError(err error) {
 func main() {
 
 	rmq.Info("Define the publisher message targets")
-
-	env := rmq.NewEnvironment([]string{"amqp://"}, nil)
+	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 	amqpConnection, err := env.NewConnection(context.Background())
 	checkError(err)
 	queues := []string{"queue1", "queue2", "queue3"}

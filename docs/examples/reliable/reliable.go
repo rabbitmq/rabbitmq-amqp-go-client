@@ -46,7 +46,7 @@ func main() {
 	}(stateChanged)
 
 	// Open a connection to the AMQP 1.0 server
-	amqpConnection, err := rmq.Dial(context.Background(), []string{"amqp://"}, &rmq.AmqpConnOptions{
+	amqpConnection, err := rmq.Dial(context.Background(), "amqp://", &rmq.AmqpConnOptions{
 		SASLType:    amqp.SASLTypeAnonymous(),
 		ContainerID: "reliable-amqp10-go",
 		RecoveryConfiguration: &rmq.RecoveryConfiguration{

@@ -122,3 +122,9 @@ func (l *LifeCycle) SetState(value ILifeCycleState) {
 		To:   value,
 	}
 }
+
+func (l *LifeCycle) notifyStatusChange(channel chan *StateChanged) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.chStatusChanged = channel
+}

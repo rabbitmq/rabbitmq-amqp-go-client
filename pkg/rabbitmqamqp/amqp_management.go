@@ -25,7 +25,7 @@ type AmqpManagement struct {
 	lifeCycle *LifeCycle
 }
 
-func NewAmqpManagement() *AmqpManagement {
+func newAmqpManagement() *AmqpManagement {
 	return &AmqpManagement{
 		lifeCycle: NewLifeCycle(),
 	}
@@ -241,6 +241,11 @@ func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*Amqp
 func (a *AmqpManagement) PurgeQueue(ctx context.Context, name string) (int, error) {
 	purge := newAmqpQueue(a, name)
 	return purge.Purge(ctx)
+}
+
+func (a *AmqpManagement) refreshToken(ctx context.Context, token string) error {
+	_, err := a.Request(ctx, []byte(token), authTokens, commandPut, []int{responseCode204})
+	return err
 }
 
 func (a *AmqpManagement) NotifyStatusChange(channel chan *StateChanged) {

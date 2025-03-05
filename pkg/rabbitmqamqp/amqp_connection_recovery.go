@@ -29,6 +29,17 @@ type RecoveryConfiguration struct {
 	MaxReconnectAttempts int
 }
 
+func (c *RecoveryConfiguration) Clone() *RecoveryConfiguration {
+	cloned := &RecoveryConfiguration{
+		ActiveRecovery:           c.ActiveRecovery,
+		BackOffReconnectInterval: c.BackOffReconnectInterval,
+		MaxReconnectAttempts:     c.MaxReconnectAttempts,
+	}
+
+	return cloned
+
+}
+
 func NewRecoveryConfiguration() *RecoveryConfiguration {
 	return &RecoveryConfiguration{
 		ActiveRecovery:           true,

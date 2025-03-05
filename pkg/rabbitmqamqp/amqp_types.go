@@ -1,6 +1,7 @@
 package rabbitmqamqp
 
 import (
+	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
 )
@@ -40,6 +41,9 @@ type IConsumerOptions interface {
 
 	// id returns the id of the consumer
 	id() string
+
+	// validate the consumer options based on the available features
+	validate(available *featuresAvailable) error
 }
 
 func getInitialCredits(co IConsumerOptions) int32 {
@@ -76,6 +80,10 @@ func (mo *managementOptions) id() string {
 	return "management"
 }
 
+func (mo *managementOptions) validate(available *featuresAvailable) error {
+	return nil
+}
+
 // ConsumerOptions represents the options for quorum and classic queues
 type ConsumerOptions struct {
 	//ReceiverLinkName: see the IConsumerOptions interface
@@ -100,6 +108,10 @@ func (aco *ConsumerOptions) linkFilters() []amqp.LinkFilter {
 
 func (aco *ConsumerOptions) id() string {
 	return aco.Id
+}
+
+func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
+	return nil
 }
 
 type IOffsetSpecification interface {
@@ -272,6 +284,15 @@ func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
 
 func (sco *StreamConsumerOptions) id() string {
 	return sco.Id
+}
+
+func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
+	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Properties != nil {
+		if !available.is41OrMore {
+			return fmt.Errorf("stream consumer with properties filter is not supported. You need RabbitMQ 4.1 or later")
+		}
+	}
+	return nil
 }
 
 ///// PublisherOptions /////

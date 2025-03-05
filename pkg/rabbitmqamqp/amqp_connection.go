@@ -12,18 +12,39 @@ import (
 	"time"
 )
 
-//func (c *ConnUrlHelper) UseSsl(value bool) {
-//	c.UseSsl = value
-//	if value {
-//		c.Scheme = "amqps"
-//	} else {
-//		c.Scheme = "amqp"
-//	}
-//}
+type AmqpAddress struct {
+	// the address of the AMQP server
+	// it is in the form of amqp://<host>:<port>
+	// or amqps://<host>:<port>
+	// the port is optional
+	// the default port is 5672
+	// the default protocol is amqp
+	// the default host is localhost
+	// the default virtual host is "/"
+	// the default user is guest
+	// the default password is guest
+	// the default SASL type is SASLTypeAnonymous
+	Address string
+	// Options: Additional options for the connection
+	Options *AmqpConnOptions
+}
+
+type OAuth2Options struct {
+	Token string
+}
+
+func (o OAuth2Options) Clone() *OAuth2Options {
+	cloned := &OAuth2Options{
+		Token: o.Token,
+	}
+	return cloned
+
+}
 
 type AmqpConnOptions struct {
 	// wrapper for amqp.ConnOptions
 	ContainerID string
+
 	// wrapper for amqp.ConnOptions
 	HostName string
 	// wrapper for amqp.ConnOptions
@@ -51,8 +72,40 @@ type AmqpConnOptions struct {
 	// when the connection is closed unexpectedly.
 	RecoveryConfiguration *RecoveryConfiguration
 
-	// copy the addresses for reconnection
-	addresses []string
+	// The OAuth2Options is used to configure the connection with OAuth2 token.
+	OAuth2Options *OAuth2Options
+
+	// Local connection identifier (not sent to the server)
+	// if not provided, a random UUID is generated
+	Id string
+}
+
+func (a *AmqpConnOptions) isOAuth2() bool {
+	return a.OAuth2Options != nil
+}
+
+func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
+
+	cloned := &AmqpConnOptions{
+		ContainerID:  a.ContainerID,
+		IdleTimeout:  a.IdleTimeout,
+		MaxFrameSize: a.MaxFrameSize,
+		MaxSessions:  a.MaxSessions,
+		Properties:   a.Properties,
+		SASLType:     a.SASLType,
+		TLSConfig:    a.TLSConfig,
+		WriteTimeout: a.WriteTimeout,
+		Id:           a.Id,
+	}
+	if a.OAuth2Options != nil {
+		cloned.OAuth2Options = a.OAuth2Options.Clone()
+	}
+	if a.RecoveryConfiguration != nil {
+		cloned.RecoveryConfiguration = a.RecoveryConfiguration.Clone()
+	}
+
+	return cloned
+
 }
 
 type AmqpConnection struct {
@@ -60,10 +113,10 @@ type AmqpConnection struct {
 	featuresAvailable *featuresAvailable
 
 	azureConnection *amqp.Conn
-	id              string
 	management      *AmqpManagement
 	lifeCycle       *LifeCycle
 	amqpConnOptions *AmqpConnOptions
+	address         string
 	session         *amqp.Session
 	refMap          *sync.Map
 	entitiesTracker *entitiesTracker
@@ -100,6 +153,12 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 	destination := &QueueAddress{
 		Queue: queueName,
 	}
+	if options != nil {
+		err := options.validate(a.featuresAvailable)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	destinationAdd, err := destination.toAddress()
 	if err != nil {
@@ -111,16 +170,53 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
 // Returns a pointer to the new AmqpConnection if successful else an error.
-// addresses is a list of addresses to connect to. It picks one randomly.
-// It is enough that one of the addresses is reachable.
-func Dial(ctx context.Context, addresses []string, connOptions *AmqpConnOptions, args ...string) (*AmqpConnection, error) {
+func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*AmqpConnection, error) {
+	connOptions, err := validateOptions(connOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// create the connection
+	conn := &AmqpConnection{
+		management:        newAmqpManagement(),
+		lifeCycle:         NewLifeCycle(),
+		amqpConnOptions:   connOptions,
+		entitiesTracker:   newEntitiesTracker(),
+		featuresAvailable: newFeaturesAvailable(),
+	}
+
+	err = conn.open(ctx, address, connOptions)
+	if err != nil {
+		return nil, err
+	}
+	conn.amqpConnOptions = connOptions
+	conn.address = address
+	conn.lifeCycle.SetState(&StateOpen{})
+	return conn, nil
+
+}
+
+func validateOptions(connOptions *AmqpConnOptions) (*AmqpConnOptions, error) {
 	if connOptions == nil {
-		connOptions = &AmqpConnOptions{
-			// RabbitMQ requires SASL security layer
-			// to be enabled for AMQP 1.0 connections.
-			// So this is mandatory and default in case not defined.
-			SASLType: amqp.SASLTypeAnonymous(),
+		connOptions = &AmqpConnOptions{}
+	}
+	if connOptions.SASLType == nil {
+		// RabbitMQ requires SASL security layer
+		// to be enabled for AMQP 1.0 connections.
+		// So this is mandatory and default in case not defined.
+		connOptions.SASLType = amqp.SASLTypeAnonymous()
+	}
+
+	if connOptions.Id == "" {
+		connOptions.Id = uuid.New().String()
+	}
+
+	// In case of OAuth2 token, the SASLType should be set to SASLTypePlain
+	if connOptions.isOAuth2() {
+		if connOptions.OAuth2Options.Token == "" {
+			return nil, fmt.Errorf("OAuth2 token is empty")
 		}
+		connOptions.SASLType = amqp.SASLTypePlain("", connOptions.OAuth2Options.Token)
 	}
 
 	if connOptions.RecoveryConfiguration == nil {
@@ -135,37 +231,28 @@ func Dial(ctx context.Context, addresses []string, connOptions *AmqpConnOptions,
 		return nil, fmt.Errorf("BackOffReconnectInterval should be greater than 1 second")
 	}
 
-	// create the connection
-
-	conn := &AmqpConnection{
-		management:        NewAmqpManagement(),
-		lifeCycle:         NewLifeCycle(),
-		amqpConnOptions:   connOptions,
-		entitiesTracker:   newEntitiesTracker(),
-		featuresAvailable: newFeaturesAvailable(),
-	}
-	tmp := make([]string, len(addresses))
-	copy(tmp, addresses)
-
-	err := conn.open(ctx, addresses, connOptions, args...)
-	if err != nil {
-		return nil, err
-	}
-	conn.amqpConnOptions = connOptions
-	conn.amqpConnOptions.addresses = addresses
-	conn.lifeCycle.SetState(&StateOpen{})
-	return conn, nil
-
+	return connOptions, nil
 }
 
 // Open opens a connection to the AMQP 1.0 server.
 // using the provided connectionSettings and the AMQPLite library.
 // Setups the connection and the management interface.
-func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptions *AmqpConnOptions, args ...string) error {
+func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *AmqpConnOptions) error {
+
+	// random pick and extract one address to use for connection
+	var azureConnection *amqp.Conn
+	//connOptions.hostName is the  way to set the virtual host
+	// so we need to pre-parse the URI to get the virtual host
+	// the PARSE is copied from go-amqp091 library
+	// the URI will be parsed is parsed again in the amqp lite library
+	uri, err := ParseURI(address)
+	if err != nil {
+		return err
+	}
 
 	amqpLiteConnOptions := &amqp.ConnOptions{
 		ContainerID:  connOptions.ContainerID,
-		HostName:     connOptions.HostName,
+		HostName:     fmt.Sprintf("vhost:%s", uri.Vhost),
 		IdleTimeout:  connOptions.IdleTimeout,
 		MaxFrameSize: connOptions.MaxFrameSize,
 		MaxSessions:  connOptions.MaxSessions,
@@ -174,90 +261,59 @@ func (a *AmqpConnection) open(ctx context.Context, addresses []string, connOptio
 		TLSConfig:    connOptions.TLSConfig,
 		WriteTimeout: connOptions.WriteTimeout,
 	}
-	tmp := make([]string, len(addresses))
-	copy(tmp, addresses)
-
-	// random pick and extract one address to use for connection
-	var azureConnection *amqp.Conn
-	for len(tmp) > 0 {
-		idx := random(len(tmp))
-		addr := tmp[idx]
-		//connOptions.HostName is the  way to set the virtual host
-		// so we need to pre-parse the URI to get the virtual host
-		// the PARSE is copied from go-amqp091 library
-		// the URI will be parsed is parsed again in the amqp lite library
-		uri, err := ParseURI(addr)
-		if err != nil {
-			return err
-		}
-		connOptions.HostName = fmt.Sprintf("vhost:%s", uri.Vhost)
-		// remove the index from the tmp list
-		tmp = append(tmp[:idx], tmp[idx+1:]...)
-		azureConnection, err = amqp.Dial(ctx, addr, amqpLiteConnOptions)
-		if err != nil {
-			Error("Failed to open connection", ExtractWithoutPassword(addr), err)
-			continue
-		}
-		a.properties = azureConnection.Properties()
-		err = a.featuresAvailable.ParseProperties(a.properties)
-		if err != nil {
-			Warn("Validate properties Error.", ExtractWithoutPassword(addr), err)
-		}
-
-		if !a.featuresAvailable.is4OrMore {
-			Warn("The server version is less than 4.0.0", ExtractWithoutPassword(addr))
-		}
-
-		if !a.featuresAvailable.isRabbitMQ {
-			Warn("The server is not RabbitMQ", ExtractWithoutPassword(addr))
-		}
-
-		Debug("Connected to", ExtractWithoutPassword(addr))
-		break
+	azureConnection, err = amqp.Dial(ctx, address, amqpLiteConnOptions)
+	if err != nil {
+		Error("Failed to open connection", ExtractWithoutPassword(address), err, "ID", connOptions.Id)
+		return fmt.Errorf("failed to open connection: %w", err)
 	}
-	if azureConnection == nil {
-		return fmt.Errorf("failed to connect to any of the provided addresses")
+	a.properties = azureConnection.Properties()
+	err = a.featuresAvailable.ParseProperties(a.properties)
+	if err != nil {
+		Warn("Validate properties Error.", ExtractWithoutPassword(address), err)
 	}
 
-	if len(args) > 0 {
-		a.id = args[0]
-	} else {
-		a.id = uuid.New().String()
+	if !a.featuresAvailable.is4OrMore {
+		Warn("The server version is less than 4.0.0", ExtractWithoutPassword(address), "ID", connOptions.Id)
 	}
 
+	if !a.featuresAvailable.isRabbitMQ {
+		Warn("The server is not RabbitMQ", ExtractWithoutPassword(address))
+	}
+
+	Debug("Connected to", ExtractWithoutPassword(address), "ID", connOptions.Id)
 	a.azureConnection = azureConnection
-	var err error
 	a.session, err = a.azureConnection.NewSession(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to open session, for the connection id:%s, error: %w", a.Id(), err)
+	}
 	go func() {
 		<-azureConnection.Done()
 		{
 			a.lifeCycle.SetState(&StateClosed{error: azureConnection.Err()})
 			if azureConnection.Err() != nil {
-				Error("connection closed unexpectedly", "error", azureConnection.Err())
+				Error("connection closed unexpectedly", "error", azureConnection.Err(), "ID", a.Id())
 				a.maybeReconnect()
 
 				return
 			}
-			Debug("connection closed successfully")
+			Debug("connection closed successfully", "ID", a.Id())
 		}
 
 	}()
 
-	if err != nil {
-		return err
-	}
 	err = a.management.Open(ctx, a)
 	if err != nil {
 		// TODO close connection?
 		return err
 	}
+	Debug("Management interface opened", "ID", a.Id())
 
 	return nil
 }
 func (a *AmqpConnection) maybeReconnect() {
 
 	if !a.amqpConnOptions.RecoveryConfiguration.ActiveRecovery {
-		Info("Recovery is disabled, closing connection")
+		Info("Recovery is disabled, closing connection", "ID", a.Id())
 		return
 	}
 	a.lifeCycle.SetState(&StateReconnecting{})
@@ -277,12 +333,12 @@ func (a *AmqpConnection) maybeReconnect() {
 			delay = maxDelay
 		}
 
-		Info("Attempting reconnection", "attempt", attempt, "delay", delay)
+		Info("Attempting reconnection", "attempt", attempt, "delay", delay, "ID", a.Id())
 		time.Sleep(delay)
 		// context with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		// try to createSender
-		err := a.open(ctx, a.amqpConnOptions.addresses, a.amqpConnOptions)
+		err := a.open(ctx, a.address, a.amqpConnOptions)
 		cancel()
 
 		if err == nil {
@@ -291,7 +347,7 @@ func (a *AmqpConnection) maybeReconnect() {
 			return
 		}
 		baseDelay *= 2
-		Error("Reconnection attempt failed", "attempt", attempt, "error", err)
+		Error("Reconnection attempt failed", "attempt", attempt, "error", err, "ID", a.Id())
 	}
 
 }
@@ -308,7 +364,7 @@ func (a *AmqpConnection) restartEntities() {
 
 		if err := publisher.createSender(ctx); err != nil {
 			atomic.AddInt32(&publisherFails, 1)
-			Error("Failed to restart publisher", "ID", publisher.Id(), "error", err)
+			Error("Failed to restart publisher", "ID", publisher.Id(), "error", err, "ID", a.Id())
 		}
 		return true
 	})
@@ -321,7 +377,7 @@ func (a *AmqpConnection) restartEntities() {
 
 		if err := consumer.createReceiver(ctx); err != nil {
 			atomic.AddInt32(&consumerFails, 1)
-			Error("Failed to restart consumer", "ID", consumer.Id(), "error", err)
+			Error("Failed to restart consumer", "ID", consumer.Id(), "error", err, "ID", a.Id())
 		}
 		return true
 	})
@@ -350,7 +406,7 @@ func (a *AmqpConnection) Close(ctx context.Context) error {
 
 	err := a.management.Close(ctx)
 	if err != nil {
-		Error("Failed to close management", "error:", err)
+		Error("Failed to close management", "error:", err, "ID", a.Id())
 	}
 	err = a.azureConnection.Close()
 	a.close()
@@ -360,7 +416,7 @@ func (a *AmqpConnection) Close(ctx context.Context) error {
 // NotifyStatusChange registers a channel to receive getState change notifications
 // from the connection.
 func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
-	a.lifeCycle.chStatusChanged = channel
+	a.lifeCycle.notifyStatusChange(channel)
 }
 
 func (a *AmqpConnection) State() ILifeCycleState {
@@ -368,7 +424,7 @@ func (a *AmqpConnection) State() ILifeCycleState {
 }
 
 func (a *AmqpConnection) Id() string {
-	return a.id
+	return a.amqpConnOptions.Id
 }
 
 // *** management section ***
@@ -377,6 +433,26 @@ func (a *AmqpConnection) Id() string {
 // The management interface is used to declare and delete exchanges, queues, and bindings.
 func (a *AmqpConnection) Management() *AmqpManagement {
 	return a.management
+}
+
+func (a *AmqpConnection) RefreshToken(background context.Context, token string) error {
+	if !a.amqpConnOptions.isOAuth2() {
+		return fmt.Errorf("the connection is not configured to use OAuth2 token")
+	}
+
+	if a.amqpConnOptions.isOAuth2() && !a.featuresAvailable.is41OrMore {
+		return fmt.Errorf("the server does not support OAuth2 token, you need to upgrade to RabbitMQ 4.1 or later")
+	}
+
+	err := a.Management().refreshToken(background, token)
+	if err != nil {
+		return err
+	}
+	// update the SASLType in case of reconnect after token refresh
+	// it should use the new token
+	a.amqpConnOptions.SASLType = amqp.SASLTypePlain("", token)
+	return nil
+
 }
 
 //*** end management section ***

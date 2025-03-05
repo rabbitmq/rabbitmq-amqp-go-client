@@ -23,7 +23,7 @@ var _ = Describe("Recovery connection test", func() {
 		*/
 
 		name := "connection should reconnect producers and consumers if dropped by via REST API"
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType:    amqp.SASLTypeAnonymous(),
 			ContainerID: name,
 			// reduced the reconnect interval to speed up the test
@@ -32,6 +32,7 @@ var _ = Describe("Recovery connection test", func() {
 				BackOffReconnectInterval: 2 * time.Second,
 				MaxReconnectAttempts:     5,
 			},
+			Id: "reconnect producers and consumers",
 		})
 		Expect(err).To(BeNil())
 		ch := make(chan *StateChanged, 1)
@@ -136,7 +137,7 @@ var _ = Describe("Recovery connection test", func() {
 
 	It("connection should not reconnect producers and consumers if the auto-recovery is disabled", func() {
 		name := "connection should reconnect producers and consumers if dropped by via REST API"
-		connection, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType:    amqp.SASLTypeAnonymous(),
 			ContainerID: name,
 			// reduced the reconnect interval to speed up the test
@@ -174,7 +175,7 @@ var _ = Describe("Recovery connection test", func() {
 
 	It("validate the Recovery connection parameters", func() {
 
-		_, err := Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+		_, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous(),
 			// reduced the reconnect interval to speed up the test
 			RecoveryConfiguration: &RecoveryConfiguration{
@@ -186,7 +187,7 @@ var _ = Describe("Recovery connection test", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("BackOffReconnectInterval should be greater than"))
 
-		_, err = Dial(context.Background(), []string{"amqp://"}, &AmqpConnOptions{
+		_, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous(),
 			RecoveryConfiguration: &RecoveryConfiguration{
 				ActiveRecovery:       true,

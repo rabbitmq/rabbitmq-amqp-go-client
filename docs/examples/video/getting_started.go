@@ -11,7 +11,7 @@ func main() {
 	queueName := "getting-started-go-queue"
 	routingKey := "routing-key"
 
-	env := rmq.NewEnvironment([]string{"amqp://guest:guest@localhost:5672"}, nil)
+	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 
 	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
 	amqpConnection, err := env.NewConnection(context.Background())

@@ -11,7 +11,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	var connection *AmqpConnection
 	var management *AmqpManagement
 	BeforeEach(func() {
-		conn, err := Dial(context.TODO(), []string{"amqp://"}, nil)
+		conn, err := Dial(context.TODO(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		connection = conn
 		management = connection.Management()
@@ -244,7 +244,7 @@ var _ = Describe("AMQP Queue test ", func() {
 })
 
 func publishMessages(queueName string, count int, args ...string) {
-	conn, err := Dial(context.TODO(), []string{"amqp://guest:guest@localhost"}, nil)
+	conn, err := Dial(context.TODO(), "amqp://guest:guest@localhost", nil)
 	Expect(err).To(BeNil())
 
 	publisher, err := conn.NewPublisher(context.TODO(), &QueueAddress{Queue: queueName}, nil)

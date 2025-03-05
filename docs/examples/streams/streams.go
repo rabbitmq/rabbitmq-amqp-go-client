@@ -19,7 +19,8 @@ func main() {
 
 	rmq.Info("Golang AMQP 1.0 Streams example")
 	queueStream := "stream-go-queue-" + time.Now().String()
-	env := rmq.NewEnvironment([]string{"amqp://"}, nil)
+	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
+
 	amqpConnection, err := env.NewConnection(context.Background())
 	checkError(err)
 	management := amqpConnection.Management()

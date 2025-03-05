@@ -62,7 +62,6 @@ func DropConnectionContainerID(Id string) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -74,6 +73,7 @@ func DropConnection(name string, port string) error {
 
 	return nil
 }
+
 func httpGet(url, username, password string) (string, error) {
 	return baseCall(url, username, password, "GET")
 }
@@ -104,6 +104,11 @@ func baseCall(url, username, password string, method string) (string, error) {
 			return "", err2
 		}
 		return string(bodyBytes), nil
+	}
+
+	if resp.StatusCode == 201 {
+		// Created! it is ok
+		return "", nil
 	}
 
 	if resp.StatusCode == 204 { // No Content

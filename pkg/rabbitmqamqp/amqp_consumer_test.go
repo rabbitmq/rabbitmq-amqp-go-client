@@ -13,7 +13,7 @@ var _ = Describe("NewConsumer tests", func() {
 
 	It("AMQP NewConsumer should fail due to context cancellation", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should fail due to context cancellation")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 
 		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
@@ -33,7 +33,7 @@ var _ = Describe("NewConsumer tests", func() {
 
 	It("AMQP NewConsumer should ack and empty the queue", func() {
 		qName := generateNameWithDateTime("AMQP NewConsumer should ack and empty the queue")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: qName,
@@ -62,7 +62,7 @@ var _ = Describe("NewConsumer tests", func() {
 	It("AMQP NewConsumer should requeue the message to the queue", func() {
 
 		qName := generateNameWithDateTime("AMQP NewConsumer should requeue the message to the queue")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: qName,
@@ -90,7 +90,7 @@ var _ = Describe("NewConsumer tests", func() {
 	It("AMQP NewConsumer should requeue the message to the queue with annotations", func() {
 
 		qName := generateNameWithDateTime("AMQP NewConsumer should requeue the message to the queue with annotations")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: qName,
@@ -126,7 +126,7 @@ var _ = Describe("NewConsumer tests", func() {
 	It("AMQP NewConsumer should discard the message to the queue with and without annotations", func() {
 		// TODO: Implement this test with a dead letter queue to test the discard feature
 		qName := generateNameWithDateTime("AMQP NewConsumer should discard the message to the queue with and without annotations")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
 			Name: qName,

@@ -20,7 +20,7 @@ func main() {
 	// see also: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions
 	rmq.Info("Golang AMQP 1.0 Streams example with filtering")
 	queueStream := "stream-go-queue-filtering-" + time.Now().String()
-	env := rmq.NewEnvironment([]string{"amqp://"}, nil)
+	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 	amqpConnection, err := env.NewConnection(context.Background())
 	checkError(err)
 	management := amqpConnection.Management()

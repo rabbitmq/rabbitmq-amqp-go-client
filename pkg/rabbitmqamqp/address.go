@@ -45,7 +45,7 @@ func (eas *ExchangeAddress) toAddress() (string, error) {
 }
 
 // address Creates the address for the exchange or queue following the RabbitMQ conventions.
-// see: https://www.rabbitmq.com/docs/next/amqp#address-v2
+// see: https://www.rabbitmq.com/docs/amqp#address-v2
 func address(exchange, key, queue *string, urlParameters *string) (string, error) {
 	if exchange == nil && queue == nil {
 		return "", errors.New("exchange or queue must be set")

@@ -10,7 +10,7 @@ import (
 var _ = Describe("AMQP publisher ", func() {
 	It("Send a message to a queue with a Message Target NewPublisher", func() {
 		qName := generateNameWithDateTime("Send a message to a queue with a Message Target NewPublisher")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
@@ -36,7 +36,7 @@ var _ = Describe("AMQP publisher ", func() {
 	})
 
 	It("NewPublisher should fail to a not existing exchange", func() {
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		exchangeName := "Nope"
@@ -48,7 +48,7 @@ var _ = Describe("AMQP publisher ", func() {
 
 	It("publishResult should released to a not existing routing key", func() {
 		eName := generateNameWithDateTime("publishResult should released to a not existing routing key")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		exchange, err := connection.Management().DeclareExchange(context.Background(), &TopicExchangeSpecification{
@@ -75,7 +75,7 @@ var _ = Describe("AMQP publisher ", func() {
 
 	It("Send a message to a deleted queue should fail", func() {
 		qName := generateNameWithDateTime("Send a message to a deleted queue should fail")
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
@@ -97,7 +97,7 @@ var _ = Describe("AMQP publisher ", func() {
 	})
 
 	It("Multi Targets NewPublisher should fail with StateReleased when the destination does not exist", func() {
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		publisher, err := connection.NewPublisher(context.Background(), nil, nil)
@@ -121,7 +121,7 @@ var _ = Describe("AMQP publisher ", func() {
 	})
 
 	It("Multi Targets NewPublisher should success with StateReceived when the destination exists", func() {
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		Expect(err).To(BeNil())
@@ -177,7 +177,7 @@ var _ = Describe("AMQP publisher ", func() {
 	})
 
 	It("Multi Targets NewPublisher should fail it TO is not set or not valid", func() {
-		connection, err := Dial(context.Background(), []string{"amqp://"}, nil)
+		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
 		Expect(connection).NotTo(BeNil())
 		publisher, err := connection.NewPublisher(context.Background(), nil, nil)

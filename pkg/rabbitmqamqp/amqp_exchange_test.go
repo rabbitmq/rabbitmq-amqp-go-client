@@ -11,7 +11,7 @@ var _ = Describe("AMQP Exchange test ", func() {
 	var connection *AmqpConnection
 	var management *AmqpManagement
 	BeforeEach(func() {
-		conn, err := Dial(context.TODO(), []string{"amqp://"}, nil)
+		conn, err := Dial(context.TODO(), "amqp://", nil)
 		connection = conn
 		Expect(err).To(BeNil())
 		management = connection.Management()

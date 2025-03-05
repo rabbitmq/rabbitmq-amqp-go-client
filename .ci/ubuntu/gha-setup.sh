@@ -7,13 +7,7 @@ set -o xtrace
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 readonly script_dir
 echo "[INFO] script_dir: '$script_dir'"
-
-if [[ $3 == 'arm' ]]
-then
-    readonly rabbitmq_image="${RABBITMQ_IMAGE:-pivotalrabbitmq/rabbitmq-arm64:main}"
-else
-    readonly rabbitmq_image="${RABBITMQ_IMAGE:-pivotalrabbitmq/rabbitmq:main}"
-fi
+readonly rabbitmq_image=rabbitmq:4.1.0-beta.4-management-alpine
 
 
 readonly docker_name_prefix='rabbitmq-amqp-go-client'
@@ -91,6 +85,8 @@ function start_rabbitmq
         --network "$docker_network_name" \
         --volume "$GITHUB_WORKSPACE/.ci/ubuntu/enabled_plugins:/etc/rabbitmq/enabled_plugins" \
         --volume "$GITHUB_WORKSPACE/.ci/ubuntu/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro" \
+         --volume "$GITHUB_WORKSPACE/.ci/ubuntu/definitions.json:/etc/rabbitmq/definitions.json:ro" \
+        --volume "$GITHUB_WORKSPACE/.ci/ubuntu/advanced.config:/etc/rabbitmq/advanced.config:ro" \
         --volume "$GITHUB_WORKSPACE/.ci/certs:/etc/rabbitmq/certs:ro" \
         --volume "$GITHUB_WORKSPACE/.ci/ubuntu/log:/var/log/rabbitmq" \
         "$rabbitmq_image"
@@ -163,8 +159,7 @@ function install_ca_certificate
     openssl s_client -connect localhost:5671 \
         -CAfile "$GITHUB_WORKSPACE/.ci/certs/ca_certificate.pem" \
         -cert "$GITHUB_WORKSPACE/.ci/certs/client_localhost_certificate.pem" \
-        -key "$GITHUB_WORKSPACE/.ci/certs/client_localhost_key.pem" \
-        -pass pass:grapefruit < /dev/null
+        -key "$GITHUB_WORKSPACE/.ci/certs/client_localhost_key.pem"
 }
 
 docker network create "$docker_network_name" || echo "[INFO] network '$docker_network_name' is already created"
