@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"context"
+	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -84,7 +85,6 @@ var _ = Describe("AMQP Environment Test", func() {
 	Describe("Environment strategy", func() {
 		DescribeTable("Environment with strategy should success", func(strategy TEndPointStrategy) {
 			env := NewClusterEnvironmentWithStrategy([]Endpoint{{Address: "amqp://", Options: &AmqpConnOptions{Id: "my"}}, {Address: "amqp://nohost:555"}, {Address: "amqp://nono"}}, StrategyRandom)
-			//env := NewClusterEnvironmentWithStrategy([]Endpoint{{Address: "amqp://", Options: &AmqpConnOptions{Id: "my"}}}, strategy)
 			Expect(env).NotTo(BeNil())
 			Expect(env.Connections()).NotTo(BeNil())
 			Expect(len(env.Connections())).To(Equal(0))
@@ -95,6 +95,24 @@ var _ = Describe("AMQP Environment Test", func() {
 		},
 			Entry("StrategyRandom", StrategyRandom),
 			Entry("StrategySequential", StrategySequential),
+		)
+	})
+
+	Describe("Environment should success even partial options", func() {
+		DescribeTable("Environment should success even partial options", func(options *AmqpConnOptions) {
+
+			env := NewClusterEnvironment([]Endpoint{{Address: "amqp://", Options: options}})
+			Expect(env).NotTo(BeNil())
+			Expect(env.Connections()).NotTo(BeNil())
+			Expect(len(env.Connections())).To(Equal(0))
+			conn, err := env.NewConnection(context.Background())
+			Expect(err).To(BeNil())
+			Expect(conn.Close(context.Background()))
+
+		},
+			Entry("Partial options", &AmqpConnOptions{Id: "my"}),
+			Entry("Partial options", &AmqpConnOptions{SASLType: amqp.SASLTypeAnonymous()}),
+			Entry("Partial options", &AmqpConnOptions{ContainerID: "cid_my"}),
 		)
 	})
 

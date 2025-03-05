@@ -28,6 +28,12 @@ func main() {
 	// given the same parameters
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 
+	// in case you have multiple endpoints you can use the following:
+	//env := rmq.NewClusterEnvironment([]rmq.Endpoint{
+	//	{Address: "amqp://server1", Options: &rmq.AmqpConnOptions{}},
+	//	{Address: "amqp://server2", Options: &rmq.AmqpConnOptions{}},
+	//})
+
 	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
 	amqpConnection, err := env.NewConnection(context.Background())
 	if err != nil {

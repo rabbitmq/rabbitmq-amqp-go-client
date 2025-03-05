@@ -153,6 +153,12 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 	destination := &QueueAddress{
 		Queue: queueName,
 	}
+	if options != nil {
+		err := options.validate(a.featuresAvailable)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	destinationAdd, err := destination.toAddress()
 	if err != nil {
@@ -432,6 +438,10 @@ func (a *AmqpConnection) Management() *AmqpManagement {
 func (a *AmqpConnection) RefreshToken(background context.Context, token string) error {
 	if !a.amqpConnOptions.isOAuth2() {
 		return fmt.Errorf("the connection is not configured to use OAuth2 token")
+	}
+
+	if a.amqpConnOptions.isOAuth2() && !a.featuresAvailable.is41OrMore {
+		return fmt.Errorf("the server does not support OAuth2 token, you need to upgrade to RabbitMQ 4.1 or later")
 	}
 
 	err := a.Management().refreshToken(background, token)
