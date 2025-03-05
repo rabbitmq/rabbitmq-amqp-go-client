@@ -23,7 +23,7 @@ var _ = Describe("Recovery connection test", func() {
 		*/
 
 		name := "connection should reconnect producers and consumers if dropped by via REST API"
-		connection, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
+		env := NewEnvironment("amqp://", &AmqpConnOptions{
 			SASLType:    amqp.SASLTypeAnonymous(),
 			ContainerID: name,
 			// reduced the reconnect interval to speed up the test
@@ -34,6 +34,8 @@ var _ = Describe("Recovery connection test", func() {
 			},
 			Id: "reconnect producers and consumers",
 		})
+
+		connection, err := env.NewConnection(context.Background())
 		Expect(err).To(BeNil())
 		ch := make(chan *StateChanged, 1)
 		connection.NotifyStatusChange(ch)
