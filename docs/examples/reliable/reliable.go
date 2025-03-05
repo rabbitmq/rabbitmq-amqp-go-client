@@ -125,12 +125,12 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 500_000; i++ {
-				publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
+				publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage(make([]byte, 10)))
 				if err != nil {
 					// here you need to deal with the error. You can store the message in a local in memory/persistent storage
 					// then retry to send the message as soon as the connection is reestablished

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
+	"sync"
 	"sync/atomic"
 )
 
@@ -20,6 +21,9 @@ type Publisher struct {
 	linkName       string
 	destinationAdd string
 	id             string
+	maxInFlight    int
+	condition      *sync.Cond
+	pending        int32
 }
 
 func (m *Publisher) Id() string {
@@ -32,7 +36,10 @@ func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAd
 		id = options.id()
 	}
 
-	r := &Publisher{connection: connection, linkName: getLinkName(options), destinationAdd: destinationAdd, id: id}
+	r := &Publisher{connection: connection, linkName: getLinkName(options),
+		destinationAdd: destinationAdd, id: id,
+		maxInFlight: 10_00,
+		condition:   sync.NewCond(&sync.Mutex{})}
 	connection.entitiesTracker.storeOrReplaceProducer(r)
 	err := r.createSender(ctx)
 	if err != nil {
@@ -109,6 +116,29 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 		Message: message,
 		Outcome: state,
 	}, err
+}
+
+type CallbackConfirmation func(message *amqp.Message, state DeliveryState, err error)
+
+func (m *Publisher) PublishAsyncConfirmation(ctx context.Context, message *amqp.Message, callback CallbackConfirmation) error {
+	//go func() {
+	r, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
+	if err != nil {
+		return err
+	}
+	if atomic.AddInt32(&m.pending, 1) == int32(m.maxInFlight) {
+		m.condition.L.Lock()
+		m.condition.Wait()
+		m.condition.L.Unlock()
+	}
+	go func() {
+		state, err := r.Wait(ctx)
+		atomic.AddInt32(&m.pending, -1)
+		//m.condition.Signal()
+		callback(message, state, err)
+	}()
+	//}()
+	return nil
 }
 
 // Close closes the publisher.
