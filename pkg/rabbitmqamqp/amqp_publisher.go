@@ -38,7 +38,7 @@ func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAd
 
 	r := &Publisher{connection: connection, linkName: getLinkName(options),
 		destinationAdd: destinationAdd, id: id,
-		maxInFlight: 10_00,
+		maxInFlight: 1_000,
 		condition:   sync.NewCond(&sync.Mutex{})}
 	connection.entitiesTracker.storeOrReplaceProducer(r)
 	err := r.createSender(ctx)
@@ -121,22 +121,24 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 type CallbackConfirmation func(message *amqp.Message, state DeliveryState, err error)
 
 func (m *Publisher) PublishAsyncConfirmation(ctx context.Context, message *amqp.Message, callback CallbackConfirmation) error {
-	//go func() {
-	r, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
-	if err != nil {
-		return err
-	}
-	if atomic.AddInt32(&m.pending, 1) == int32(m.maxInFlight) {
+	if atomic.AddInt32(&m.pending, 1) >= int32(m.maxInFlight) {
 		m.condition.L.Lock()
 		m.condition.Wait()
 		m.condition.L.Unlock()
 	}
-	go func() {
-		state, err := r.Wait(ctx)
+
+	//go func() {
+	sendReceipt, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
+	if err != nil {
+		return err
+	}
+
+	go func(sr amqp.SendReceipt) {
+		state, err := sr.Wait(ctx)
 		atomic.AddInt32(&m.pending, -1)
-		//m.condition.Signal()
+		m.condition.Signal()
 		callback(message, state, err)
-	}()
+	}(sendReceipt)
 	//}()
 	return nil
 }
