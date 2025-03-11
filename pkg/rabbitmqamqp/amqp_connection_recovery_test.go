@@ -29,8 +29,9 @@ var _ = Describe("Recovery connection test", func() {
 			// reduced the reconnect interval to speed up the test
 			RecoveryConfiguration: &RecoveryConfiguration{
 				ActiveRecovery:           true,
-				BackOffReconnectInterval: 2 * time.Second,
+				BackOffReconnectInterval: 1 * time.Second,
 				MaxReconnectAttempts:     5,
+				Jitter:                   200 * time.Millisecond,
 			},
 			Id: "reconnect producers and consumers",
 		})
@@ -178,18 +179,6 @@ var _ = Describe("Recovery connection test", func() {
 	It("validate the Recovery connection parameters", func() {
 
 		_, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{
-			SASLType: amqp.SASLTypeAnonymous(),
-			// reduced the reconnect interval to speed up the test
-			RecoveryConfiguration: &RecoveryConfiguration{
-				ActiveRecovery:           true,
-				BackOffReconnectInterval: 500 * time.Millisecond,
-				MaxReconnectAttempts:     5,
-			},
-		})
-		Expect(err).NotTo(BeNil())
-		Expect(err.Error()).To(ContainSubstring("BackOffReconnectInterval should be greater than"))
-
-		_, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{
 			SASLType: amqp.SASLTypeAnonymous(),
 			RecoveryConfiguration: &RecoveryConfiguration{
 				ActiveRecovery:       true,

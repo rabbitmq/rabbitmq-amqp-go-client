@@ -22,6 +22,12 @@ type RecoveryConfiguration struct {
 	BackOffReconnectInterval time.Duration
 
 	/*
+		Jitter used to add randomness to the reconnection interval.
+		Default is 500 milliseconds.
+	*/
+	Jitter time.Duration
+
+	/*
 		MaxReconnectAttempts The maximum number of reconnection attempts.
 		Default is 5.
 		The minimum value is 1.
@@ -34,6 +40,7 @@ func (c *RecoveryConfiguration) Clone() *RecoveryConfiguration {
 		ActiveRecovery:           c.ActiveRecovery,
 		BackOffReconnectInterval: c.BackOffReconnectInterval,
 		MaxReconnectAttempts:     c.MaxReconnectAttempts,
+		Jitter:                   c.Jitter,
 	}
 
 	return cloned
@@ -45,6 +52,7 @@ func NewRecoveryConfiguration() *RecoveryConfiguration {
 		ActiveRecovery:           true,
 		BackOffReconnectInterval: 5 * time.Second,
 		MaxReconnectAttempts:     5,
+		Jitter:                   500 * time.Millisecond,
 	}
 }
 
