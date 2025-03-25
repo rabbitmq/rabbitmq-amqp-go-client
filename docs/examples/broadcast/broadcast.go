@@ -38,6 +38,11 @@ func main() {
 			IsExclusive:  true,
 		})
 
+		if err != nil {
+			rmq.Error("Error DeclareQueue", err)
+			return
+		}
+
 		_, err = management.Bind(context.TODO(), &rmq.ExchangeToQueueBindingSpecification{
 			SourceExchange:   broadcastExchange,
 			DestinationQueue: q.Name(),
