@@ -227,9 +227,6 @@ func validateOptions(connOptions *AmqpConnOptions) (*AmqpConnOptions, error) {
 	if connOptions.RecoveryConfiguration.MaxReconnectAttempts <= 0 && connOptions.RecoveryConfiguration.ActiveRecovery {
 		return nil, fmt.Errorf("MaxReconnectAttempts should be greater than 0")
 	}
-	if connOptions.RecoveryConfiguration.BackOffReconnectInterval <= 1*time.Second && connOptions.RecoveryConfiguration.ActiveRecovery {
-		return nil, fmt.Errorf("BackOffReconnectInterval should be greater than 1 second")
-	}
 
 	return connOptions, nil
 }
@@ -325,9 +322,11 @@ func (a *AmqpConnection) maybeReconnect() {
 
 		///wait for before reconnecting
 		// add some random milliseconds to the wait time to avoid thundering herd
-		// the random time is between 0 and 500 milliseconds
-		// Calculate delay with exponential backoff and jitter
-		jitter := time.Duration(rand.Intn(500)) * time.Millisecond
+		var jitter = time.Duration(0)
+		if a.amqpConnOptions.RecoveryConfiguration.Jitter > 0 {
+			jitter = time.Duration(rand.Int63n(int64(a.amqpConnOptions.RecoveryConfiguration.Jitter)))
+		}
+
 		delay := baseDelay + jitter
 		if delay > maxDelay {
 			delay = maxDelay
