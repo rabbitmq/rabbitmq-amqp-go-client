@@ -243,7 +243,10 @@ var _ = Describe("AMQP publisher ", func() {
 		Expect(dc.Message().Header.Durable).To(BeTrue())
 		Expect(dc.Accept(context.Background())).To(BeNil())
 
-		msgNotPersistent := NewMessageWithPersistence([]byte("hello"), false)
+		msgNotPersistent := NewMessage([]byte("hello"))
+		msgNotPersistent.Header = &amqp.MessageHeader{
+			Durable: false,
+		}
 		publishResult, err = publisher.Publish(context.Background(), msgNotPersistent)
 		Expect(err).To(BeNil())
 		Expect(publishResult).NotTo(BeNil())

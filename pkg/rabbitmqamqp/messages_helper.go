@@ -30,17 +30,6 @@ func NewMessage(body []byte) *amqp.Message {
 	return amqp.NewMessage(body)
 }
 
-// NewMessageWithHeader creates a new AMQP 1.0 message with the given payload and sets the persistence to the given value.
-// The persistence is set by setting the Header.Durable property to true or false.
-
-func NewMessageWithPersistence(body []byte, persistence bool) *amqp.Message {
-	m := amqp.NewMessage(body)
-	m.Header = &amqp.MessageHeader{
-		Durable: persistence,
-	}
-	return m
-}
-
 // NewMessageWithAddress creates a new AMQP 1.0  new message with the given payload and sets the To property to the address of the target.
 // The target must be a QueueAddress or an ExchangeAddress.
 // This function is a helper that combines NewMessage and MessagePropertyToAddress.
