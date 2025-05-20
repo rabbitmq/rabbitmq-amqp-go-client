@@ -203,4 +203,65 @@ var _ = Describe("AMQP publisher ", func() {
 
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
+
+	It("Message should durable by default", func() {
+		// https://github.com/rabbitmq/rabbitmq-server/pull/13918
+
+		// Here we test the default behavior of the message durability
+		// The lib should set the Header.Durable to true by default
+		// when the Header is set by the user
+		// it is up to the user to set the Header.Durable to true or false
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+		name := generateNameWithDateTime("Message should durable by default")
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: name,
+		})
+		Expect(err).To(BeNil())
+
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: name}, nil)
+		Expect(err).To(BeNil())
+		Expect(publisher).NotTo(BeNil())
+
+		msg := NewMessage([]byte("hello"))
+		Expect(msg.Header).To(BeNil())
+		publishResult, err := publisher.Publish(context.Background(), msg)
+		Expect(err).To(BeNil())
+		Expect(publishResult).NotTo(BeNil())
+		Expect(publishResult.Outcome).To(Equal(&StateAccepted{}))
+		Expect(msg.Header).NotTo(BeNil())
+		Expect(msg.Header.Durable).To(BeTrue())
+
+		consumer, err := connection.NewConsumer(context.Background(), name, nil)
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		dc, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(dc).NotTo(BeNil())
+		Expect(dc.Message().Header).NotTo(BeNil())
+		Expect(dc.Message().Header.Durable).To(BeTrue())
+		Expect(dc.Accept(context.Background())).To(BeNil())
+
+		msgNotPersistent := NewMessage([]byte("hello"))
+		msgNotPersistent.Header = &amqp.MessageHeader{
+			Durable: false,
+		}
+		publishResult, err = publisher.Publish(context.Background(), msgNotPersistent)
+		Expect(err).To(BeNil())
+		Expect(publishResult).NotTo(BeNil())
+		Expect(publishResult.Outcome).To(Equal(&StateAccepted{}))
+		Expect(msgNotPersistent.Header).NotTo(BeNil())
+		Expect(msgNotPersistent.Header.Durable).To(BeFalse())
+		dc, err = consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(dc).NotTo(BeNil())
+		Expect(dc.Message().Header).NotTo(BeNil())
+		Expect(dc.Message().Header.Durable).To(BeFalse())
+		Expect(dc.Accept(context.Background())).To(BeNil())
+		Expect(publisher.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), name)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+
+	})
 })

@@ -62,7 +62,7 @@ RabbitMQ supports the following DeliveryState types:
   - StateRejected
     See: https://www.rabbitmq.com/docs/next/amqp#outcomes for more information.
 
-Note: If the destination address is not defined during the creation, the message must have a TO property set.
+If the destination address is not defined during the creation, the message must have a TO property set.
 You can use the helper "MessagePropertyToAddress" to create the destination address.
 See the examples:
 Create a new publisher that sends messages to a specific destination address:
@@ -85,6 +85,16 @@ Create a new publisher that sends messages based on message destination address:
 	..:= publisher.Publish(context.Background(), msg)
 
 </code>
+
+The message is persistent by default by setting the Header.Durable to true when Header is nil.
+You can set the message to be non-persistent by setting the Header.Durable to false.
+Note:
+When you use the `Header` is up to you to set the message properties,
+You need set the `Header.Durable` to true or false.
+
+<code>
+
+</code>
 */
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
 	if m.destinationAdd == "" {
@@ -97,6 +107,14 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 			return nil, err
 		}
 	}
+
+	// set the default persistence to the message
+	if message.Header == nil {
+		message.Header = &amqp.MessageHeader{
+			Durable: true,
+		}
+	}
+
 	r, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
 	if err != nil {
 		return nil, err

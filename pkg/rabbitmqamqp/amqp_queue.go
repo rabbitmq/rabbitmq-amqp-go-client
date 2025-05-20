@@ -29,13 +29,18 @@ func (a *AmqpQueueInfo) Members() []string {
 }
 
 func newAmqpQueueInfo(response map[string]any) *AmqpQueueInfo {
+	leader := ""
+	if response["leader"] != nil {
+		leader = response["leader"].(string)
+	}
+
 	return &AmqpQueueInfo{
 		name:          response["name"].(string),
 		isDurable:     response["durable"].(bool),
 		isAutoDelete:  response["auto_delete"].(bool),
 		isExclusive:   response["exclusive"].(bool),
 		queueType:     TQueueType(response["type"].(string)),
-		leader:        response["leader"].(string),
+		leader:        leader,
 		members:       response["replicas"].([]string),
 		arguments:     response["arguments"].(map[string]any),
 		consumerCount: response["consumer_count"].(uint32),
