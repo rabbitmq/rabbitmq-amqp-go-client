@@ -97,6 +97,14 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 			return nil, err
 		}
 	}
+
+	// set the default persistence to the message
+	if message.Header == nil {
+		message.Header = &amqp.MessageHeader{
+			Durable: true,
+		}
+	}
+
 	r, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
 	if err != nil {
 		return nil, err
