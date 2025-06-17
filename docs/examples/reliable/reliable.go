@@ -16,18 +16,19 @@ func main() {
 	var stateAccepted int32
 	var stateReleased int32
 	var stateRejected int32
+	var isRunning bool
 
 	var received int32
 	var failed int32
 
 	startTime := time.Now()
+	isRunning = true
 	go func() {
-		for {
+		for isRunning {
 			time.Sleep(5 * time.Second)
 			total := stateAccepted + stateReleased + stateRejected
 			messagesPerSecond := float64(total) / time.Since(startTime).Seconds()
 			rmq.Info("[Stats]", "sent", total, "received", received, "failed", failed, "messagesPerSecond", messagesPerSecond)
-
 		}
 	}()
 
@@ -41,6 +42,16 @@ func main() {
 			switch statusChanged.To.(type) {
 			case *rmq.StateOpen:
 				signalBlock.Broadcast()
+			case *rmq.StateReconnecting:
+				rmq.Info("[connection]", "Reconnecting to the AMQP 1.0 server")
+			case *rmq.StateClosed:
+				StateClosed := statusChanged.To.(*rmq.StateClosed)
+				if errors.Is(StateClosed.GetError(), rmq.ErrMaxReconnectAttemptsReached) {
+					rmq.Error("[connection]", "Max reconnect attempts reached. Closing connection", StateClosed.GetError())
+					signalBlock.Broadcast()
+					isRunning = false
+				}
+
 			}
 		}
 	}(stateChanged)
@@ -130,6 +141,10 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 500_000; i++ {
+				if !isRunning {
+					rmq.Info("[Publisher]", "Publisher is stopped simulation not running, queue", queueName)
+					return
+				}
 				publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 				if err != nil {
 					// here you need to deal with the error. You can store the message in a local in memory/persistent storage

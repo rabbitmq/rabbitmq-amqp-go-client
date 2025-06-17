@@ -350,6 +350,10 @@ func (a *AmqpConnection) maybeReconnect() {
 		Error("Reconnection attempt failed", "attempt", attempt, "error", err, "ID", a.Id())
 	}
 
+	// If we reach here, all attempts failed
+	Error("All reconnection attempts failed, closing connection", "ID", a.Id())
+	a.lifeCycle.SetState(&StateClosed{error: ErrMaxReconnectAttemptsReached})
+
 }
 
 // restartEntities attempts to restart all publishers and consumers after a reconnection

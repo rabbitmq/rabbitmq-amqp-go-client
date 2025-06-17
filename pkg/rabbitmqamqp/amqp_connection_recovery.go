@@ -1,9 +1,13 @@
 package rabbitmqamqp
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
+
+// ErrMaxReconnectAttemptsReached typed error when the MaxReconnectAttempts is reached
+var ErrMaxReconnectAttemptsReached = errors.New("max reconnect attempts reached, connection will not be recovered")
 
 type RecoveryConfiguration struct {
 	/*
