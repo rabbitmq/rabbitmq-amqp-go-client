@@ -98,13 +98,13 @@ func main() {
 
 	// Consume messages from the queue
 	go func(ctx context.Context) {
-		for {
+		for isRunning {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
 				return
 			}
-			if err != nil {
+			if err != nil && isRunning {
 				// An error occurred receiving the message
 				// here the consumer could be disconnected from the server due to a network error
 				signalBlock.L.Lock()
@@ -118,7 +118,7 @@ func main() {
 
 			atomic.AddInt32(&received, 1)
 			err = deliveryContext.Accept(context.Background())
-			if err != nil {
+			if err != nil && isRunning {
 				// same here the delivery could not be accepted due to a network error
 				// we wait for 2_500 ms and try again
 				time.Sleep(2500 * time.Millisecond)
@@ -135,11 +135,8 @@ func main() {
 		return
 	}
 
-	wg := &sync.WaitGroup{}
 	for i := 0; i < 1; i++ {
-		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			for i := 0; i < 500_000; i++ {
 				if !isRunning {
 					rmq.Info("[Publisher]", "Publisher is stopped simulation not running, queue", queueName)
@@ -175,7 +172,6 @@ func main() {
 			}
 		}()
 	}
-	wg.Wait()
 
 	println("press any key to close the connection")
 

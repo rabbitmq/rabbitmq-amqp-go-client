@@ -77,6 +77,9 @@ func (s StateChanged) String() string {
 
 	switch s.To.(type) {
 	case *StateClosed:
+		if s.To.(*StateClosed).error == nil {
+			return fmt.Sprintf("From: %s, To: %s", statusToString(s.From), statusToString(s.To))
+		}
 		return fmt.Sprintf("From: %s, To: %s, Error: %s", statusToString(s.From), statusToString(s.To), s.To.(*StateClosed).error)
 
 	}
