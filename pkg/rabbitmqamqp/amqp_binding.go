@@ -58,8 +58,8 @@ func (b *AMQPBinding) Bind(ctx context.Context) (string, error) {
 	kv[destination] = b.destinationName
 	kv["arguments"] = make(map[string]any)
 	_, err := b.management.Request(ctx, kv, path, commandPost, []int{responseCode204})
-	bindingPathWithExchangeQueueKey := bindingPathWithExchangeQueueKey(b.toQueue, b.sourceName, b.destinationName, b.bindingKey)
-	return bindingPathWithExchangeQueueKey, err
+	bindingPathWithExchangeQueueAndKey := bindingPathWithExchangeQueueKey(b.toQueue, b.sourceName, b.destinationName, b.bindingKey)
+	return bindingPathWithExchangeQueueAndKey, err
 }
 
 // Unbind removes a binding between an exchange and a queue or exchange

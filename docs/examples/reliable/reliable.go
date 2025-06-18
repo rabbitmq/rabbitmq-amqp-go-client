@@ -16,18 +16,19 @@ func main() {
 	var stateAccepted int32
 	var stateReleased int32
 	var stateRejected int32
+	var isRunning bool
 
 	var received int32
 	var failed int32
 
 	startTime := time.Now()
+	isRunning = true
 	go func() {
-		for {
+		for isRunning {
 			time.Sleep(5 * time.Second)
 			total := stateAccepted + stateReleased + stateRejected
 			messagesPerSecond := float64(total) / time.Since(startTime).Seconds()
 			rmq.Info("[Stats]", "sent", total, "received", received, "failed", failed, "messagesPerSecond", messagesPerSecond)
-
 		}
 	}()
 
@@ -41,6 +42,16 @@ func main() {
 			switch statusChanged.To.(type) {
 			case *rmq.StateOpen:
 				signalBlock.Broadcast()
+			case *rmq.StateReconnecting:
+				rmq.Info("[connection]", "Reconnecting to the AMQP 1.0 server")
+			case *rmq.StateClosed:
+				StateClosed := statusChanged.To.(*rmq.StateClosed)
+				if errors.Is(StateClosed.GetError(), rmq.ErrMaxReconnectAttemptsReached) {
+					rmq.Error("[connection]", "Max reconnect attempts reached. Closing connection", StateClosed.GetError())
+					signalBlock.Broadcast()
+					isRunning = false
+				}
+
 			}
 		}
 	}(stateChanged)
@@ -87,13 +98,13 @@ func main() {
 
 	// Consume messages from the queue
 	go func(ctx context.Context) {
-		for {
+		for isRunning {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
 				return
 			}
-			if err != nil {
+			if err != nil && isRunning {
 				// An error occurred receiving the message
 				// here the consumer could be disconnected from the server due to a network error
 				signalBlock.L.Lock()
@@ -107,7 +118,7 @@ func main() {
 
 			atomic.AddInt32(&received, 1)
 			err = deliveryContext.Accept(context.Background())
-			if err != nil {
+			if err != nil && isRunning {
 				// same here the delivery could not be accepted due to a network error
 				// we wait for 2_500 ms and try again
 				time.Sleep(2500 * time.Millisecond)
@@ -124,12 +135,13 @@ func main() {
 		return
 	}
 
-	wg := &sync.WaitGroup{}
 	for i := 0; i < 1; i++ {
-		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			for i := 0; i < 500_000; i++ {
+				if !isRunning {
+					rmq.Info("[Publisher]", "Publisher is stopped simulation not running, queue", queueName)
+					return
+				}
 				publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 				if err != nil {
 					// here you need to deal with the error. You can store the message in a local in memory/persistent storage
@@ -160,7 +172,6 @@ func main() {
 			}
 		}()
 	}
-	wg.Wait()
 
 	println("press any key to close the connection")
 

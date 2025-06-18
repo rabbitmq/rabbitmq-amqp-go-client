@@ -1,13 +1,13 @@
 # RabbitMQ AMQP 1.0 Golang Client
 
 This library is meant to be used with RabbitMQ 4.0. 
-Suitable for testing in pre-production environments.
-
 
 ## Getting Started
 
 - [Getting Started](docs/examples/getting_started)
 - [Examples](docs/examples)
+  Inside the `docs/examples` directory you will find several examples to get you started.</br>
+  Also advanced examples like how to use streams, how to handle reconnections, and how to use TLS.
 - Getting started Video tutorial: </br>
 [![Getting Started](https://img.youtube.com/vi/iR1JUFh3udI/0.jpg)](https://youtu.be/iR1JUFh3udI)
 
