@@ -1,6 +1,6 @@
 # RabbitMQ AMQP 1.0 Golang Client
 
-This library is meant to be used with RabbitMQ 4.0. 
+This library is meant to be used with RabbitMQ `4.x`.
 
 ## Getting Started
 
