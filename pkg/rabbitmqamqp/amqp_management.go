@@ -217,6 +217,7 @@ func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBinding
 	bind.SourceExchange(bindingSpecification.sourceExchange())
 	bind.Destination(bindingSpecification.destination(), bindingSpecification.isDestinationQueue())
 	bind.BindingKey(bindingSpecification.bindingKey())
+	bind.AdditionalArguments(bindingSpecification.arguments())
 	return bind.Bind(ctx)
 
 }
