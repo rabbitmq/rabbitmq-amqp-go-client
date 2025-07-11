@@ -60,6 +60,9 @@ var _ = Describe("AMQP Queue test ", func() {
 			MaxLengthBytes:       CapacityGB(1),
 			MaxPriority:          2,
 			LeaderLocator:        &BalancedLeaderLocator{},
+			Arguments: map[string]any{
+				"foo": "bar",
+			},
 		})
 
 		Expect(err).To(BeNil())
@@ -84,6 +87,7 @@ var _ = Describe("AMQP Queue test ", func() {
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-expires", int64(1000)))
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-priority", int64(2)))
 		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-queue-leader-locator", "random"))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("foo", "bar"))
 
 		// validate GET (query queue info)
 		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
@@ -174,7 +178,7 @@ var _ = Describe("AMQP Queue test ", func() {
 	It("AMQP Declare Queue should fail with Precondition fail", func() {
 		// The first queue is declared as Classic, and it should succeed
 		// The second queue is declared as Quorum, and it should fail since it is already declared as Classic
-		//queueName := generateName("AMQP Declare Queue should fail with Precondition fail")
+		// queueName := generateName("AMQP Declare Queue should fail with Precondition fail")
 		queueName := "ab"
 		_, err := management.DeclareQueue(context.TODO(), &ClassicQueueSpecification{
 			Name: queueName,

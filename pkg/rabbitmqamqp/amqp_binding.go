@@ -10,11 +10,12 @@ type AMQPBindingInfo struct {
 }
 
 type AMQPBinding struct {
-	sourceName      string
-	destinationName string
-	toQueue         bool
-	bindingKey      string
-	management      *AmqpManagement
+	sourceName          string
+	destinationName     string
+	toQueue             bool
+	bindingKey          string
+	management          *AmqpManagement
+	additionalArguments map[string]any
 }
 
 func newAMQPBinding(management *AmqpManagement) *AMQPBinding {
@@ -37,6 +38,10 @@ func (b *AMQPBinding) Destination(name string, isQueue bool) {
 	b.toQueue = isQueue
 }
 
+func (b *AMQPBinding) AdditionalArguments(args map[string]any) {
+	b.additionalArguments = args
+}
+
 // Bind creates a binding between an exchange and a queue or exchange
 // with the specified binding key.
 // Returns the binding path that can be used to unbind the binding.
@@ -56,7 +61,11 @@ func (b *AMQPBinding) Bind(ctx context.Context) (string, error) {
 	kv["binding_key"] = b.bindingKey
 	kv["source"] = b.sourceName
 	kv[destination] = b.destinationName
-	kv["arguments"] = make(map[string]any)
+	if b.additionalArguments != nil {
+		kv["arguments"] = b.additionalArguments
+	} else {
+		kv["arguments"] = make(map[string]any)
+	}
 	_, err := b.management.Request(ctx, kv, path, commandPost, []int{responseCode204})
 	bindingPathWithExchangeQueueAndKey := bindingPathWithExchangeQueueKey(b.toQueue, b.sourceName, b.destinationName, b.bindingKey)
 	return bindingPathWithExchangeQueueAndKey, err
