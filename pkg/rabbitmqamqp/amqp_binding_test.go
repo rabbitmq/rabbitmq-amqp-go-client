@@ -69,6 +69,7 @@ var _ = Describe("AMQP Bindings test ", func() {
 		bindingPath, err := management.Bind(context.TODO(), &ExchangeToExchangeBindingSpecification{
 			SourceExchange:      exchangeName,
 			DestinationExchange: exchangeName2,
+			Arguments:           map[string]any{},
 		})
 
 		Expect(err).To(BeNil())
@@ -82,6 +83,7 @@ var _ = Describe("AMQP Bindings test ", func() {
 		_, err := management.Bind(context.TODO(), &ExchangeToExchangeBindingSpecification{
 			SourceExchange:      "",
 			DestinationExchange: "destination",
+			Arguments:           map[string]any{},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
@@ -89,6 +91,7 @@ var _ = Describe("AMQP Bindings test ", func() {
 		_, err = management.Bind(context.TODO(), &ExchangeToExchangeBindingSpecification{
 			SourceExchange:      "source",
 			DestinationExchange: "",
+			Arguments:           map[string]any{},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
@@ -96,6 +99,7 @@ var _ = Describe("AMQP Bindings test ", func() {
 		_, err = management.Bind(context.TODO(), &ExchangeToQueueBindingSpecification{
 			SourceExchange:   "",
 			DestinationQueue: "destination",
+			Arguments:        map[string]any{},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
@@ -103,6 +107,7 @@ var _ = Describe("AMQP Bindings test ", func() {
 		_, err = management.Bind(context.TODO(), &ExchangeToQueueBindingSpecification{
 			SourceExchange:   "source",
 			DestinationQueue: "",
+			Arguments:        map[string]any{"binding_key": "key"},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
