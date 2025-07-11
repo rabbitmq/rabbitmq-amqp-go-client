@@ -182,7 +182,7 @@ func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueS
 	amqpQueue.AutoDelete(specification.isAutoDelete())
 	amqpQueue.Exclusive(specification.isExclusive())
 	amqpQueue.QueueType(specification.queueType())
-	amqpQueue.SetArguments(specification.buildArguments())
+	amqpQueue.Arguments(specification.buildArguments())
 
 	return amqpQueue.Declare(ctx)
 }
@@ -217,7 +217,7 @@ func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBinding
 	bind.SourceExchange(bindingSpecification.sourceExchange())
 	bind.Destination(bindingSpecification.destination(), bindingSpecification.isDestinationQueue())
 	bind.BindingKey(bindingSpecification.bindingKey())
-	bind.AdditionalArguments(bindingSpecification.arguments())
+	bind.Arguments(bindingSpecification.arguments())
 	return bind.Bind(ctx)
 
 }

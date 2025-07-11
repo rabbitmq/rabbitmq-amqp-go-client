@@ -88,7 +88,7 @@ type AmqpQueue struct {
 	name         string
 }
 
-func (a *AmqpQueue) SetArguments(arguments map[string]any) {
+func (a *AmqpQueue) Arguments(arguments map[string]any) {
 	a.arguments = arguments
 }
 
