@@ -61,6 +61,10 @@ func (e *AmqpExchange) AutoDelete(isAutoDelete bool) {
 	e.isAutoDelete = isAutoDelete
 }
 
+func (e *AmqpExchange) Arguments(arguments map[string]any) {
+	e.arguments = arguments
+}
+
 func (e *AmqpExchange) IsAutoDelete() bool {
 	return e.isAutoDelete
 }
