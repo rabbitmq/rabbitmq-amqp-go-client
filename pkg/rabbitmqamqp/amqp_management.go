@@ -200,6 +200,7 @@ func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecificat
 	exchange := newAmqpExchange(a, exchangeSpecification.name())
 	exchange.AutoDelete(exchangeSpecification.isAutoDelete())
 	exchange.ExchangeType(exchangeSpecification.exchangeType())
+	exchange.Arguments(exchangeSpecification.arguments())
 	return exchange.Declare(ctx)
 }
 
