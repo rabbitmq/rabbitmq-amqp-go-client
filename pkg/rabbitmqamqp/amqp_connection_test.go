@@ -164,4 +164,16 @@ var _ = Describe("AMQP connection Test", func() {
 		}()
 	})
 
+	Describe("AMQP TLS connection should fail with error.", func() {
+		tlsConfig := &tls.Config{}
+
+		// Dial the AMQP server with TLS configuration
+		connection, err := Dial(context.Background(), "amqps://does_not_exist:5671", &AmqpConnOptions{
+			TLSConfig: tlsConfig,
+		})
+		Expect(connection).To(BeNil())
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("failed to open TLS connection"))
+	})
+
 })

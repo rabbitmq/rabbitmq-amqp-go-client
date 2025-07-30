@@ -262,6 +262,10 @@ func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *
 		WriteTimeout: connOptions.WriteTimeout,
 	}
 	azureConnection, err = amqp.Dial(ctx, address, amqpLiteConnOptions)
+	if err != nil && (connOptions.TLSConfig != nil || uri.Scheme == AMQPS) {
+		Error("Failed to open TLS connection", fmt.Sprintf("%s://%s", uri.Scheme, uri.Host), err, "ID", connOptions.Id)
+		return fmt.Errorf("failed to open TLS connection: %w", err)
+	}
 	if err != nil {
 		Error("Failed to open connection", ExtractWithoutPassword(address), err, "ID", connOptions.Id)
 		return fmt.Errorf("failed to open connection: %w", err)
