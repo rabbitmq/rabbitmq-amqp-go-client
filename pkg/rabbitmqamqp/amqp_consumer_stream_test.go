@@ -392,6 +392,7 @@ var _ = Describe("Consumer stream test", func() {
 		/*
 			Test the consumer should filter messages based on properties
 		*/
+		// TODO: defer cleanup to delete the stream queue
 		qName := generateName("consumer should filter messages based on properties")
 		qName += time.Now().String()
 		connection, err := Dial(context.Background(), "amqp://", nil)

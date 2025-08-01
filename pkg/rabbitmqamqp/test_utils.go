@@ -1,7 +1,11 @@
 package rabbitmqamqp
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"log/slog"
+	"os"
 	"strconv"
 	"time"
 )
@@ -34,4 +38,43 @@ func createDateTime() time.Time {
 // convert time to pointer
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+
+// ptr returns a pointer to the given value of type T
+func ptr[T any](v T) *T {
+	return &v
+}
+
+type GinkgoLogHandler struct {
+	slog.Handler
+	w io.Writer
+}
+
+func (h *GinkgoLogHandler) Handle(_ context.Context, r slog.Record) error {
+	_, err := h.w.Write([]byte(r.Message + "\n"))
+	return err
+}
+
+func NewGinkgoHandler(level slog.Level, writer io.Writer) slog.Handler {
+	handlerOptions := &slog.HandlerOptions{
+		Level:     level,
+		AddSource: true,
+	}
+
+	return &GinkgoLogHandler{
+		Handler: slog.NewJSONHandler(os.Stdout, handlerOptions),
+		w:       writer,
+	}
+}
+
+func declareQueueAndConnection(name string) (*AmqpConnection, error) {
+	connection, err := Dial(context.Background(), "amqp://", nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = connection.Management().DeclareQueue(context.Background(), &ClassicQueueSpecification{Name: name})
+	if err != nil {
+		return nil, err
+	}
+	return connection, nil
 }
