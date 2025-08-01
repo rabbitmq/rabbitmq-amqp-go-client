@@ -172,7 +172,7 @@ var _ = Describe("AMQP connection Test", func() {
 			TLSConfig: tlsConfig,
 		})
 		Expect(connection).To(BeNil())
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to open TLS connection"))
 	})
 
