@@ -10,6 +10,7 @@ import (
 
 // public consts
 
+const AMQPS = "amqps"
 const StreamFilterValue = "x-stream-filter-value"
 
 const (
