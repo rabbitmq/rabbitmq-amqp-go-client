@@ -45,7 +45,7 @@ var _ = FDescribe("RpcServer E2E", func() {
 
 		replyQueue, err := conn.management.DeclareQueue(
 			context.Background(),
-			&ClassicQueueSpecification{Name: "reply-queue", IsExclusive: true},
+			&ClassicQueueSpecification{Name: fmt.Sprintf("reply-queue_%s", CurrentSpecReport().LeafNodeText), IsExclusive: true},
 		)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -81,9 +81,11 @@ var _ = FDescribe("RpcServer E2E", func() {
 
 		// act
 		message := amqp.NewMessage([]byte("message 1"))
+		q, err := (&QueueAddress{Queue: replyQueue.Name()}).toAddress()
+		Expect(err).ToNot(HaveOccurred())
 		message.Properties = &amqp.MessageProperties{
 			MessageID: "1",
-			ReplyTo:   ptr(fmt.Sprintf("/queues/%s", replyQueue.Name())),
+			ReplyTo:   &q,
 		}
 		res, err := requestPublisher.Publish(ctx, message)
 		Expect(err).ToNot(HaveOccurred())
@@ -121,4 +123,68 @@ var _ = FDescribe("RpcServer E2E", func() {
 		// assert
 		Eventually(buf).Within(time.Second).Should(gbytes.Say("RPC server is closed. Stopping the handler"))
 	}, SpecTimeout(time.Second*10))
+
+	It("uses a custom correlation id extractor and post processor", func(ctx SpecContext) {
+		// setup
+		replyQueue, err := conn.management.DeclareQueue(
+			context.Background(),
+			&ClassicQueueSpecification{Name: fmt.Sprintf("reply-queue_%s", CurrentSpecReport().LeafNodeText), IsExclusive: true},
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		replyConsumer, err := conn.NewConsumer(context.Background(), replyQueue.Name(), nil)
+		Expect(err).ToNot(HaveOccurred())
+		requestPublisher, err := conn.NewPublisher(context.Background(), &QueueAddress{Queue: requestQueue}, nil)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func(ctx SpecContext) {
+			replyConsumer.Close(ctx)
+			requestPublisher.Close(ctx)
+		})
+
+		correlationIdExtractor := func(message *amqp.Message) any {
+			return message.ApplicationProperties["message-id"]
+		}
+		postProcessor := func(reply *amqp.Message, correlationID any) *amqp.Message {
+			reply.Properties.CorrelationID = correlationID
+			reply.ApplicationProperties["test"] = "success"
+			return reply
+		}
+		server := &amqpRpcServer{
+			publisher:              publisher,
+			consumer:               consumer,
+			correlationIdExtractor: correlationIdExtractor,
+			postProcessor:          postProcessor,
+			requestHandler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
+				m := amqp.NewMessage(request.GetData())
+				m.Properties = &amqp.MessageProperties{}
+				m.ApplicationProperties = make(map[string]any)
+				return m, nil
+			},
+		}
+		go server.handle()
+
+		// act
+		message := amqp.NewMessage([]byte("message with custom correlation id extractor and custom post processor"))
+		q, err := (&QueueAddress{Queue: replyQueue.Name()}).toAddress()
+		Expect(err).ToNot(HaveOccurred())
+		message.Properties = &amqp.MessageProperties{
+			MessageID: 123,
+			ReplyTo:   &q,
+		}
+		message.ApplicationProperties = map[string]any{
+			"message-id": "my-message-id",
+		}
+		res, err := requestPublisher.Publish(ctx, message)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Outcome).To(BeAssignableToTypeOf(&StateAccepted{}), "expected rabbit to confirm the message")
+
+		// assert
+		serverReply, err := replyConsumer.Receive(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		m := serverReply.Message()
+		Expect(m).ToNot(BeNil())
+		Expect(m.GetData()).To(BeEquivalentTo("message with custom correlation id extractor and custom post processor"))
+		Expect(m.Properties.CorrelationID).To(BeEquivalentTo("my-message-id"))
+		Expect(m.ApplicationProperties["test"]).To(BeEquivalentTo("success"))
+	})
 })
