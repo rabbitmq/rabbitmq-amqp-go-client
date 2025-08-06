@@ -23,10 +23,34 @@ func (n *nameSupplier) get() string {
 	return fmt.Sprintf("%s-%s", n.prefix, uuid.New().String())
 }
 
-type RpcServerHandlerFn func(ctx context.Context, request *amqp.Message) (*amqp.Message, error)
+type RpcServerHandler func(ctx context.Context, request *amqp.Message) (*amqp.Message, error)
 
-var noOpHandler RpcServerHandlerFn = func(_ context.Context, _ *amqp.Message) (*amqp.Message, error) {
-	return &amqp.Message{}, nil
+var noOpHandler RpcServerHandler = func(_ context.Context, _ *amqp.Message) (*amqp.Message, error) {
+	return nil, nil
+}
+
+// CorrelationIdExtractor defines the signature for a function that extracts the correlation ID
+// from an AMQP message.
+type CorrelationIdExtractor func(message *amqp.Message) any
+
+var defaultCorrelationIdExtractor CorrelationIdExtractor = func(message *amqp.Message) any {
+	if message.Properties == nil {
+		return nil
+	}
+	return message.Properties.MessageID
+}
+
+type PostProcessor func(reply *amqp.Message, correlationID any) *amqp.Message
+
+var defaultPostProcessor PostProcessor = func(reply *amqp.Message, correlationID any) *amqp.Message {
+	if reply == nil {
+		return nil
+	}
+	if reply.Properties == nil {
+		reply.Properties = &amqp.MessageProperties{}
+	}
+	reply.Properties.CorrelationID = correlationID
+	return reply
 }
 
 // RpcServer is Remote Procedure Call server that receives a message, process them,
@@ -44,30 +68,23 @@ type RpcServer interface {
 
 type RpcServerOptions struct {
 	RequestQueue string
-	Handler      RpcServerHandlerFn
-	// TODO(Zerpet): what is a correlation ID? Can it be anything? Anything serialisable?
-	//CorrectionIdExtractor func(message *amqp.Message) any
-	// TODO: ReplyPostProcessor()
-}
-
-type rpcPublisher interface {
-	Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error)
-	Close(ctx context.Context) error
-}
-
-type rpcConsumer interface {
-	Receive(ctx context.Context) (*DeliveryContext, error)
-	Close(ctx context.Context) error
+	Handler      RpcServerHandler
+	// CorrectionIdExtractor is a function that extracts a correction ID from the request message.
+	// The returned value should be an AMQP type that can be binary encoded.
+	CorrelationIdExtractor CorrelationIdExtractor
+	PostProcessor          PostProcessor
 }
 
 type amqpRpcServer struct {
-	mu             sync.Mutex
-	requestHandler RpcServerHandlerFn
-	requestQueue   string
-	publisher      rpcPublisher
-	consumer       rpcConsumer
-	closer         sync.Once
-	closed         bool
+	mu                     sync.Mutex
+	requestHandler         RpcServerHandler
+	requestQueue           string
+	publisher              *Publisher
+	consumer               *Consumer
+	closer                 sync.Once
+	closed                 bool
+	correlationIdExtractor CorrelationIdExtractor
+	postProcessor          PostProcessor
 }
 
 // Close closes the RPC server and its underlying AMQP resources. It ensures that these resources
@@ -108,13 +125,16 @@ func (a *amqpRpcServer) Unpause() {
 }
 
 func (a *amqpRpcServer) handle() {
-	// this function handles all the server behaviour, tweaking points are correectionIdExtractor function and post processor function
+	// This function handles all the server behaviour, tweaking points are correectionIdExtractor function and
+	// post processor function.
 	// TODO: implement these
 	/*
 		The RPC server has the following behavior:
-		when receiving a message request, it calls the processing logic (handler), extracts the correlation ID, calls a reply post-processor if defined, and sends the reply message.
+		when receiving a message request, it calls the processing logic (handler), extracts the correlation ID,
+		calls a reply post-processor if defined, and sends the reply message.
 		if all these operations succeed, the server accepts the request message (settles it with the ACCEPTED outcome).
-		if any of these operations throws an exception, the server discards the request message (the message is removed from the request queue and is dead-lettered if configured).
+		if any of these operations throws an exception, the server discards the request message (the message is
+		removed from the request queue and is dead-lettered if configured).
 	*/
 	for {
 		if a.isClosed() {
@@ -138,24 +158,28 @@ func (a *amqpRpcServer) handle() {
 		if reply != nil && request.message.Properties != nil && request.message.Properties.ReplyTo != nil {
 			setToProperty(reply, request.message.Properties.ReplyTo)
 		}
-		// TODO: correlation ID extractor
-		// TODO: reply post processor
-		err = callAndMaybeRetry(func() error {
-			r, err := a.publisher.Publish(context.Background(), reply)
+
+		correlationID := a.correlationIdExtractor(request.message)
+		reply = a.postProcessor(reply, correlationID)
+		if reply != nil {
+			err = callAndMaybeRetry(func() error {
+				r, err := a.publisher.Publish(context.Background(), reply)
+				if err != nil {
+					return err
+				}
+				switch r.Outcome.(type) {
+				case *StateAccepted:
+					return nil
+				}
+				return fmt.Errorf("reply message not accepted: %s", r.Outcome)
+			}, []time.Duration{time.Second, 3 * time.Second, 5 * time.Second, 10 * time.Second})
 			if err != nil {
-				return err
+				Error("Failed to publish reply", "error", err, "correlationId", reply.Properties.CorrelationID)
+				request.Discard(context.Background(), nil)
+				continue
 			}
-			switch r.Outcome.(type) {
-			case *StateAccepted:
-				return nil
-			}
-			return fmt.Errorf("reply message not accepted: %s", r.Outcome)
-		}, []time.Duration{time.Second, 3 * time.Second, 5 * time.Second, 10 * time.Second})
-		if err != nil {
-			Error("Failed to publish reply", "error", err, "correlationId", reply.Properties.CorrelationID)
-			request.Discard(context.Background(), nil)
-			continue
 		}
+
 		// TODO: https://github.com/rabbitmq/rabbitmq-amqp-java-client/blob/main/src/main/java/com/rabbitmq/client/amqp/impl/AmqpRpcServer.java#L100-L103
 		err = request.Accept(context.Background())
 		if err != nil {

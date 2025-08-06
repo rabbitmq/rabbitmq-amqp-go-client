@@ -72,7 +72,7 @@ func declareQueueAndConnection(name string) (*AmqpConnection, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = connection.Management().DeclareQueue(context.Background(), &ClassicQueueSpecification{Name: name})
+	_, err = connection.Management().DeclareQueue(context.Background(), &ClassicQueueSpecification{Name: name, IsAutoDelete: true})
 	if err != nil {
 		return nil, err
 	}
