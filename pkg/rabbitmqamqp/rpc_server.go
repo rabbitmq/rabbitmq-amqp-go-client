@@ -7,21 +7,7 @@ import (
 	"time"
 
 	amqp "github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 )
-
-// TODO: move name supplier to Rpc Client
-type nameSupplier struct {
-	prefix string
-}
-
-func newNameSupplier(prefix string) *nameSupplier {
-	return &nameSupplier{prefix: prefix}
-}
-
-func (n *nameSupplier) get() string {
-	return fmt.Sprintf("%s-%s", n.prefix, uuid.New().String())
-}
 
 type RpcServerHandler func(ctx context.Context, request *amqp.Message) (*amqp.Message, error)
 
@@ -30,7 +16,7 @@ var noOpHandler RpcServerHandler = func(_ context.Context, _ *amqp.Message) (*am
 }
 
 // CorrelationIdExtractor defines the signature for a function that extracts the correlation ID
-// from an AMQP message.
+// from an AMQP message. Then returned value must be a valid AMQP type that can be binary encoded.
 type CorrelationIdExtractor func(message *amqp.Message) any
 
 var defaultCorrelationIdExtractor CorrelationIdExtractor = func(message *amqp.Message) any {
@@ -40,6 +26,8 @@ var defaultCorrelationIdExtractor CorrelationIdExtractor = func(message *amqp.Me
 	return message.Properties.MessageID
 }
 
+// PostProcessor is a function that is called after the request handler has processed the request.
+// It can be used to modify the reply message before it is sent.
 type PostProcessor func(reply *amqp.Message, correlationID any) *amqp.Message
 
 var defaultPostProcessor PostProcessor = func(reply *amqp.Message, correlationID any) *amqp.Message {
@@ -67,12 +55,51 @@ type RpcServer interface {
 }
 
 type RpcServerOptions struct {
+	// RequestQueue is the name of the queue to subscribe to. This queue must be pre-declared.
+	// The RPC server does not declare the queue, it is the responsibility of the caller to declare the queue.
 	RequestQueue string
-	Handler      RpcServerHandler
+	// Handler is a function to process the request message. If the server wants to send a response to
+	// the client, it must return a response message. If the function returns nil, the server will not send a response.
+	//
+	// It is encouraged to initialise the response message properties in the handler. If the handler returns a non-nil
+	// error, the server will discard the request message and log an error.
+	//
+	// The server handler blocks until this function returns. It is highly recommended to functions that process and return quickly.
+	// If you need to perform a long running operation, it's advisable to dispatch the operation to another queue.
+	//
+	// Example:
+	// 		func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
+	// 			return amqp.NewMessage([]byte(fmt.Sprintf("Pong: %s", request.GetData()))), nil
+	// 		}
+	Handler RpcServerHandler
 	// CorrectionIdExtractor is a function that extracts a correction ID from the request message.
 	// The returned value should be an AMQP type that can be binary encoded.
+	//
+	// This field is optional. If not provided, the server will use the MessageID as the correlation ID.
+	//
+	// Example:
+	// 		func(message *amqp.Message) any {
+	// 			return message.Properties.MessageID
+	// 		}
+	//
+	// The default correlation ID extractor also handles nil cases.
 	CorrelationIdExtractor CorrelationIdExtractor
-	PostProcessor          PostProcessor
+	// PostProcessor is a function that receives the reply message and the extracted correlation ID, just before the reply is sent.
+	// It can be used to modify the reply message before it is sent.
+	//
+	// The post processor must set the correlation ID in the reply message properties.
+	//
+	// This field is optional. If not provided, the server will set the correlation ID in the reply message properties, using
+	// the correlation ID extracted from the CorrelationIdExtractor.
+	//
+	// Example:
+	// 		func(reply *amqp.Message, correlationID any) *amqp.Message {
+	// 			reply.Properties.CorrelationID = correlationID
+	// 			return reply
+	// 		}
+	//
+	// The default post processor also handles nil cases.
+	PostProcessor PostProcessor
 }
 
 type amqpRpcServer struct {
@@ -125,23 +152,23 @@ func (a *amqpRpcServer) Unpause() {
 }
 
 func (a *amqpRpcServer) handle() {
-	// This function handles all the server behaviour, tweaking points are correectionIdExtractor function and
-	// post processor function.
-	// TODO: implement these
 	/*
 		The RPC server has the following behavior:
-		when receiving a message request, it calls the processing logic (handler), extracts the correlation ID,
-		calls a reply post-processor if defined, and sends the reply message.
-		if all these operations succeed, the server accepts the request message (settles it with the ACCEPTED outcome).
-		if any of these operations throws an exception, the server discards the request message (the message is
-		removed from the request queue and is dead-lettered if configured).
+		- when receiving a message request:
+			- it calls the processing logic (handler)
+			- it extracts the correlation ID
+			- it calls a reply post-processor if defined
+			- it sends the reply message
+		- if all these operations succeed, the server accepts the request message (settles it with the ACCEPTED outcome)
+		- if any of these operations throws an exception, the server discards the request message (the message is
+			removed from the request queue and is dead-lettered if configured)
 	*/
 	for {
 		if a.isClosed() {
 			Debug("RPC server is closed. Stopping the handler")
 			return
 		}
-		// TODO: maybe we need to panic to unblock the call
+
 		request, err := a.consumer.Receive(context.Background())
 		if err != nil {
 			Debug("Receive request returned error. This may be expected if the server is closing", "error", err)
@@ -180,7 +207,6 @@ func (a *amqpRpcServer) handle() {
 			}
 		}
 
-		// TODO: https://github.com/rabbitmq/rabbitmq-amqp-java-client/blob/main/src/main/java/com/rabbitmq/client/amqp/impl/AmqpRpcServer.java#L100-L103
 		err = request.Accept(context.Background())
 		if err != nil {
 			Error("Failed to accept request", "error", err, "messageId", request.message.Properties.MessageID)
@@ -192,29 +218,4 @@ func (a *amqpRpcServer) isClosed() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.closed
-}
-
-func callAndMaybeRetry(fn func() error, delays []time.Duration) error {
-	var err error
-	for i, delay := range delays {
-		err = fn()
-		if err == nil {
-			return nil
-		}
-		Error("Retrying operation", "attempt", i+1, "error", err)
-		if i < len(delays)-1 { // Don't sleep after the last attempt
-			time.Sleep(delay)
-		}
-	}
-	return fmt.Errorf("failed after %d attempts: %w", len(delays), err)
-}
-
-// setToProperty sets the To property of the message m to the value of replyTo.
-// If the message has no properties, it creates a new properties object.
-// This function modifies the message in place.
-func setToProperty(m *amqp.Message, replyTo *string) {
-	if m.Properties == nil {
-		m.Properties = &amqp.MessageProperties{}
-	}
-	m.Properties.To = replyTo
 }

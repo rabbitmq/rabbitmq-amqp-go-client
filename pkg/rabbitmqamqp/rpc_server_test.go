@@ -99,7 +99,7 @@ var _ = FDescribe("RpcServer E2E", func() {
 		Expect(m).ToNot(BeNil())
 		Expect(m.GetData()).To(BeEquivalentTo("reply"))
 		Expect(m.Properties.CorrelationID).To(BeEquivalentTo("1"))
-	})
+	}, SpecTimeout(time.Second*10))
 
 	It("stops the handler when the RPC server closes", func(ctx SpecContext) {
 		// setup
@@ -113,6 +113,7 @@ var _ = FDescribe("RpcServer E2E", func() {
 			postProcessor:          defaultPostProcessor,
 		}
 		go server.handle()
+		time.Sleep(time.Second) // ugly but necessary to wait for the server to call Receive() and block
 
 		buf := gbytes.NewBuffer()
 		SetSlogHandler(NewGinkgoHandler(slog.LevelDebug, buf))
@@ -121,6 +122,7 @@ var _ = FDescribe("RpcServer E2E", func() {
 		server.Close(ctx)
 
 		// assert
+		Eventually(buf).Within(time.Second).Should(gbytes.Say("Receive request returned error. This may be expected if the server is closing"))
 		Eventually(buf).Within(time.Second).Should(gbytes.Say("RPC server is closed. Stopping the handler"))
 	}, SpecTimeout(time.Second*10))
 
@@ -186,5 +188,5 @@ var _ = FDescribe("RpcServer E2E", func() {
 		Expect(m.GetData()).To(BeEquivalentTo("message with custom correlation id extractor and custom post processor"))
 		Expect(m.Properties.CorrelationID).To(BeEquivalentTo("my-message-id"))
 		Expect(m.ApplicationProperties["test"]).To(BeEquivalentTo("success"))
-	})
+	}, SpecTimeout(time.Second*10))
 })

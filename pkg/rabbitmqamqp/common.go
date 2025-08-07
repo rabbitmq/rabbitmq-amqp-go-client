@@ -4,8 +4,11 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+	"time"
+
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
 
 // public consts
@@ -60,4 +63,29 @@ func generateName(prefix string) string {
 func isStringNilOrEmpty(str *string) bool {
 	return str == nil || len(*str) == 0
 
+}
+
+func callAndMaybeRetry(fn func() error, delays []time.Duration) error {
+	var err error
+	for i, delay := range delays {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		Error("Retrying operation", "attempt", i+1, "error", err)
+		if i < len(delays)-1 { // Don't sleep after the last attempt
+			time.Sleep(delay)
+		}
+	}
+	return fmt.Errorf("failed after %d attempts: %w", len(delays), err)
+}
+
+// setToProperty sets the To property of the message m to the value of replyTo.
+// If the message has no properties, it creates a new properties object.
+// This function modifies the message in place.
+func setToProperty(m *amqp.Message, replyTo *string) {
+	if m.Properties == nil {
+		m.Properties = &amqp.MessageProperties{}
+	}
+	m.Properties.To = replyTo
 }
