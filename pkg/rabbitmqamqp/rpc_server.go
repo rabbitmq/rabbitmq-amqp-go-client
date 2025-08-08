@@ -48,10 +48,8 @@ type RpcServer interface {
 	Close(context.Context) error
 	// Pause the server to stop receiving messages.
 	Pause()
-	// Unpause request to receive messages again.
-	Unpause()
-	// Handle receives an RPC request message, process it, and returns a response message.
-	// Handle(context.Context, *amqp.Message) *amqp.Message
+	// Unpause requests to receive messages again.
+	Unpause() error
 }
 
 type RpcServerOptions struct {
@@ -103,6 +101,7 @@ type RpcServerOptions struct {
 }
 
 type amqpRpcServer struct {
+	// TODO: handle state changes for reconnections
 	mu                     sync.Mutex
 	requestHandler         RpcServerHandler
 	requestQueue           string
@@ -142,13 +141,25 @@ func (a *amqpRpcServer) Close(ctx context.Context) error {
 }
 
 func (a *amqpRpcServer) Pause() {
-	//TODO implement me
-	panic("implement me")
+	err := a.consumer.pause(context.Background())
+	if err != nil {
+		Warn("Did not pause consumer", "error", err)
+	}
 }
 
-func (a *amqpRpcServer) Unpause() {
-	//TODO implement me
-	panic("implement me")
+func (a *amqpRpcServer) Unpause() error {
+	a.mu.Lock()
+	if a.closed {
+		a.mu.Unlock()
+		return nil
+	}
+	a.mu.Unlock()
+
+	err := a.consumer.unpause(1)
+	if err != nil {
+		return fmt.Errorf("error unpausing RPC server: %w", err)
+	}
+	return nil
 }
 
 func (a *amqpRpcServer) handle() {
@@ -167,6 +178,12 @@ func (a *amqpRpcServer) handle() {
 		if a.isClosed() {
 			Debug("RPC server is closed. Stopping the handler")
 			return
+		}
+
+		err := a.issueCredits(1)
+		if err != nil {
+			Warn("Failed to request credits", "error", err)
+			continue
 		}
 
 		request, err := a.consumer.Receive(context.Background())
@@ -218,4 +235,8 @@ func (a *amqpRpcServer) isClosed() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.closed
+}
+
+func (a *amqpRpcServer) issueCredits(credits uint32) error {
+	return a.consumer.issueCredits(credits)
 }

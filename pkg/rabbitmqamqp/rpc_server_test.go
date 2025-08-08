@@ -12,11 +12,9 @@ import (
 	"github.com/onsi/gomega/gbytes"
 )
 
-var _ = FDescribe("RpcServer E2E", func() {
+var _ = Describe("RpcServer E2E", func() {
 	var (
 		conn         *AmqpConnection
-		publisher    *Publisher
-		consumer     *Consumer
 		requestQueue string
 	)
 
@@ -25,17 +23,9 @@ var _ = FDescribe("RpcServer E2E", func() {
 		var err error
 		conn, err = declareQueueAndConnection(requestQueue)
 		Expect(err).ToNot(HaveOccurred())
-
-		publisher, err = conn.NewPublisher(context.Background(), nil, nil)
-		Expect(err).ToNot(HaveOccurred())
-
-		consumer, err = conn.NewConsumer(context.Background(), requestQueue, nil)
-		Expect(err).ToNot(HaveOccurred())
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		publisher.Close(ctx)
-		consumer.Close(ctx)
 		conn.Close(ctx)
 	})
 
@@ -58,10 +48,9 @@ var _ = FDescribe("RpcServer E2E", func() {
 			requestPublisher.Close(ctx)
 		})
 
-		server := &amqpRpcServer{
-			publisher: publisher,
-			consumer:  consumer,
-			requestHandler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
+		server, err := conn.NewRpcServer(context.Background(), &RpcServerOptions{
+			RequestQueue: requestQueue,
+			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				if request.Properties == nil {
 					return nil, fmt.Errorf("request properties are nil")
 				}
@@ -73,11 +62,11 @@ var _ = FDescribe("RpcServer E2E", func() {
 				reply := amqp.NewMessage([]byte("reply"))
 				return reply, nil
 			},
-			correlationIdExtractor: defaultCorrelationIdExtractor,
-			postProcessor:          defaultPostProcessor,
-		}
-		defer server.Close(context.Background())
-		go server.handle()
+		})
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func(ctx SpecContext) {
+			server.Close(ctx)
+		}, NodeTimeout(time.Second*10))
 
 		// act
 		message := amqp.NewMessage([]byte("message 1"))
@@ -103,20 +92,17 @@ var _ = FDescribe("RpcServer E2E", func() {
 
 	It("stops the handler when the RPC server closes", func(ctx SpecContext) {
 		// setup
-		server := &amqpRpcServer{
-			publisher: publisher,
-			consumer:  consumer,
-			requestHandler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
-				return nil, nil
-			},
-			correlationIdExtractor: defaultCorrelationIdExtractor,
-			postProcessor:          defaultPostProcessor,
-		}
-		go server.handle()
-		time.Sleep(time.Second) // ugly but necessary to wait for the server to call Receive() and block
+		server, err := conn.NewRpcServer(context.Background(), &RpcServerOptions{
+			RequestQueue: requestQueue,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func(ctx SpecContext) {
+			server.Close(ctx)
+		}, NodeTimeout(time.Second*10))
 
 		buf := gbytes.NewBuffer()
 		SetSlogHandler(NewGinkgoHandler(slog.LevelDebug, buf))
+		time.Sleep(time.Second) // ugly but necessary to wait for the server to call Receive() and block
 
 		// act
 		server.Close(ctx)
@@ -151,19 +137,21 @@ var _ = FDescribe("RpcServer E2E", func() {
 			reply.ApplicationProperties["test"] = "success"
 			return reply
 		}
-		server := &amqpRpcServer{
-			publisher:              publisher,
-			consumer:               consumer,
-			correlationIdExtractor: correlationIdExtractor,
-			postProcessor:          postProcessor,
-			requestHandler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
+		server, err := conn.NewRpcServer(context.Background(), &RpcServerOptions{
+			RequestQueue: requestQueue,
+			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				m := amqp.NewMessage(request.GetData())
 				m.Properties = &amqp.MessageProperties{}
 				m.ApplicationProperties = make(map[string]any)
 				return m, nil
 			},
-		}
-		go server.handle()
+			CorrelationIdExtractor: correlationIdExtractor,
+			PostProcessor:          postProcessor,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func(ctx SpecContext) {
+			server.Close(ctx)
+		}, NodeTimeout(time.Second*10))
 
 		// act
 		message := amqp.NewMessage([]byte("message with custom correlation id extractor and custom post processor"))

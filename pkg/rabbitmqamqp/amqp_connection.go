@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
 
 type AmqpAddress struct {
@@ -166,6 +167,61 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 	}
 
 	return newConsumer(ctx, a, destinationAdd, options)
+}
+
+// NewRpcServer creates a new RPC server that processes requests from the
+// specified queue. The requestQueue in options is mandatory, while other
+// fields are optional and will use defaults if not provided.
+func (a *AmqpConnection) NewRpcServer(ctx context.Context, options *RpcServerOptions) (RpcServer, error) {
+	if options == nil {
+		return nil, fmt.Errorf("options cannot be nil")
+	}
+	if options.RequestQueue == "" {
+		return nil, fmt.Errorf("requestQueue is mandatory")
+	}
+
+	// Create consumer for receiving requests
+	// consumer, err := a.NewConsumer(ctx, options.RequestQueue, nil)
+	consumer, err := a.NewConsumer(ctx, options.RequestQueue, &ConsumerOptions{InitialCredits: -1})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consumer: %w", err)
+	}
+	consumer.issueCredits(1)
+
+	// Create publisher for sending replies
+	publisher, err := a.NewPublisher(ctx, nil, nil)
+	if err != nil {
+		consumer.Close(ctx) // cleanup consumer on failure
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	// Set defaults for optional fields
+	handler := options.Handler
+	if handler == nil {
+		handler = noOpHandler
+	}
+
+	correlationIdExtractor := options.CorrelationIdExtractor
+	if correlationIdExtractor == nil {
+		correlationIdExtractor = defaultCorrelationIdExtractor
+	}
+
+	postProcessor := options.PostProcessor
+	if postProcessor == nil {
+		postProcessor = defaultPostProcessor
+	}
+
+	server := &amqpRpcServer{
+		requestHandler:         handler,
+		requestQueue:           options.RequestQueue,
+		publisher:              publisher,
+		consumer:               consumer,
+		correlationIdExtractor: correlationIdExtractor,
+		postProcessor:          postProcessor,
+	}
+	go server.handle()
+
+	return server, nil
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
