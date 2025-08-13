@@ -172,12 +172,9 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 // NewRpcServer creates a new RPC server that processes requests from the
 // specified queue. The requestQueue in options is mandatory, while other
 // fields are optional and will use defaults if not provided.
-func (a *AmqpConnection) NewRpcServer(ctx context.Context, options *RpcServerOptions) (RpcServer, error) {
-	if options == nil {
-		return nil, fmt.Errorf("options cannot be nil")
-	}
-	if options.RequestQueue == "" {
-		return nil, fmt.Errorf("requestQueue is mandatory")
+func (a *AmqpConnection) NewRpcServer(ctx context.Context, options RpcServerOptions) (RpcServer, error) {
+	if err := options.validate(); err != nil {
+		return nil, fmt.Errorf("rpc server options validation: %w", err)
 	}
 
 	// Create consumer for receiving requests
@@ -206,9 +203,9 @@ func (a *AmqpConnection) NewRpcServer(ctx context.Context, options *RpcServerOpt
 		correlationIdExtractor = defaultCorrelationIdExtractor
 	}
 
-	postProcessor := options.PostProcessor
-	if postProcessor == nil {
-		postProcessor = defaultPostProcessor
+	replyPostProcessor := options.ReplyPostProcessor
+	if replyPostProcessor == nil {
+		replyPostProcessor = defaultReplyPostProcessor
 	}
 
 	server := &amqpRpcServer{
@@ -217,11 +214,106 @@ func (a *AmqpConnection) NewRpcServer(ctx context.Context, options *RpcServerOpt
 		publisher:              publisher,
 		consumer:               consumer,
 		correlationIdExtractor: correlationIdExtractor,
-		postProcessor:          postProcessor,
+		replyPostProcessor:     replyPostProcessor,
 	}
 	go server.handle()
 
 	return server, nil
+}
+
+// NewRpcClient creates a new RPC client that sends requests to the specified queue
+// and receives replies on a dynamically created reply queue.
+func (a *AmqpConnection) NewRpcClient(ctx context.Context, options *RpcClientOptions) (RpcClient, error) {
+	if options == nil {
+		return nil, fmt.Errorf("options cannot be nil")
+	}
+	if options.RequestQueueName == "" {
+		return nil, fmt.Errorf("requestQueueName is mandatory")
+	}
+
+	// Create publisher for sending requests
+	requestQueue := &QueueAddress{
+		Queue: options.RequestQueueName,
+	}
+	publisher, err := a.NewPublisher(ctx, requestQueue, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	replyQueueName := options.ReplyToQueueName
+	if len(replyQueueName) == 0 {
+		replyQueueName = generateNameWithDefaultPrefix()
+	}
+
+	// Declare reply queue as exclusive, auto-delete classic queue
+	q, err := a.management.DeclareQueue(ctx, &ClassicQueueSpecification{
+		Name:         replyQueueName,
+		IsExclusive:  true,
+		IsAutoDelete: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to declare reply queue: %w", err)
+	}
+
+	// Set defaults for optional fields
+	correlationIdSupplier := options.CorrelationIdSupplier
+	if correlationIdSupplier == nil {
+		correlationIdSupplier = newRandomUuidCorrelationIdSupplier()
+	}
+
+	requestPostProcessor := options.RequestPostProcessor
+	if requestPostProcessor == nil {
+		requestPostProcessor = func(request *amqp.Message, correlationID any) *amqp.Message {
+			if request.Properties == nil {
+				request.Properties = &amqp.MessageProperties{}
+			}
+			request.Properties.MessageID = correlationID
+			replyTo, err := (&QueueAddress{
+				Queue: q.Name(),
+			}).toAddress()
+			if err != nil {
+				// this should never happen
+				panic(err)
+			}
+			request.Properties.ReplyTo = &replyTo
+			return request
+		}
+	}
+
+	requestTimeout := options.RequestTimeout
+	if requestTimeout == 0 {
+		requestTimeout = DefaultRpcRequestTimeout
+	}
+
+	correlationIdExtractor := options.CorrelationIdExtractor
+	if correlationIdExtractor == nil {
+		correlationIdExtractor = defaultReplyCorrelationIdExtractor
+	}
+
+	client := &amqpRpcClient{
+		requestQueue:           requestQueue,
+		publisher:              publisher,
+		requestPostProcessor:   requestPostProcessor,
+		correlationIdSupplier:  correlationIdSupplier,
+		correlationIdExtractor: correlationIdExtractor,
+		requestTimeout:         requestTimeout,
+		pendingRequests:        make(map[any]*outstandingRequest),
+		done:                   make(chan struct{}),
+	}
+
+	// Create consumer for receiving replies
+	consumer, err := a.NewConsumer(ctx, q.Name(), nil)
+	if err != nil {
+		_ = publisher.Close(ctx) // cleanup publisher on failure
+		return nil, fmt.Errorf("failed to create consumer: %w", err)
+	}
+
+	client.consumer = consumer
+
+	go client.messageReceivedHandler()
+	go client.requestTimeoutTask()
+
+	return client, nil
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings

@@ -48,7 +48,7 @@ var _ = Describe("RpcServer E2E", func() {
 			requestPublisher.Close(ctx)
 		})
 
-		server, err := conn.NewRpcServer(context.Background(), &RpcServerOptions{
+		server, err := conn.NewRpcServer(context.Background(), RpcServerOptions{
 			RequestQueue: requestQueue,
 			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				if request.Properties == nil {
@@ -92,7 +92,7 @@ var _ = Describe("RpcServer E2E", func() {
 
 	It("stops the handler when the RPC server closes", func(ctx SpecContext) {
 		// setup
-		server, err := conn.NewRpcServer(context.Background(), &RpcServerOptions{
+		server, err := conn.NewRpcServer(context.Background(), RpcServerOptions{
 			RequestQueue: requestQueue,
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -137,7 +137,7 @@ var _ = Describe("RpcServer E2E", func() {
 			reply.ApplicationProperties["test"] = "success"
 			return reply
 		}
-		server, err := conn.NewRpcServer(context.Background(), &RpcServerOptions{
+		server, err := conn.NewRpcServer(context.Background(), RpcServerOptions{
 			RequestQueue: requestQueue,
 			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				m := amqp.NewMessage(request.GetData())
@@ -146,7 +146,7 @@ var _ = Describe("RpcServer E2E", func() {
 				return m, nil
 			},
 			CorrelationIdExtractor: correlationIdExtractor,
-			PostProcessor:          postProcessor,
+			ReplyPostProcessor:     postProcessor,
 		})
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func(ctx SpecContext) {

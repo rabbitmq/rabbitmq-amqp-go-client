@@ -26,11 +26,11 @@ var defaultCorrelationIdExtractor CorrelationIdExtractor = func(message *amqp.Me
 	return message.Properties.MessageID
 }
 
-// PostProcessor is a function that is called after the request handler has processed the request.
+// ReplyPostProcessor is a function that is called after the request handler has processed the request.
 // It can be used to modify the reply message before it is sent.
-type PostProcessor func(reply *amqp.Message, correlationID any) *amqp.Message
+type ReplyPostProcessor func(reply *amqp.Message, correlationID any) *amqp.Message
 
-var defaultPostProcessor PostProcessor = func(reply *amqp.Message, correlationID any) *amqp.Message {
+var defaultReplyPostProcessor ReplyPostProcessor = func(reply *amqp.Message, correlationID any) *amqp.Message {
 	if reply == nil {
 		return nil
 	}
@@ -97,7 +97,14 @@ type RpcServerOptions struct {
 	// 		}
 	//
 	// The default post processor also handles nil cases.
-	PostProcessor PostProcessor
+	ReplyPostProcessor ReplyPostProcessor
+}
+
+func (r *RpcServerOptions) validate() error {
+	if r.RequestQueue == "" {
+		return fmt.Errorf("requestQueue is mandatory")
+	}
+	return nil
 }
 
 type amqpRpcServer struct {
@@ -110,7 +117,7 @@ type amqpRpcServer struct {
 	closer                 sync.Once
 	closed                 bool
 	correlationIdExtractor CorrelationIdExtractor
-	postProcessor          PostProcessor
+	replyPostProcessor     ReplyPostProcessor
 }
 
 // Close closes the RPC server and its underlying AMQP resources. It ensures that these resources
@@ -204,7 +211,7 @@ func (a *amqpRpcServer) handle() {
 		}
 
 		correlationID := a.correlationIdExtractor(request.message)
-		reply = a.postProcessor(reply, correlationID)
+		reply = a.replyPostProcessor(reply, correlationID)
 		if reply != nil {
 			err = callAndMaybeRetry(func() error {
 				r, err := a.publisher.Publish(context.Background(), reply)
