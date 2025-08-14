@@ -268,14 +268,6 @@ func (a *AmqpConnection) NewRpcClient(ctx context.Context, options *RpcClientOpt
 				request.Properties = &amqp.MessageProperties{}
 			}
 			request.Properties.MessageID = correlationID
-			replyTo, err := (&QueueAddress{
-				Queue: q.Name(),
-			}).toAddress()
-			if err != nil {
-				// this should never happen
-				panic(err)
-			}
-			request.Properties.ReplyTo = &replyTo
 			return request
 		}
 	}
@@ -292,6 +284,7 @@ func (a *AmqpConnection) NewRpcClient(ctx context.Context, options *RpcClientOpt
 
 	client := &amqpRpcClient{
 		requestQueue:           requestQueue,
+		replyToQueue:           &QueueAddress{Queue: replyQueueName},
 		publisher:              publisher,
 		requestPostProcessor:   requestPostProcessor,
 		correlationIdSupplier:  correlationIdSupplier,

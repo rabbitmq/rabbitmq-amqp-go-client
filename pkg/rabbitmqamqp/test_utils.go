@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/Azure/go-amqp"
 )
 
 func generateNameWithDateTime(name string) string {
@@ -77,4 +80,18 @@ func declareQueueAndConnection(name string) (*AmqpConnection, error) {
 		return nil, err
 	}
 	return connection, nil
+}
+
+func copyApplicationProperties(from *amqp.Message, to *amqp.Message) {
+	if to == nil || from == nil {
+		return
+	}
+	if from.ApplicationProperties == nil {
+		to.ApplicationProperties = nil
+		return
+	}
+	if to.ApplicationProperties == nil {
+		to.ApplicationProperties = make(map[string]any)
+	}
+	maps.Copy(to.ApplicationProperties, from.ApplicationProperties)
 }

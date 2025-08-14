@@ -12,7 +12,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 )
 
-var _ = Describe("RpcServer E2E", func() {
+var _ = Describe("RpcServer", func() {
 	var (
 		conn         *AmqpConnection
 		requestQueue string

@@ -120,6 +120,7 @@ type outstandingRequest struct {
 
 type amqpRpcClient struct {
 	requestQueue           ITargetAddress
+	replyToQueue           ITargetAddress
 	publisher              *Publisher
 	consumer               *Consumer
 	requestPostProcessor   RequestPostProcessor
@@ -175,6 +176,14 @@ func (a *amqpRpcClient) Publish(ctx context.Context, message *amqp.Message) (<-c
 	if a.isClosed() {
 		return nil, fmt.Errorf("rpc client is closed")
 	}
+	replyTo, err := a.replyToQueue.toAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to set reply-to address: %w", err)
+	}
+	if message.Properties == nil {
+		message.Properties = &amqp.MessageProperties{}
+	}
+	message.Properties.ReplyTo = &replyTo
 	correlationID := a.correlationIdSupplier.Get()
 	m := a.requestPostProcessor(message, correlationID)
 	pr, err := a.publisher.Publish(ctx, m)
