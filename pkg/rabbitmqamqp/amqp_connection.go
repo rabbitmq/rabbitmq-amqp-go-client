@@ -3,6 +3,7 @@ package rabbitmqamqp
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
 )
+
+var ErrConnectionClosed = errors.New("connection is closed")
 
 type AmqpAddress struct {
 	// the address of the AMQP server
@@ -121,6 +124,8 @@ type AmqpConnection struct {
 	session         *amqp.Session
 	refMap          *sync.Map
 	entitiesTracker *entitiesTracker
+	mutex           sync.RWMutex
+	closed          bool
 }
 
 func (a *AmqpConnection) Properties() map[string]any {
@@ -379,6 +384,12 @@ func validateOptions(connOptions *AmqpConnOptions) (*AmqpConnOptions, error) {
 // using the provided connectionSettings and the AMQPLite library.
 // Setups the connection and the management interface.
 func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *AmqpConnOptions) error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if a.closed {
+		return ErrConnectionClosed
+	}
 
 	// random pick and extract one address to use for connection
 	var azureConnection *amqp.Conn
@@ -456,7 +467,6 @@ func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *
 	return nil
 }
 func (a *AmqpConnection) maybeReconnect() {
-
 	if !a.amqpConnOptions.RecoveryConfiguration.ActiveRecovery {
 		Info("Recovery is disabled, closing connection", "ID", a.Id())
 		return
@@ -467,7 +477,6 @@ func (a *AmqpConnection) maybeReconnect() {
 	maxDelay := 1 * time.Minute
 
 	for attempt := 1; attempt <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts; attempt++ {
-
 		///wait for before reconnecting
 		// add some random milliseconds to the wait time to avoid thundering herd
 		// the random time is between 0 and 500 milliseconds
@@ -491,6 +500,12 @@ func (a *AmqpConnection) maybeReconnect() {
 			a.lifeCycle.SetState(&StateOpen{})
 			return
 		}
+
+		if errors.Is(err, ErrConnectionClosed) {
+			Info("Connection was closed during reconnect, aborting.", "ID", a.Id())
+			return
+		}
+
 		baseDelay *= 2
 		Error("Reconnection attempt failed", "attempt", attempt, "error", err, "ID", a.Id())
 	}
@@ -548,6 +563,13 @@ Close closes the connection to the AMQP 1.0 server and the management interface.
 All the publishers and consumers are closed as well.
 */
 func (a *AmqpConnection) Close(ctx context.Context) error {
+	a.mutex.Lock()
+	if a.closed {
+		a.mutex.Unlock()
+		return nil
+	}
+	a.closed = true
+	defer a.mutex.Unlock()
 	// the status closed (lifeCycle.SetState(&StateClosed{error: nil})) is not set here
 	// it is set in the connection.Done() channel
 	// the channel is called anyway
