@@ -39,11 +39,11 @@ type RpcClient interface {
 	Publish(context.Context, *amqp.Message) (<-chan *amqp.Message, error)
 }
 
-// CorrectionIdSupplier is an interface for providing correlation IDs for RPC requests.
+// CorrelationIdSupplier is an interface for providing correlation IDs for RPC requests.
 // Implementations should generate unique identifiers for each request.
 // The returned value from `Get()` should be an AMQP type, or a type that can be
 // encoded into an AMQP message property (e.g., string, int, []byte, etc.).
-type CorrectionIdSupplier interface {
+type CorrelationIdSupplier interface {
 	Get() any
 }
 
@@ -61,7 +61,7 @@ func (c *randomUuidCorrelationIdSupplier) Get() any {
 	return s
 }
 
-func newRandomUuidCorrelationIdSupplier() CorrectionIdSupplier {
+func newRandomUuidCorrelationIdSupplier() CorrelationIdSupplier {
 	u, err := uuid.NewRandom()
 	if err != nil {
 		panic(err)
@@ -96,17 +96,29 @@ var DefaultRpcRequestTimeout = 30 * time.Second
 // RpcClientOptions is a struct that contains the options for the RPC client.
 // It is used to configure the RPC client.
 type RpcClientOptions struct {
-	// The name of the queue to send requests to.
+	// The name of the queue to send requests to. This queue must exist.
+	//
+	// Mandatory.
 	RequestQueueName string
 	// The name of the queue to receive replies from.
+	//
+	// Optional. If not set, a dedicated reply-to queue will be created for each request.
 	ReplyToQueueName string
 	// Generator of correlation IDs for requests. Each correlationID generated must be unique.
-	CorrelationIdSupplier CorrectionIdSupplier
+	//
+	// Optional. If not set, a random UUID will be used as prefix and an auto-incrementing counter as suffix.
+	CorrelationIdSupplier CorrelationIdSupplier
 	// Function to extract correlation IDs from replies.
+	//
+	// Optional. If not set, the `CorrelationID` message property will be used.
 	CorrelationIdExtractor CorrelationIdExtractor
 	// Function to modify requests before they are sent.
+	//
+	// Optional. If not set, the default `RequestPostProcessor` assigns the correlation ID to the `MessageID` property.
 	RequestPostProcessor RequestPostProcessor
 	// The timeout for requests.
+	//
+	// Optional. If not set, a default timeout of 30 seconds will be used.
 	RequestTimeout time.Duration
 }
 
@@ -124,7 +136,7 @@ type amqpRpcClient struct {
 	publisher              *Publisher
 	consumer               *Consumer
 	requestPostProcessor   RequestPostProcessor
-	correlationIdSupplier  CorrectionIdSupplier
+	correlationIdSupplier  CorrelationIdSupplier
 	correlationIdExtractor CorrelationIdExtractor
 	requestTimeout         time.Duration
 	mu                     sync.Mutex

@@ -134,3 +134,81 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 		Expect(rpcServer.Close(ctx)).To(Succeed())
 	})
 })
+
+func ExampleRpcClient() {
+	// open a connection
+	conn, err := rabbitmqamqp.Dial(context.TODO(), "amqp://localhost:5672", &rabbitmqamqp.AmqpConnOptions{
+		Properties: map[string]any{"connection_name": "example rpc client"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close(context.TODO())
+
+	// Create RPC client options
+	// RequestQueueName is mandatory. The queue must exist.
+	options := rabbitmqamqp.RpcClientOptions{
+		RequestQueueName: "rpc-queue",
+	}
+	// Create a new RPC client
+	rpcClient, err := conn.NewRpcClient(context.TODO(), &options)
+	if err != nil {
+		panic(err)
+	}
+	defer rpcClient.Close(context.TODO())
+
+	// Create an AMQP message with some initial data
+	msg := rpcClient.Message([]byte("hello world"))
+	// Add some application properties to the message
+	msg.ApplicationProperties = map[string]any{"example": "rpc"}
+
+	// Send the message to the server
+	pendingRequestCh, err := rpcClient.Publish(context.TODO(), msg)
+	if err != nil {
+		panic(err)
+	}
+
+	// Wait for the reply from the server
+	replyFromServer := <-pendingRequestCh
+	// Print the reply from the server
+	// This example assumes that the server is an "echo" server, that just returns the message it received.
+	fmt.Printf("application property 'example': %s\n", replyFromServer.ApplicationProperties["example"])
+	fmt.Printf("reply correlation ID: %s\n", replyFromServer.Properties.CorrelationID)
+}
+
+type fooCorrelationIdSupplier struct {
+	count int
+}
+
+func (c *fooCorrelationIdSupplier) Get() any {
+	c.count++
+	return fmt.Sprintf("foo-%d", c.count)
+}
+
+func ExampleRpcClient_customCorrelationID() {
+	// type fooCorrelationIdSupplier struct {
+	// 	count int
+	// }
+	//
+	// func (c *fooCorrelationIdSupplier) Get() any {
+	// 	c.count++
+	// 	return fmt.Sprintf("foo-%d", c.count)
+	// }
+
+	// Connection setup
+	conn, _ := rabbitmqamqp.Dial(context.TODO(), "amqp://", nil)
+	defer conn.Close(context.TODO())
+
+	// Create RPC client options
+	options := rabbitmqamqp.RpcClientOptions{
+		RequestQueueName:      "rpc-queue", // the queue must exist
+		CorrelationIdSupplier: &fooCorrelationIdSupplier{},
+	}
+
+	// Create a new RPC client
+	rpcClient, _ := conn.NewRpcClient(context.TODO(), &options)
+	pendingRequestCh, _ := rpcClient.Publish(context.TODO(), rpcClient.Message([]byte("hello world")))
+	replyFromServer := <-pendingRequestCh
+	fmt.Printf("reply correlation ID: %s\n", replyFromServer.Properties.CorrelationID)
+	// Should print: foo-1
+}

@@ -9,6 +9,19 @@ import (
 	amqp "github.com/Azure/go-amqp"
 )
 
+// RpcServerHandler is a function that processes a request message and returns a response message.
+// If the server wants to send a response to the client, it must return a response message.
+// If the function returns nil, the server will not send a response.
+// If the server does not send a response message, this high level RPC server doesn't make much sense,
+// and it is better to use a normal AMQP 1.0 consumer.
+//
+// The server handler blocks until this function returns. It is highly recommended to use functions that process and return quickly.
+//
+// Example:
+//
+//	func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
+//		return amqp.NewMessage([]byte(fmt.Sprintf("Pong: %s", request.GetData()))), nil
+//	}
 type RpcServerHandler func(ctx context.Context, request *amqp.Message) (*amqp.Message, error)
 
 var noOpHandler RpcServerHandler = func(_ context.Context, _ *amqp.Message) (*amqp.Message, error) {
@@ -55,6 +68,8 @@ type RpcServer interface {
 type RpcServerOptions struct {
 	// RequestQueue is the name of the queue to subscribe to. This queue must be pre-declared.
 	// The RPC server does not declare the queue, it is the responsibility of the caller to declare the queue.
+	//
+	// Mandatory.
 	RequestQueue string
 	// Handler is a function to process the request message. If the server wants to send a response to
 	// the client, it must return a response message. If the function returns nil, the server will not send a response.
@@ -69,11 +84,13 @@ type RpcServerOptions struct {
 	// 		func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 	// 			return amqp.NewMessage([]byte(fmt.Sprintf("Pong: %s", request.GetData()))), nil
 	// 		}
+	//
+	// Mandatory.
 	Handler RpcServerHandler
 	// CorrectionIdExtractor is a function that extracts a correction ID from the request message.
 	// The returned value should be an AMQP type that can be binary encoded.
 	//
-	// This field is optional. If not provided, the server will use the MessageID as the correlation ID.
+	// This field is optional. If not provided, the server will use the `MessageID` as the correlation ID.
 	//
 	// Example:
 	// 		func(message *amqp.Message) any {
@@ -81,6 +98,8 @@ type RpcServerOptions struct {
 	// 		}
 	//
 	// The default correlation ID extractor also handles nil cases.
+	//
+	// Optional.
 	CorrelationIdExtractor CorrelationIdExtractor
 	// PostProcessor is a function that receives the reply message and the extracted correlation ID, just before the reply is sent.
 	// It can be used to modify the reply message before it is sent.
@@ -97,6 +116,8 @@ type RpcServerOptions struct {
 	// 		}
 	//
 	// The default post processor also handles nil cases.
+	//
+	// Optional.
 	ReplyPostProcessor ReplyPostProcessor
 }
 
