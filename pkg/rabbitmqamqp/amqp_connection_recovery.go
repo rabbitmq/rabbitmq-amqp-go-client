@@ -64,20 +64,20 @@ func newEntitiesTracker() *entitiesTracker {
 	}
 }
 
-func (e *entitiesTracker) storeOrReplaceProducer(entity iEntityIdentifier) {
-	e.publishers.Store(entity.Id(), entity)
+func (e *entitiesTracker) storeOrReplaceProducer(entity EntityIdentifier) {
+	e.publishers.Store(entity.ID(), entity)
 }
 
-func (e *entitiesTracker) removeProducer(entity iEntityIdentifier) {
-	e.publishers.Delete(entity.Id())
+func (e *entitiesTracker) removeProducer(entity EntityIdentifier) {
+	e.publishers.Delete(entity.ID())
 }
 
-func (e *entitiesTracker) storeOrReplaceConsumer(entity iEntityIdentifier) {
-	e.consumers.Store(entity.Id(), entity)
+func (e *entitiesTracker) storeOrReplaceConsumer(entity EntityIdentifier) {
+	e.consumers.Store(entity.ID(), entity)
 }
 
-func (e *entitiesTracker) removeConsumer(entity iEntityIdentifier) {
-	e.consumers.Delete(entity.Id())
+func (e *entitiesTracker) removeConsumer(entity EntityIdentifier) {
+	e.consumers.Delete(entity.ID())
 }
 
 func (e *entitiesTracker) CleanUp() {

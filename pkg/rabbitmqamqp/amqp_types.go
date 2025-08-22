@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
 )
@@ -14,108 +15,92 @@ type StateRejected = amqp.StateRejected
 type StateReleased = amqp.StateReleased
 type StateModified = amqp.StateModified
 
-type iLinkerName interface {
-	linkName() string
-}
-
-func getLinkName(l iLinkerName) string {
-	if l == nil || l.linkName() == "" {
+func getLinkName(linkName string) string {
+	if linkName == "" {
 		return uuid.New().String()
 	}
-	return l.linkName()
+	return linkName
 }
 
-/// IConsumerOptions interface for the AMQP and Stream consumer///
-
-type IConsumerOptions interface {
-	// linkName returns the name of the link
-	// if not set it will return a random UUID
-	linkName() string
-	// initialCredits returns the initial credits for the link
-	// if not set it will return 256
-	initialCredits() int32
-
-	// linkFilters returns the link filters for the link.
-	// It is mostly used for the stream consumers.
-	linkFilters() []amqp.LinkFilter
-
-	// id returns the id of the consumer
-	id() string
-
-	// validate the consumer options based on the available features
-	validate(available *featuresAvailable) error
+// ConsumerOptions interface for AMQP and Stream consumers
+type ConsumerOptions interface {
+	LinkName() string
+	InitialCredits() int32
+	LinkFilters() []amqp.LinkFilter
+	ID() string
+	Validate(available *featuresAvailable) error
 }
 
-func getInitialCredits(co IConsumerOptions) int32 {
-	if co == nil || co.initialCredits() == 0 {
+func getInitialCredits(co ConsumerOptions) int32 {
+	if co == nil {
 		return 256
 	}
-	return co.initialCredits()
+	if credits := co.InitialCredits(); credits > 0 {
+		return credits
+	}
+	return 256
 }
 
-func getLinkFilters(co IConsumerOptions) []amqp.LinkFilter {
+func getLinkFilters(co ConsumerOptions) []amqp.LinkFilter {
 	if co == nil {
 		return nil
 	}
-	return co.linkFilters()
+	return co.LinkFilters()
 }
 
 type managementOptions struct {
 }
 
-func (mo *managementOptions) linkName() string {
+func (mo *managementOptions) LinkName() string {
 	return linkPairName
 }
 
-func (mo *managementOptions) initialCredits() int32 {
+func (mo *managementOptions) InitialCredits() int32 {
 	// by default i 256 but here we set it to 100. For the management is enough.
 	return 100
 }
 
-func (mo *managementOptions) linkFilters() []amqp.LinkFilter {
+func (mo *managementOptions) LinkFilters() []amqp.LinkFilter {
 	return nil
 }
 
-func (mo *managementOptions) id() string {
+func (mo *managementOptions) ID() string {
 	return "management"
 }
 
-func (mo *managementOptions) validate(available *featuresAvailable) error {
+func (mo *managementOptions) Validate(available *featuresAvailable) error {
 	return nil
 }
 
-// ConsumerOptions represents the options for quorum and classic queues
-type ConsumerOptions struct {
-	//ReceiverLinkName: see the IConsumerOptions interface
+// QueueConsumerOptions for quorum and classic queues
+type QueueConsumerOptions struct {
 	ReceiverLinkName string
-	//InitialCredits: see the IConsumerOptions interface
-	InitialCredits int32
-	// The id of the consumer
-	Id string
+	Credits          int32
+	ConsumerID       string
 }
 
-func (aco *ConsumerOptions) linkName() string {
+func (aco *QueueConsumerOptions) LinkName() string {
 	return aco.ReceiverLinkName
 }
 
-func (aco *ConsumerOptions) initialCredits() int32 {
-	return aco.InitialCredits
+func (aco *QueueConsumerOptions) InitialCredits() int32 {
+	return aco.Credits
 }
 
-func (aco *ConsumerOptions) linkFilters() []amqp.LinkFilter {
+func (aco *QueueConsumerOptions) LinkFilters() []amqp.LinkFilter {
 	return nil
 }
 
-func (aco *ConsumerOptions) id() string {
-	return aco.Id
+func (aco *QueueConsumerOptions) ID() string {
+	return aco.ConsumerID
 }
 
-func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
+func (aco *QueueConsumerOptions) Validate(available *featuresAvailable) error {
 	return nil
 }
 
-type IOffsetSpecification interface {
-	toLinkFilter() amqp.LinkFilter
+type OffsetSpecification interface {
+	ToLinkFilter() amqp.LinkFilter
 }
 
 const rmqStreamFilter = "rabbitmq:stream-filter"
@@ -131,14 +116,14 @@ const offsetLast = "last"
 type OffsetFirst struct {
 }
 
-func (of *OffsetFirst) toLinkFilter() amqp.LinkFilter {
+func (of *OffsetFirst) ToLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetFirst)
 }
 
 type OffsetLast struct {
 }
 
-func (ol *OffsetLast) toLinkFilter() amqp.LinkFilter {
+func (ol *OffsetLast) ToLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetLast)
 }
 
@@ -146,147 +131,125 @@ type OffsetValue struct {
 	Offset uint64
 }
 
-func (ov *OffsetValue) toLinkFilter() amqp.LinkFilter {
+func (ov *OffsetValue) ToLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, ov.Offset)
 }
 
 type OffsetNext struct {
 }
 
-func (on *OffsetNext) toLinkFilter() amqp.LinkFilter {
+func (on *OffsetNext) ToLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetNext)
 }
 
-// StreamFilterOptions represents the options that can be used to filter the stream data.
-// It is used in the StreamConsumerOptions.
+// StreamFilterOptions for filtering stream data
 // See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions/
 type StreamFilterOptions struct {
-	// Filter values.
-	Values []string
-	//
-	MatchUnfiltered bool
-
-	// Filter the data based on Application Property
+	Values                []string
+	MatchUnfiltered       bool
 	ApplicationProperties map[string]any
-
-	// Filter the data based on Message Properties
-	Properties *amqp.MessageProperties
+	Properties            *amqp.MessageProperties
 }
 
-/*
-StreamConsumerOptions represents the options for stream queues
-It is mandatory in case of creating a stream consumer.
-*/
+// StreamConsumerOptions for stream queues
 type StreamConsumerOptions struct {
-	//ReceiverLinkName: see the IConsumerOptions interface
-	ReceiverLinkName string
-	//InitialCredits: see the IConsumerOptions interface
-	InitialCredits int32
-	// The offset specification for the stream consumer
-	// see the interface implementations
-	Offset              IOffsetSpecification
+	ReceiverLinkName    string
+	Credits             int32
+	Offset              OffsetSpecification
 	StreamFilterOptions *StreamFilterOptions
-
-	Id string
+	ConsumerID          string
 }
 
-func (sco *StreamConsumerOptions) linkName() string {
+func (sco *StreamConsumerOptions) LinkName() string {
 	return sco.ReceiverLinkName
 }
 
-func (sco *StreamConsumerOptions) initialCredits() int32 {
-	return sco.InitialCredits
+func (sco *StreamConsumerOptions) InitialCredits() int32 {
+	return sco.Credits
 }
 
-func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
-	var filters []amqp.LinkFilter
+func (sco *StreamConsumerOptions) LinkFilters() []amqp.LinkFilter {
+	filters := []amqp.LinkFilter{sco.Offset.ToLinkFilter()}
 
-	filters = append(filters, sco.Offset.toLinkFilter())
-	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Values != nil {
-		var l []any
-		for _, f := range sco.StreamFilterOptions.Values {
-			l = append(l, f)
-		}
-
-		filters = append(filters, amqp.NewLinkFilter(rmqStreamFilter, 0, l))
-		filters = append(filters, amqp.NewLinkFilter(rmqStreamMatchUnfiltered, 0, sco.StreamFilterOptions.MatchUnfiltered))
+	if sco.StreamFilterOptions == nil {
+		return filters
 	}
 
-	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.ApplicationProperties != nil {
-		l := map[string]any{}
-		for k, v := range sco.StreamFilterOptions.ApplicationProperties {
-			l[k] = v
+	opt := sco.StreamFilterOptions
+	if len(opt.Values) > 0 {
+		values := make([]any, len(opt.Values))
+		for i, v := range opt.Values {
+			values[i] = v
 		}
-		filters = append(filters, amqp.NewLinkFilter(amqpApplicationPropertiesFilter, 0, l))
+		filters = append(filters,
+			amqp.NewLinkFilter(rmqStreamFilter, 0, values),
+			amqp.NewLinkFilter(rmqStreamMatchUnfiltered, 0, opt.MatchUnfiltered))
 	}
 
-	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Properties != nil {
-		l := map[amqp.Symbol]any{}
-		if sco.StreamFilterOptions.Properties.ContentType != nil {
-			l["content-type"] = amqp.Symbol(*sco.StreamFilterOptions.Properties.ContentType)
-		}
+	if len(opt.ApplicationProperties) > 0 {
+		filters = append(filters, amqp.NewLinkFilter(amqpApplicationPropertiesFilter, 0, opt.ApplicationProperties))
+	}
 
-		if sco.StreamFilterOptions.Properties.ContentEncoding != nil {
-			l["content-encoding"] = amqp.Symbol(*sco.StreamFilterOptions.Properties.ContentEncoding)
-		}
-
-		if sco.StreamFilterOptions.Properties.CorrelationID != nil {
-			l["correlation-id"] = sco.StreamFilterOptions.Properties.CorrelationID
-		}
-
-		if sco.StreamFilterOptions.Properties.MessageID != nil {
-			l["message-id"] = sco.StreamFilterOptions.Properties.MessageID
-		}
-
-		if sco.StreamFilterOptions.Properties.Subject != nil {
-			l["subject"] = *sco.StreamFilterOptions.Properties.Subject
-		}
-
-		if sco.StreamFilterOptions.Properties.ReplyTo != nil {
-			l["reply-to"] = *sco.StreamFilterOptions.Properties.ReplyTo
-		}
-
-		if sco.StreamFilterOptions.Properties.To != nil {
-			l["to"] = *sco.StreamFilterOptions.Properties.To
-		}
-
-		if sco.StreamFilterOptions.Properties.GroupID != nil {
-			l["group-id"] = *sco.StreamFilterOptions.Properties.GroupID
-		}
-
-		if sco.StreamFilterOptions.Properties.UserID != nil {
-			l["user-id"] = sco.StreamFilterOptions.Properties.UserID
-		}
-
-		if sco.StreamFilterOptions.Properties.AbsoluteExpiryTime != nil {
-			l["absolute-expiry-time"] = sco.StreamFilterOptions.Properties.AbsoluteExpiryTime
-		}
-
-		if sco.StreamFilterOptions.Properties.CreationTime != nil {
-			l["creation-time"] = sco.StreamFilterOptions.Properties.CreationTime
-		}
-
-		if sco.StreamFilterOptions.Properties.GroupSequence != nil {
-			l["group-sequence"] = *sco.StreamFilterOptions.Properties.GroupSequence
-		}
-
-		if sco.StreamFilterOptions.Properties.ReplyToGroupID != nil {
-			l["reply-to-group-id"] = *sco.StreamFilterOptions.Properties.ReplyToGroupID
-		}
-
-		if len(l) > 0 {
-			filters = append(filters, amqp.NewLinkFilter(amqpPropertiesFilter, 0, l))
+	if opt.Properties != nil {
+		if propFilter := buildPropertiesFilter(opt.Properties); len(propFilter) > 0 {
+			filters = append(filters, amqp.NewLinkFilter(amqpPropertiesFilter, 0, propFilter))
 		}
 	}
 
 	return filters
 }
 
-func (sco *StreamConsumerOptions) id() string {
-	return sco.Id
+func buildPropertiesFilter(props *amqp.MessageProperties) map[amqp.Symbol]any {
+	filter := make(map[amqp.Symbol]any)
+
+	if props.ContentType != nil {
+		filter["content-type"] = amqp.Symbol(*props.ContentType)
+	}
+	if props.ContentEncoding != nil {
+		filter["content-encoding"] = amqp.Symbol(*props.ContentEncoding)
+	}
+	if props.CorrelationID != nil {
+		filter["correlation-id"] = props.CorrelationID
+	}
+	if props.MessageID != nil {
+		filter["message-id"] = props.MessageID
+	}
+	if props.Subject != nil {
+		filter["subject"] = *props.Subject
+	}
+	if props.ReplyTo != nil {
+		filter["reply-to"] = *props.ReplyTo
+	}
+	if props.To != nil {
+		filter["to"] = *props.To
+	}
+	if props.GroupID != nil {
+		filter["group-id"] = *props.GroupID
+	}
+	if props.UserID != nil {
+		filter["user-id"] = props.UserID
+	}
+	if props.AbsoluteExpiryTime != nil {
+		filter["absolute-expiry-time"] = props.AbsoluteExpiryTime
+	}
+	if props.CreationTime != nil {
+		filter["creation-time"] = props.CreationTime
+	}
+	if props.GroupSequence != nil {
+		filter["group-sequence"] = *props.GroupSequence
+	}
+	if props.ReplyToGroupID != nil {
+		filter["reply-to-group-id"] = *props.ReplyToGroupID
+	}
+
+	return filter
 }
 
-func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
+func (sco *StreamConsumerOptions) ID() string {
+	return sco.ConsumerID
+}
+
+func (sco *StreamConsumerOptions) Validate(available *featuresAvailable) error {
 	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Properties != nil {
 		if !available.is41OrMore {
 			return fmt.Errorf("stream consumer with properties filter is not supported. You need RabbitMQ 4.1 or later")
@@ -297,20 +260,20 @@ func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
 
 ///// PublisherOptions /////
 
-type IPublisherOptions interface {
-	linkName() string
-	id() string
+type PublisherOptions interface {
+	LinkName() string
+	ID() string
 }
 
-type PublisherOptions struct {
-	Id             string
+type QueuePublisherOptions struct {
+	PublisherID    string
 	SenderLinkName string
 }
 
-func (apo *PublisherOptions) linkName() string {
+func (apo *QueuePublisherOptions) LinkName() string {
 	return apo.SenderLinkName
 }
 
-func (apo *PublisherOptions) id() string {
-	return apo.Id
+func (apo *QueuePublisherOptions) ID() string {
+	return apo.PublisherID
 }

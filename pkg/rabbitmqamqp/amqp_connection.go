@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
 
 type AmqpAddress struct {
@@ -128,44 +129,44 @@ func (a *AmqpConnection) Properties() map[string]any {
 }
 
 // NewPublisher creates a new Publisher that sends messages to the provided destination.
-// The destination is a ITargetAddress that can be a Queue or an Exchange with a routing key.
-// options is an IPublisherOptions that can be used to configure the publisher.
+// The destination is a TargetAddress that can be a Queue or an Exchange with a routing key.
+// options is a PublisherOptions that can be used to configure the publisher.
 // See QueueAddress and ExchangeAddress for more information.
-func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAddress, options IPublisherOptions) (*Publisher, error) {
-	destinationAdd := ""
+func (a *AmqpConnection) NewPublisher(ctx context.Context, destination TargetAddress, options PublisherOptions) (*Publisher, error) {
+	destinationAddress := ""
 	err := error(nil)
 	if destination != nil {
-		destinationAdd, err = destination.toAddress()
+		destinationAddress, err = destination.ToAddress()
 		if err != nil {
 			return nil, err
 		}
-		err = validateAddress(destinationAdd)
+		err = validateAddress(destinationAddress)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return newPublisher(ctx, a, destinationAdd, options)
+	return newPublisher(ctx, a, destinationAddress, options)
 }
 
 // NewConsumer creates a new Consumer that listens to the provided Queue
-func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options IConsumerOptions) (*Consumer, error) {
+func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options ConsumerOptions) (*Consumer, error) {
 	destination := &QueueAddress{
 		Queue: queueName,
 	}
 	if options != nil {
-		err := options.validate(a.featuresAvailable)
+		err := options.Validate(a.featuresAvailable)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	destinationAdd, err := destination.toAddress()
+	destinationAddress, err := destination.ToAddress()
 	if err != nil {
 		return nil, err
 	}
 
-	return newConsumer(ctx, a, destinationAdd, options)
+	return newConsumer(ctx, a, destinationAddress, options)
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
@@ -427,7 +428,7 @@ func (a *AmqpConnection) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.notifyStatusChange(channel)
 }
 
-func (a *AmqpConnection) State() ILifeCycleState {
+func (a *AmqpConnection) State() LifeCycleState {
 	return a.lifeCycle.State()
 }
 

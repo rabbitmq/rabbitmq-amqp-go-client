@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -111,14 +112,14 @@ var _ = Describe("Available Features", func() {
 		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
 	})
 
-	It("StreamConsumerOptions validate for RabbitMQ 4.1", func() {
+	It("StreamConsumerOptions Validate for RabbitMQ 4.1", func() {
 		Expect((&StreamConsumerOptions{
 			StreamFilterOptions: &StreamFilterOptions{
 				Properties: &amqp.MessageProperties{
 					MessageID: "123",
 				},
 			},
-		}).validate(&featuresAvailable{is41OrMore: false})).To(MatchError("stream consumer with properties filter is not supported. You need RabbitMQ 4.1 or later"))
+		}).Validate(&featuresAvailable{is41OrMore: false})).To(MatchError("stream consumer with properties filter is not supported. You need RabbitMQ 4.1 or later"))
 
 		Expect((&StreamConsumerOptions{
 			StreamFilterOptions: &StreamFilterOptions{
@@ -126,7 +127,7 @@ var _ = Describe("Available Features", func() {
 					MessageID: "123",
 				},
 			},
-		}).validate(&featuresAvailable{is41OrMore: true})).To(BeNil())
+		}).Validate(&featuresAvailable{is41OrMore: true})).To(BeNil())
 	})
 
 })

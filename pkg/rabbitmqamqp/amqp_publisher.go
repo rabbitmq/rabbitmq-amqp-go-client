@@ -3,9 +3,10 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
-	"sync/atomic"
 )
 
 type PublishResult struct {
@@ -15,24 +16,28 @@ type PublishResult struct {
 
 // Publisher is a publisher that sends messages to a specific destination address.
 type Publisher struct {
-	sender         atomic.Pointer[amqp.Sender]
-	connection     *AmqpConnection
-	linkName       string
-	destinationAdd string
-	id             string
+	sender             atomic.Pointer[amqp.Sender]
+	connection         *AmqpConnection
+	linkName           string
+	destinationAddress string
+	id                 string
 }
 
-func (m *Publisher) Id() string {
+func (m *Publisher) ID() string {
 	return m.id
 }
 
-func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IPublisherOptions) (*Publisher, error) {
+func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAddress string, options PublisherOptions) (*Publisher, error) {
 	id := fmt.Sprintf("publisher-%s", uuid.New().String())
-	if options != nil && options.id() != "" {
-		id = options.id()
+	if options != nil && options.ID() != "" {
+		id = options.ID()
 	}
 
-	r := &Publisher{connection: connection, linkName: getLinkName(options), destinationAdd: destinationAdd, id: id}
+	linkName := ""
+	if options != nil {
+		linkName = options.LinkName()
+	}
+	r := &Publisher{connection: connection, linkName: getLinkName(linkName), destinationAddress: destinationAddress, id: id}
 	connection.entitiesTracker.storeOrReplaceProducer(r)
 	err := r.createSender(ctx)
 	if err != nil {
@@ -42,7 +47,7 @@ func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAd
 }
 
 func (m *Publisher) createSender(ctx context.Context) error {
-	sender, err := m.connection.session.NewSender(ctx, m.destinationAdd, createSenderLinkOptions(m.destinationAdd, m.linkName, AtLeastOnce))
+	sender, err := m.connection.session.NewSender(ctx, m.destinationAddress, createSenderLinkOptions(m.destinationAddress, m.linkName, AtLeastOnce))
 	if err != nil {
 		return err
 	}
@@ -50,54 +55,11 @@ func (m *Publisher) createSender(ctx context.Context) error {
 	return nil
 }
 
-/*
-Publish sends a message to the destination address that can be decided during the creation of the publisher or at the time of sending the message.
-
-The message is sent and the outcome of the operation is returned.
-The outcome is a DeliveryState that indicates if the message was accepted or rejected.
-RabbitMQ supports the following DeliveryState types:
-
-  - StateAccepted
-  - StateReleased
-  - StateRejected
-    See: https://www.rabbitmq.com/docs/next/amqp#outcomes for more information.
-
-If the destination address is not defined during the creation, the message must have a TO property set.
-You can use the helper "MessagePropertyToAddress" to create the destination address.
-See the examples:
-Create a new publisher that sends messages to a specific destination address:
-<code>
-
-	publisher, err := amqpConnection.NewPublisher(context.Background(), &rabbitmqamqp.ExchangeAddress{
-				Exchange: "myExchangeName",
-				Key:      "myRoutingKey",
-			}
-
-	.. publisher.Publish(context.Background(), amqp.NewMessage([]byte("Hello, World!")))
-
-</code>
-Create a new publisher that sends messages based on message destination address:
-<code>
-
-	publisher, err := connection.NewPublisher(context.Background(), nil, "test")
-	msg := amqp.NewMessage([]byte("hello"))
-	..:= MessagePropertyToAddress(msg, &QueueAddress{Queue: "myQueueName"})
-	..:= publisher.Publish(context.Background(), msg)
-
-</code>
-
-The message is persistent by default by setting the Header.Durable to true when Header is nil.
-You can set the message to be non-persistent by setting the Header.Durable to false.
-Note:
-When you use the `Header` is up to you to set the message properties,
-You need set the `Header.Durable` to true or false.
-
-<code>
-
-</code>
-*/
+// Publish sends a message and returns the delivery outcome.
+// Messages are persistent by default. Set Header.Durable to false for non-persistent messages.
+// If no destination was set during publisher creation, the message must have a TO property.
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
-	if m.destinationAdd == "" {
+	if m.destinationAddress == "" {
 		if message.Properties == nil || message.Properties.To == nil {
 			return nil, fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
 		}

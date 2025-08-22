@@ -3,9 +3,10 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
-	"sync/atomic"
 )
 
 type DeliveryContext struct {
@@ -66,11 +67,11 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 }
 
 type Consumer struct {
-	receiver       atomic.Pointer[amqp.Receiver]
-	connection     *AmqpConnection
-	options        IConsumerOptions
-	destinationAdd string
-	id             string
+	receiver           atomic.Pointer[amqp.Receiver]
+	connection         *AmqpConnection
+	options            ConsumerOptions
+	destinationAddress string
+	id                 string
 
 	/*
 		currentOffset is the current offset of the consumer. It is valid only for the stream consumers.
@@ -81,20 +82,20 @@ type Consumer struct {
 	currentOffset int64
 }
 
-func (c *Consumer) Id() string {
+func (c *Consumer) ID() string {
 	return c.id
 }
 
-func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IConsumerOptions) (*Consumer, error) {
+func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAddress string, options ConsumerOptions) (*Consumer, error) {
 	id := fmt.Sprintf("consumer-%s", uuid.New().String())
-	if options != nil && options.id() != "" {
-		id = options.id()
+	if options != nil && options.ID() != "" {
+		id = options.ID()
 	}
 
 	r := &Consumer{connection: connection, options: options,
-		destinationAdd: destinationAdd,
-		currentOffset:  -1,
-		id:             id}
+		destinationAddress: destinationAddress,
+		currentOffset:      -1,
+		id:                 id}
 	connection.entitiesTracker.storeOrReplaceConsumer(r)
 	err := r.createReceiver(ctx)
 	if err != nil {
@@ -111,8 +112,8 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 		if c.options != nil {
 			// here we assume it is a stream. So we recreate the options with the offset.
 			c.options = &StreamConsumerOptions{
-				ReceiverLinkName: c.options.linkName(),
-				InitialCredits:   c.options.initialCredits(),
+				ReceiverLinkName: c.options.LinkName(),
+				InitialCredits:   c.options.InitialCredits(),
 				// we increment the offset by one to start from the next message.
 				// because the current was already consumed.
 				Offset: &OffsetValue{Offset: uint64(c.currentOffset + 1)},
@@ -120,8 +121,8 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 		}
 	}
 
-	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd,
-		createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce))
+	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAddress,
+		createReceiverLinkOptions(c.destinationAddress, c.options, AtLeastOnce))
 	if err != nil {
 		return err
 	}

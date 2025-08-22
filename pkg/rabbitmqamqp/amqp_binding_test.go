@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -37,9 +38,9 @@ var _ = Describe("AMQP Bindings test ", func() {
 		Expect(queueInfo).NotTo(BeNil())
 		Expect(queueInfo.Name()).To(Equal(queueName))
 		bindingPath, err := management.Bind(context.TODO(), &ExchangeToQueueBindingSpecification{
-			SourceExchange:   exchangeName,
-			DestinationQueue: queueName,
-			BindingKey:       "routing-key",
+			Source: exchangeName,
+			Queue:  queueName,
+			Key:    "routing-key",
 		})
 		Expect(err).To(BeNil())
 		err = management.Unbind(context.TODO(), bindingPath)
@@ -67,9 +68,9 @@ var _ = Describe("AMQP Bindings test ", func() {
 		Expect(exchangeInfo2.Name()).To(Equal(exchangeName2))
 
 		bindingPath, err := management.Bind(context.TODO(), &ExchangeToExchangeBindingSpecification{
-			SourceExchange:      exchangeName,
-			DestinationExchange: exchangeName2,
-			Arguments:           map[string]any{},
+			Source:    exchangeName,
+			Exchange:  exchangeName2,
+			Arguments: map[string]any{},
 		})
 
 		Expect(err).To(BeNil())
@@ -81,33 +82,33 @@ var _ = Describe("AMQP Bindings test ", func() {
 	It("AMQP Bindings should fail if source or destinations are empty", func() {
 
 		_, err := management.Bind(context.TODO(), &ExchangeToExchangeBindingSpecification{
-			SourceExchange:      "",
-			DestinationExchange: "destination",
-			Arguments:           map[string]any{},
+			Source:    "",
+			Exchange:  "destination",
+			Arguments: map[string]any{},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
 
 		_, err = management.Bind(context.TODO(), &ExchangeToExchangeBindingSpecification{
-			SourceExchange:      "source",
-			DestinationExchange: "",
-			Arguments:           map[string]any{},
+			Source:    "source",
+			Exchange:  "",
+			Arguments: map[string]any{},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
 
 		_, err = management.Bind(context.TODO(), &ExchangeToQueueBindingSpecification{
-			SourceExchange:   "",
-			DestinationQueue: "destination",
-			Arguments:        map[string]any{},
+			Source:    "",
+			Queue:     "destination",
+			Arguments: map[string]any{},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))
 
 		_, err = management.Bind(context.TODO(), &ExchangeToQueueBindingSpecification{
-			SourceExchange:   "source",
-			DestinationQueue: "",
-			Arguments:        map[string]any{"binding_key": "key"},
+			Source:    "source",
+			Queue:     "",
+			Arguments: map[string]any{"binding_key": "key"},
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("source and destination names are required"))

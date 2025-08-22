@@ -4,8 +4,9 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // public consts
@@ -47,17 +48,14 @@ func generateNameWithDefaultPrefix() string {
 // generateName generates a unique name with the given prefix
 func generateName(prefix string) string {
 	uid := uuid.New()
-	uuidBytes := []byte(uid.String())
-	md5obj := md5.New()
-	digest := md5obj.Sum(uuidBytes)
+	hasher := md5.New()
+	hasher.Write([]byte(uid.String()))
+	digest := hasher.Sum(nil)
 	result := base64.StdEncoding.EncodeToString(digest)
-	result = strings.ReplaceAll(result, "+", "-")
-	result = strings.ReplaceAll(result, "/", "_")
-	result = strings.ReplaceAll(result, "=", "")
-	return prefix + result
+	replacer := strings.NewReplacer("+", "-", "/", "_", "=", "")
+	return prefix + replacer.Replace(result)
 }
 
 func isStringNilOrEmpty(str *string) bool {
-	return str == nil || len(*str) == 0
-
+	return str == nil || *str == ""
 }

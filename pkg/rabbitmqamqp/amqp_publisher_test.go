@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"context"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -159,9 +160,9 @@ var _ = Describe("AMQP publisher ", func() {
 
 		// Create the binding between the exchange and the queue
 		_, err = connection.Management().Bind(context.Background(), &ExchangeToQueueBindingSpecification{
-			SourceExchange:   name,
-			DestinationQueue: name,
-			BindingKey:       "#",
+			Source: name,
+			Queue:  name,
+			Key:    "#",
 		})
 		Expect(err).To(BeNil())
 		// the status should be StateAccepted since the exchange has a binding

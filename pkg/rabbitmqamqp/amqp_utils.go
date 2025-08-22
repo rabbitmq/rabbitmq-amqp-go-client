@@ -2,9 +2,9 @@ package rabbitmqamqp
 
 import (
 	"fmt"
-	"github.com/Azure/go-amqp"
 	"math/rand"
-	"time"
+
+	"github.com/Azure/go-amqp"
 )
 
 const AtMostOnce = 0
@@ -40,7 +40,7 @@ func createSenderLinkOptions(address string, linkName string, deliveryMode int) 
 // receiverLinkOptions returns the options for a receiver link
 // with the given address and link name.
 // That should be the same for all the links.
-func createReceiverLinkOptions(address string, options IConsumerOptions, deliveryMode int) *amqp.ReceiverOptions {
+func createReceiverLinkOptions(address string, options ConsumerOptions, deliveryMode int) *amqp.ReceiverOptions {
 	prop := make(map[string]any)
 	prop["paired"] = true
 	receiverSettleMode := amqp.SenderSettleModeSettled.Ptr()
@@ -55,7 +55,7 @@ func createReceiverLinkOptions(address string, options IConsumerOptions, deliver
 	result := &amqp.ReceiverOptions{
 		TargetAddress:             address,
 		DynamicAddress:            false,
-		Name:                      getLinkName(options),
+		Name:                      getLinkName(options.LinkName()),
 		Properties:                prop,
 		Durability:                0,
 		ExpiryTimeout:             0,
@@ -69,8 +69,7 @@ func createReceiverLinkOptions(address string, options IConsumerOptions, deliver
 }
 
 func random(max int) int {
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-	return r.Intn(max)
+	return rand.Intn(max)
 }
 
 func validateMessageAnnotations(annotations amqp.Annotations) error {
@@ -88,7 +87,7 @@ func validateMessageAnnotations(annotations amqp.Annotations) error {
 }
 
 func validateMessageAnnotationKey(key string) error {
-	if key[:2] != "x-" {
+	if len(key) < 2 || key[:2] != "x-" {
 		return fmt.Errorf("message annotation key must start with 'x-': %s", key)
 	}
 	return nil

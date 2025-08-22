@@ -6,10 +6,10 @@ import (
 	"strings"
 )
 
-// ITargetAddress is an interface that represents an address that can be used to send messages to.
+// TargetAddress is an interface that represents an address that can be used to send messages to.
 // It can be either a Queue or an Exchange with a routing key.
-type ITargetAddress interface {
-	toAddress() (string, error)
+type TargetAddress interface {
+	ToAddress() (string, error)
 }
 
 // QueueAddress represents the address of a queue.
@@ -18,7 +18,7 @@ type QueueAddress struct {
 	Parameters string // Additional parameters not related to the queue. Most of the time it is empty
 }
 
-func (qas *QueueAddress) toAddress() (string, error) {
+func (qas *QueueAddress) ToAddress() (string, error) {
 	q := &qas.Queue
 	if isStringNilOrEmpty(&qas.Queue) {
 		q = nil
@@ -32,7 +32,7 @@ type ExchangeAddress struct {
 	Key      string // The routing key. Can be empty
 }
 
-func (eas *ExchangeAddress) toAddress() (string, error) {
+func (eas *ExchangeAddress) ToAddress() (string, error) {
 	ex := &eas.Exchange
 	if isStringNilOrEmpty(&eas.Exchange) {
 		ex = nil

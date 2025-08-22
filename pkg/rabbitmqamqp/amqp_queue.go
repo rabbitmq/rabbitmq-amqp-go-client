@@ -15,7 +15,7 @@ type AmqpQueueInfo struct {
 	leader        string
 	members       []string
 	arguments     map[string]any
-	queueType     TQueueType
+	queueType     QueueType
 	consumerCount uint32
 	messageCount  uint64
 }
@@ -39,7 +39,7 @@ func newAmqpQueueInfo(response map[string]any) *AmqpQueueInfo {
 		isDurable:     response["durable"].(bool),
 		isAutoDelete:  response["auto_delete"].(bool),
 		isExclusive:   response["exclusive"].(bool),
-		queueType:     TQueueType(response["type"].(string)),
+		queueType:     QueueType(response["type"].(string)),
 		leader:        leader,
 		members:       response["replicas"].([]string),
 		arguments:     response["arguments"].(map[string]any),
@@ -60,7 +60,7 @@ func (a *AmqpQueueInfo) IsExclusive() bool {
 	return a.isExclusive
 }
 
-func (a *AmqpQueueInfo) Type() TQueueType {
+func (a *AmqpQueueInfo) Type() QueueType {
 	return a.queueType
 }
 

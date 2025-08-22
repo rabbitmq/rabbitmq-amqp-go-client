@@ -5,12 +5,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("AMQP connection Test", func() {
@@ -69,7 +70,7 @@ var _ = Describe("AMQP connection Test", func() {
 
 		Expect(err).To(BeNil())
 		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: queueName},
-			&PublisherOptions{
+			&QueuePublisherOptions{
 				Id:             "my_id",
 				SenderLinkName: "my_sender_link",
 			})
