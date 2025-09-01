@@ -22,9 +22,12 @@ func (s *echoRpcServer) stop(ctx context.Context) {
 }
 
 func newEchoRpcServer(conn *rabbitmqamqp.AmqpConnection) *echoRpcServer {
-	conn.Management().DeclareQueue(context.TODO(), &rabbitmqamqp.QuorumQueueSpecification{
+	_, err := conn.Management().DeclareQueue(context.TODO(), &rabbitmqamqp.QuorumQueueSpecification{
 		Name: rpcServerQueueName,
 	})
+	if err != nil {
+		panic(err)
+	}
 	srv, err := conn.NewRpcServer(context.TODO(), rabbitmqamqp.RpcServerOptions{
 		RequestQueue: rpcServerQueueName,
 		Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
