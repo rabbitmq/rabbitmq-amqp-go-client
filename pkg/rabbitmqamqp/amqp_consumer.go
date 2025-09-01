@@ -3,9 +3,10 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
-	"sync/atomic"
 )
 
 type DeliveryContext struct {
@@ -65,6 +66,14 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 	})
 }
 
+type consumerState byte
+
+const (
+	consumerStateRunning consumerState = iota
+	consumerStatePausing
+	consumerStatePaused
+)
+
 type Consumer struct {
 	receiver       atomic.Pointer[amqp.Receiver]
 	connection     *AmqpConnection
@@ -79,6 +88,8 @@ type Consumer struct {
 		For the AMQP queues it is just ignored.
 	*/
 	currentOffset int64
+
+	state consumerState
 }
 
 func (c *Consumer) Id() string {
@@ -147,4 +158,41 @@ func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
 func (c *Consumer) Close(ctx context.Context) error {
 	c.connection.entitiesTracker.removeConsumer(c)
 	return c.receiver.Load().Close(ctx)
+}
+
+// pause drains the credits of the receiver and stops issuing new credits.
+func (c *Consumer) pause(ctx context.Context) error {
+	if c.state == consumerStatePaused || c.state == consumerStatePausing {
+		return nil
+	}
+	c.state = consumerStatePausing
+	err := c.receiver.Load().DrainCredit(ctx, nil)
+	if err != nil {
+		c.state = consumerStateRunning
+		return fmt.Errorf("error draining credits: %w", err)
+	}
+	c.state = consumerStatePaused
+	return nil
+}
+
+// unpause requests new credits using the initial credits value of the options.
+func (c *Consumer) unpause(credits uint32) error {
+	if c.state == consumerStateRunning {
+		return nil
+	}
+	err := c.receiver.Load().IssueCredit(credits)
+	if err != nil {
+		return fmt.Errorf("error issuing credits: %w", err)
+	}
+	c.state = consumerStateRunning
+	return nil
+}
+
+func (c *Consumer) isPausedOrPausing() bool {
+	return c.state != consumerStateRunning
+}
+
+// issueCredits issues more credits on the receiver.
+func (c *Consumer) issueCredits(credits uint32) error {
+	return c.receiver.Load().IssueCredit(credits)
 }

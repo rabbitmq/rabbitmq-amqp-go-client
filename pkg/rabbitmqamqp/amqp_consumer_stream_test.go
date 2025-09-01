@@ -3,12 +3,13 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	testhelper "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/test-helper"
-	"sync"
-	"time"
 )
 
 var _ = Describe("Consumer stream test", func() {
@@ -392,6 +393,7 @@ var _ = Describe("Consumer stream test", func() {
 		/*
 			Test the consumer should filter messages based on properties
 		*/
+		// TODO: defer cleanup to delete the stream queue
 		qName := generateName("consumer should filter messages based on properties")
 		qName += time.Now().String()
 		connection, err := Dial(context.Background(), "amqp://", nil)
@@ -407,49 +409,49 @@ var _ = Describe("Consumer stream test", func() {
 		})
 
 		publishMessagesWithMessageLogic(qName, "Subject", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{Subject: stringPtr("Subject")}
+			msg.Properties = &amqp.MessageProperties{Subject: ptr("Subject")}
 		})
 
 		publishMessagesWithMessageLogic(qName, "ReplyTo", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ReplyTo: stringPtr("ReplyTo")}
+			msg.Properties = &amqp.MessageProperties{ReplyTo: ptr("ReplyTo")}
 		})
 
 		publishMessagesWithMessageLogic(qName, "ContentType", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ContentType: stringPtr("ContentType")}
+			msg.Properties = &amqp.MessageProperties{ContentType: ptr("ContentType")}
 		})
 
 		publishMessagesWithMessageLogic(qName, "ContentEncoding", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ContentEncoding: stringPtr("ContentEncoding")}
+			msg.Properties = &amqp.MessageProperties{ContentEncoding: ptr("ContentEncoding")}
 		})
 
 		publishMessagesWithMessageLogic(qName, "GroupID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{GroupID: stringPtr("GroupID")}
+			msg.Properties = &amqp.MessageProperties{GroupID: ptr("GroupID")}
 		})
 
 		publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}
+			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}
 		})
 
 		// GroupSequence
 		publishMessagesWithMessageLogic(qName, "GroupSequence", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{GroupSequence: uint32Ptr(137)}
+			msg.Properties = &amqp.MessageProperties{GroupSequence: ptr(uint32(137))}
 		})
 
 		// ReplyToGroupID
 		publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}
+			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}
 		})
 
 		// CreationTime
 
 		publishMessagesWithMessageLogic(qName, "CreationTime", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{CreationTime: timePtr(createDateTime())}
+			msg.Properties = &amqp.MessageProperties{CreationTime: ptr(createDateTime())}
 		})
 
 		// AbsoluteExpiryTime
 
 		publishMessagesWithMessageLogic(qName, "AbsoluteExpiryTime", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{AbsoluteExpiryTime: timePtr(createDateTime())}
+			msg.Properties = &amqp.MessageProperties{AbsoluteExpiryTime: ptr(createDateTime())}
 		})
 
 		// CorrelationID
@@ -534,16 +536,16 @@ var _ = Describe("Consumer stream test", func() {
 			wg.Done()
 		},
 			Entry("MessageID", &amqp.MessageProperties{MessageID: "MessageID"}, "MessageID"),
-			Entry("Subject", &amqp.MessageProperties{Subject: stringPtr("Subject")}, "Subject"),
-			Entry("ReplyTo", &amqp.MessageProperties{ReplyTo: stringPtr("ReplyTo")}, "ReplyTo"),
-			Entry("ContentType", &amqp.MessageProperties{ContentType: stringPtr("ContentType")}, "ContentType"),
-			Entry("ContentEncoding", &amqp.MessageProperties{ContentEncoding: stringPtr("ContentEncoding")}, "ContentEncoding"),
-			Entry("GroupID", &amqp.MessageProperties{GroupID: stringPtr("GroupID")}, "GroupID"),
-			Entry("ReplyToGroupID", &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}, "ReplyToGroupID"),
-			Entry("GroupSequence", &amqp.MessageProperties{GroupSequence: uint32Ptr(137)}, "GroupSequence"),
-			Entry("ReplyToGroupID", &amqp.MessageProperties{ReplyToGroupID: stringPtr("ReplyToGroupID")}, "ReplyToGroupID"),
-			Entry("CreationTime", &amqp.MessageProperties{CreationTime: timePtr(createDateTime())}, "CreationTime"),
-			Entry("AbsoluteExpiryTime", &amqp.MessageProperties{AbsoluteExpiryTime: timePtr(createDateTime())}, "AbsoluteExpiryTime"),
+			Entry("Subject", &amqp.MessageProperties{Subject: ptr("Subject")}, "Subject"),
+			Entry("ReplyTo", &amqp.MessageProperties{ReplyTo: ptr("ReplyTo")}, "ReplyTo"),
+			Entry("ContentType", &amqp.MessageProperties{ContentType: ptr("ContentType")}, "ContentType"),
+			Entry("ContentEncoding", &amqp.MessageProperties{ContentEncoding: ptr("ContentEncoding")}, "ContentEncoding"),
+			Entry("GroupID", &amqp.MessageProperties{GroupID: ptr("GroupID")}, "GroupID"),
+			Entry("ReplyToGroupID", &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}, "ReplyToGroupID"),
+			Entry("GroupSequence", &amqp.MessageProperties{GroupSequence: ptr(uint32(137))}, "GroupSequence"),
+			Entry("ReplyToGroupID", &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}, "ReplyToGroupID"),
+			Entry("CreationTime", &amqp.MessageProperties{CreationTime: ptr(createDateTime())}, "CreationTime"),
+			Entry("AbsoluteExpiryTime", &amqp.MessageProperties{AbsoluteExpiryTime: ptr(createDateTime())}, "AbsoluteExpiryTime"),
 			Entry("CorrelationID", &amqp.MessageProperties{CorrelationID: "CorrelationID"}, "CorrelationID"),
 		)
 		go func() {

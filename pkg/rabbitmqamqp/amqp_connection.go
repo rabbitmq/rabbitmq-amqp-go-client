@@ -3,14 +3,18 @@ package rabbitmqamqp
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	"github.com/google/uuid"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	"github.com/google/uuid"
 )
+
+var ErrConnectionClosed = errors.New("connection is closed")
 
 type AmqpAddress struct {
 	// the address of the AMQP server
@@ -120,6 +124,8 @@ type AmqpConnection struct {
 	session         *amqp.Session
 	refMap          *sync.Map
 	entitiesTracker *entitiesTracker
+	mutex           sync.RWMutex
+	closed          bool
 }
 
 func (a *AmqpConnection) Properties() map[string]any {
@@ -166,6 +172,146 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 	}
 
 	return newConsumer(ctx, a, destinationAdd, options)
+}
+
+// NewRpcServer creates a new RPC server that processes requests from the
+// specified queue. The requestQueue in options is mandatory, while other
+// fields are optional and will use defaults if not provided.
+func (a *AmqpConnection) NewRpcServer(ctx context.Context, options RpcServerOptions) (RpcServer, error) {
+	if err := options.validate(); err != nil {
+		return nil, fmt.Errorf("rpc server options validation: %w", err)
+	}
+
+	// Create consumer for receiving requests
+	// consumer, err := a.NewConsumer(ctx, options.RequestQueue, nil)
+	consumer, err := a.NewConsumer(ctx, options.RequestQueue, &ConsumerOptions{InitialCredits: -1})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consumer: %w", err)
+	}
+	consumer.issueCredits(1)
+
+	// Create publisher for sending replies
+	publisher, err := a.NewPublisher(ctx, nil, nil)
+	if err != nil {
+		consumer.Close(ctx) // cleanup consumer on failure
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	// Set defaults for optional fields
+	handler := options.Handler
+	if handler == nil {
+		handler = noOpHandler
+	}
+
+	correlationIdExtractor := options.CorrelationIdExtractor
+	if correlationIdExtractor == nil {
+		correlationIdExtractor = defaultCorrelationIdExtractor
+	}
+
+	replyPostProcessor := options.ReplyPostProcessor
+	if replyPostProcessor == nil {
+		replyPostProcessor = defaultReplyPostProcessor
+	}
+
+	server := &amqpRpcServer{
+		requestHandler:         handler,
+		requestQueue:           options.RequestQueue,
+		publisher:              publisher,
+		consumer:               consumer,
+		correlationIdExtractor: correlationIdExtractor,
+		replyPostProcessor:     replyPostProcessor,
+	}
+	go server.handle()
+
+	return server, nil
+}
+
+// NewRpcClient creates a new RPC client that sends requests to the specified queue
+// and receives replies on a dynamically created reply queue.
+func (a *AmqpConnection) NewRpcClient(ctx context.Context, options *RpcClientOptions) (RpcClient, error) {
+	if options == nil {
+		return nil, fmt.Errorf("options cannot be nil")
+	}
+	if options.RequestQueueName == "" {
+		return nil, fmt.Errorf("requestQueueName is mandatory")
+	}
+
+	// Create publisher for sending requests
+	requestQueue := &QueueAddress{
+		Queue: options.RequestQueueName,
+	}
+	publisher, err := a.NewPublisher(ctx, requestQueue, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	replyQueueName := options.ReplyToQueueName
+	if len(replyQueueName) == 0 {
+		replyQueueName = generateNameWithDefaultPrefix()
+	}
+
+	// Declare reply queue as exclusive, auto-delete classic queue
+	q, err := a.management.DeclareQueue(ctx, &ClassicQueueSpecification{
+		Name:         replyQueueName,
+		IsExclusive:  true,
+		IsAutoDelete: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to declare reply queue: %w", err)
+	}
+
+	// Set defaults for optional fields
+	correlationIdSupplier := options.CorrelationIdSupplier
+	if correlationIdSupplier == nil {
+		correlationIdSupplier = newRandomUuidCorrelationIdSupplier()
+	}
+
+	requestPostProcessor := options.RequestPostProcessor
+	if requestPostProcessor == nil {
+		requestPostProcessor = func(request *amqp.Message, correlationID any) *amqp.Message {
+			if request.Properties == nil {
+				request.Properties = &amqp.MessageProperties{}
+			}
+			request.Properties.MessageID = correlationID
+			return request
+		}
+	}
+
+	requestTimeout := options.RequestTimeout
+	if requestTimeout == 0 {
+		requestTimeout = DefaultRpcRequestTimeout
+	}
+
+	correlationIdExtractor := options.CorrelationIdExtractor
+	if correlationIdExtractor == nil {
+		correlationIdExtractor = defaultReplyCorrelationIdExtractor
+	}
+
+	client := &amqpRpcClient{
+		requestQueue:           requestQueue,
+		replyToQueue:           &QueueAddress{Queue: replyQueueName},
+		publisher:              publisher,
+		requestPostProcessor:   requestPostProcessor,
+		correlationIdSupplier:  correlationIdSupplier,
+		correlationIdExtractor: correlationIdExtractor,
+		requestTimeout:         requestTimeout,
+		pendingRequests:        make(map[any]*outstandingRequest),
+		done:                   make(chan struct{}),
+	}
+
+	// Create consumer for receiving replies
+	consumer, err := a.NewConsumer(ctx, q.Name(), nil)
+	if err != nil {
+		_ = publisher.Close(ctx) // cleanup publisher on failure
+		return nil, fmt.Errorf("failed to create consumer: %w", err)
+	}
+
+	client.consumer = consumer
+
+	go client.messageReceivedHandler()
+	go client.requestTimeoutTask()
+
+	return client, nil
 }
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
@@ -238,6 +384,12 @@ func validateOptions(connOptions *AmqpConnOptions) (*AmqpConnOptions, error) {
 // using the provided connectionSettings and the AMQPLite library.
 // Setups the connection and the management interface.
 func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *AmqpConnOptions) error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if a.closed {
+		return ErrConnectionClosed
+	}
 
 	// random pick and extract one address to use for connection
 	var azureConnection *amqp.Conn
@@ -315,7 +467,6 @@ func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *
 	return nil
 }
 func (a *AmqpConnection) maybeReconnect() {
-
 	if !a.amqpConnOptions.RecoveryConfiguration.ActiveRecovery {
 		Info("Recovery is disabled, closing connection", "ID", a.Id())
 		return
@@ -326,7 +477,6 @@ func (a *AmqpConnection) maybeReconnect() {
 	maxDelay := 1 * time.Minute
 
 	for attempt := 1; attempt <= a.amqpConnOptions.RecoveryConfiguration.MaxReconnectAttempts; attempt++ {
-
 		///wait for before reconnecting
 		// add some random milliseconds to the wait time to avoid thundering herd
 		// the random time is between 0 and 500 milliseconds
@@ -350,6 +500,12 @@ func (a *AmqpConnection) maybeReconnect() {
 			a.lifeCycle.SetState(&StateOpen{})
 			return
 		}
+
+		if errors.Is(err, ErrConnectionClosed) {
+			Info("Connection was closed during reconnect, aborting.", "ID", a.Id())
+			return
+		}
+
 		baseDelay *= 2
 		Error("Reconnection attempt failed", "attempt", attempt, "error", err, "ID", a.Id())
 	}
@@ -407,6 +563,13 @@ Close closes the connection to the AMQP 1.0 server and the management interface.
 All the publishers and consumers are closed as well.
 */
 func (a *AmqpConnection) Close(ctx context.Context) error {
+	a.mutex.Lock()
+	if a.closed {
+		a.mutex.Unlock()
+		return nil
+	}
+	a.closed = true
+	defer a.mutex.Unlock()
 	// the status closed (lifeCycle.SetState(&StateClosed{error: nil})) is not set here
 	// it is set in the connection.Done() channel
 	// the channel is called anyway

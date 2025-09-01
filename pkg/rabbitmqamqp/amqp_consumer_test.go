@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"context"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -161,5 +162,49 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
+})
 
+var _ = Describe("Consumer pause and unpause", func() {
+	It("pauses and unpauses the consumer", func(ctx SpecContext) {
+		// setup
+		qName := CurrentSpecReport().LeafNodeText
+		c, err := declareQueueAndConnection(qName)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func(ctx SpecContext) {
+			_ = c.Close(ctx)
+		})
+
+		publishMessages(qName, 1)
+		consumer, err := c.NewConsumer(ctx, qName, &ConsumerOptions{InitialCredits: -1})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(consumer.receiver.Load().IssueCredit(1)).To(Succeed())
+
+		By("receiving a message when unpaused")
+
+		dc, err := consumer.Receive(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(dc.Accept(ctx)).To(Succeed())
+
+		By("not receiving any new messages after pausing")
+		Expect(consumer.pause(ctx)).To(Succeed())
+		Eventually(consumer.isPausedOrPausing).Should(BeTrue(), "expected consumer to be paused or pausing")
+		publishMessages(qName, 10)
+		// have to assert again because pause may enocunter an error and not complete the pause operation
+		Eventually(consumer.isPausedOrPausing).Should(BeTrue(), "expected consumer to be paused")
+
+		rCtx, rCancel := context.WithTimeout(ctx, 200*time.Millisecond)
+		DeferCleanup(rCancel)
+		_, err = consumer.Receive(rCtx)
+		Expect(err).To(MatchError(context.DeadlineExceeded))
+
+		By("receiving a new message after unpausing")
+		Expect(consumer.unpause(10)).To(Succeed())
+		Eventually(consumer.isPausedOrPausing).Should(BeFalse(), "expected consumer to be unpaused")
+
+		for i := 0; i < 10; i++ {
+			dc, err = consumer.Receive(ctx)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(dc.Accept(ctx)).To(Succeed())
+		}
+	}, SpecTimeout(time.Second*10))
 })

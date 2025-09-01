@@ -2,6 +2,10 @@ package rabbitmqamqp
 
 import "log/slog"
 
+func SetSlogHandler(handler slog.Handler) {
+	slog.SetDefault(slog.New(handler))
+}
+
 func Info(msg string, args ...any) {
 	slog.Info(msg, args...)
 }
