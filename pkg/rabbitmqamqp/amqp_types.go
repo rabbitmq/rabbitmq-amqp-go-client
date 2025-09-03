@@ -171,6 +171,9 @@ type StreamFilterOptions struct {
 
 	// Filter the data based on Message Properties
 	Properties *amqp.MessageProperties
+
+	// SQLFilter
+	SQL string
 }
 
 /*
@@ -202,6 +205,10 @@ func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
 	var filters []amqp.LinkFilter
 
 	filters = append(filters, sco.Offset.toLinkFilter())
+	if sco.StreamFilterOptions != nil && !isStringNilOrEmpty(&sco.StreamFilterOptions.SQL) {
+
+	}
+
 	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Values != nil {
 		var l []any
 		for _, f := range sco.StreamFilterOptions.Values {
@@ -287,10 +294,21 @@ func (sco *StreamConsumerOptions) id() string {
 }
 
 func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
-	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Properties != nil {
+	if sco.StreamFilterOptions == nil {
+		return nil
+	}
+
+	if sco.StreamFilterOptions.Properties != nil {
 		if !available.is41OrMore {
 			return fmt.Errorf("stream consumer with properties filter is not supported. You need RabbitMQ 4.1 or later")
 		}
+	}
+
+	if !isStringNilOrEmpty(&sco.StreamFilterOptions.SQL) {
+		if !available.is42rMore {
+			return fmt.Errorf("stream consumer with SQL filter is not supported. You need RabbitMQ 4.2 or later")
+		}
+		return nil
 	}
 	return nil
 }
