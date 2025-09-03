@@ -118,6 +118,8 @@ type IOffsetSpecification interface {
 	toLinkFilter() amqp.LinkFilter
 }
 
+const sqlFilter = "sql-filter"
+const amqpSqlFilter = "amqp:sql-filter"
 const rmqStreamFilter = "rabbitmq:stream-filter"
 const rmqStreamOffsetSpec = "rabbitmq:stream-offset-spec"
 const rmqStreamMatchUnfiltered = "rabbitmq:stream-match-unfiltered"
@@ -206,7 +208,9 @@ func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
 
 	filters = append(filters, sco.Offset.toLinkFilter())
 	if sco.StreamFilterOptions != nil && !isStringNilOrEmpty(&sco.StreamFilterOptions.SQL) {
-
+		l := map[string]any{}
+		l[amqpSqlFilter] = sco.StreamFilterOptions.SQL
+		filters = append(filters, amqp.NewLinkFilter(sqlFilter, 0, l))
 	}
 
 	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Values != nil {
