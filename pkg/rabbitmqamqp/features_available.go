@@ -26,6 +26,7 @@ func (v Version) Compare(other Version) int {
 type featuresAvailable struct {
 	is4OrMore  bool
 	is41OrMore bool
+	is42rMore  bool
 	isRabbitMQ bool
 }
 
@@ -45,6 +46,7 @@ func (f *featuresAvailable) ParseProperties(properties map[string]any) error {
 
 	f.is4OrMore = isVersionGreaterOrEqual(version, "4.0.0")
 	f.is41OrMore = isVersionGreaterOrEqual(version, "4.1.0")
+	f.is42rMore = isVersionGreaterOrEqual(version, "4.2.0")
 	f.isRabbitMQ = strings.EqualFold(properties["product"].(string), "RabbitMQ")
 	return nil
 }
