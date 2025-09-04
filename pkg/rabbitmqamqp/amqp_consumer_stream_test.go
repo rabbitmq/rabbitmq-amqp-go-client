@@ -555,6 +555,98 @@ var _ = Describe("Consumer stream test", func() {
 		}()
 	})
 
+	It("SQL filter consumer", func() {
+		qName := generateName("SQL filter consumer")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.name).To(Equal(qName))
+
+		publishMessagesWithMessageLogic(qName, "not_in_the_filter", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{Subject: ptr("not")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "in_the_filter", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{Subject: ptr("in_the_filter")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "in_the_filter_with_more", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{Subject: ptr("in_the_filter_with_more")}
+		})
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			InitialCredits: 200,
+			Offset:         &OffsetFirst{},
+			StreamFilterOptions: &StreamFilterOptions{
+				SQL: "properties.subject LIKE '%in_the_filter%'",
+			},
+		})
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 20; i++ {
+			dc, err := consumer.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			if i < 10 {
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, "in_the_filter")))
+			} else {
+				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i-10, "in_the_filter_with_more")))
+			}
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		Expect(consumer.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+	It("SQL filter consumer combined to other fields", func() {
+		qName := generateName("SQL filter consumer combined to other fields")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.name).To(Equal(qName))
+		publishMessagesWithMessageLogic(qName, "not_in_the_filter", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{Subject: ptr("not")}
+		})
+
+		publishMessagesWithMessageLogic(qName, "in_the_filter", 10, func(msg *amqp.Message) {
+			msg.Properties = &amqp.MessageProperties{Subject: ptr("p_in_the_filter"), To: ptr("the_id")}
+			msg.ApplicationProperties = map[string]interface{}{"a_in_the_filter_key": "a_in_the_filter_value"}
+		})
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			InitialCredits: 200,
+			Offset:         &OffsetFirst{},
+			StreamFilterOptions: &StreamFilterOptions{
+				SQL: "properties.subject LIKE '%in_the_filter%' AND properties.to = 'the_id' AND a_in_the_filter_key = 'a_in_the_filter_value'",
+			},
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 10; i++ {
+			dc, err := consumer.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, "in_the_filter")))
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		Expect(consumer.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
 })
 
 type msgLogic = func(*amqp.Message)

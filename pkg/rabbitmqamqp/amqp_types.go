@@ -118,8 +118,13 @@ type IOffsetSpecification interface {
 	toLinkFilter() amqp.LinkFilter
 }
 
+// DescriptorCodeSqlFilter see:
+// https://github.com/rabbitmq/rabbitmq-server/blob/main/deps/amqp10_common/include/amqp10_filter.hrl
+// see DESCRIPTOR_CODE_SQL_FILTER in rabbitmq-server
+// DESCRIPTOR_CODE_SQL_FILTER is the uint64 code for amqpSqlFilter = "amqp:sql-filter"
+const DescriptorCodeSqlFilter = 0x120
+
 const sqlFilter = "sql-filter"
-const amqpSqlFilter = "amqp:sql-filter"
 const rmqStreamFilter = "rabbitmq:stream-filter"
 const rmqStreamOffsetSpec = "rabbitmq:stream-offset-spec"
 const rmqStreamMatchUnfiltered = "rabbitmq:stream-match-unfiltered"
@@ -174,7 +179,27 @@ type StreamFilterOptions struct {
 	// Filter the data based on Message Properties
 	Properties *amqp.MessageProperties
 
-	// SQLFilter
+	/* SQLFilter: documentation https://www.rabbitmq.com/docs/next/stream-filtering#sql-filter-expressions
+	It requires RabbitMQ 4.2 or later
+
+	Example:
+	<code>
+	Define a message like:
+	var  msg  := NewMessage([]byte(..))
+	msg.Properties = &amqp.MessageProperties{Subject: ptr("mySubject"), To: ptr("To")}
+	msg.ApplicationProperties = map[string]interface{}{"filter_key": "filter_value"}
+
+	publisher.Publish(context.Background(), msg)
+	Then you can create a consumer with a SQL filter like:
+	consumer, err := connection.NewConsumer(context.Background(), "myQueue", &StreamConsumerOptions{
+			InitialCredits: 200,
+			Offset:         &OffsetFirst{},
+			StreamFilterOptions: &StreamFilterOptions{
+				SQL: "properties.subject LIKE '%mySubject%' AND properties.to = 'To' AND filter_key = 'filter_value'",
+			},
+		})
+	</code>
+	*/
 	SQL string
 }
 
@@ -208,9 +233,10 @@ func (sco *StreamConsumerOptions) linkFilters() []amqp.LinkFilter {
 
 	filters = append(filters, sco.Offset.toLinkFilter())
 	if sco.StreamFilterOptions != nil && !isStringNilOrEmpty(&sco.StreamFilterOptions.SQL) {
-		l := map[string]any{}
-		l[amqpSqlFilter] = sco.StreamFilterOptions.SQL
-		filters = append(filters, amqp.NewLinkFilter(sqlFilter, 0, l))
+		// here we use DescriptorCodeSqlFilter as the code for the sql filter
+		// since we need to create a simple DescribedType
+		// see DescriptorCodeSqlFilter const for more information
+		filters = append(filters, amqp.NewLinkFilter(sqlFilter, DescriptorCodeSqlFilter, sco.StreamFilterOptions.SQL))
 	}
 
 	if sco.StreamFilterOptions != nil && sco.StreamFilterOptions.Values != nil {
