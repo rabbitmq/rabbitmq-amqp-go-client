@@ -5,12 +5,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"os"
-	"sync"
-	"time"
 )
 
 var _ = Describe("AMQP connection Test", func() {
@@ -117,12 +117,10 @@ var _ = Describe("AMQP connection Test", func() {
 	})
 
 	Describe("AMQP TLS connection should succeed with in different vhosts with Anonymous and External.", func() {
-		wg := &sync.WaitGroup{}
-		wg.Add(4)
 		DescribeTable("TLS connection should success in different vhosts ", func(virtualHost string, sasl amqp.SASLType) {
 			// Load CA cert
 			caCert, err := os.ReadFile("../../.ci/certs/ca_certificate.pem")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Create a CA certificate pool and add the CA certificate to it
 			caCertPool := x509.NewCertPool()
@@ -131,7 +129,7 @@ var _ = Describe("AMQP connection Test", func() {
 			// Load client cert
 			clientCert, err := tls.LoadX509KeyPair("../../.ci/certs/client_localhost_certificate.pem",
 				"../../.ci/certs/client_localhost_key.pem")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Create a TLS configuration
 			tlsConfig := &tls.Config{
@@ -146,34 +144,32 @@ var _ = Describe("AMQP connection Test", func() {
 				SASLType:  sasl,
 				TLSConfig: tlsConfig,
 			})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(connection).NotTo(BeNil())
 
 			// Close the connection
 			err = connection.Close(context.Background())
-			Expect(err).To(BeNil())
-			wg.Done()
+			Expect(err).ToNot(HaveOccurred())
 		},
-			Entry("with virtual host. External", "%2F", amqp.SASLTypeExternal("")),
-			Entry("with a not default virtual host. External", "tls", amqp.SASLTypeExternal("")),
-			Entry("with virtual host. Anonymous", "%2F", amqp.SASLTypeAnonymous()),
-			Entry("with a not default virtual host. Anonymous", "tls", amqp.SASLTypeAnonymous()),
+			Entry("default virtual host + External", "%2F", amqp.SASLTypeExternal("")),
+			Entry("non-default virtual host + External", "tls", amqp.SASLTypeExternal("")),
+			Entry("default virtual host + Anonymous", "%2F", amqp.SASLTypeAnonymous()),
+			Entry("non-default virtual host + Anonymous", "tls", amqp.SASLTypeAnonymous()),
 		)
-		go func() {
-			wg.Wait()
-		}()
 	})
 
-	Describe("AMQP TLS connection should fail with error.", func() {
-		tlsConfig := &tls.Config{}
+	Describe("AMQP TLS connection", func() {
+		It("should fail with error", func() {
+			tlsConfig := &tls.Config{}
 
-		// Dial the AMQP server with TLS configuration
-		connection, err := Dial(context.Background(), "amqps://does_not_exist:5671", &AmqpConnOptions{
-			TLSConfig: tlsConfig,
+			// Dial the AMQP server with TLS configuration
+			connection, err := Dial(context.Background(), "amqps://does_not_exist:5671", &AmqpConnOptions{
+				TLSConfig: tlsConfig,
+			})
+			Expect(connection).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to open TLS connection"))
 		})
-		Expect(connection).To(BeNil())
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to open TLS connection"))
 	})
 
 })
