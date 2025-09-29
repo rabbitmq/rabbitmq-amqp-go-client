@@ -3,7 +3,6 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/Azure/go-amqp"
@@ -320,33 +319,43 @@ var _ = Describe("Consumer stream test", func() {
 	})
 
 	Describe("consumer should filter messages based on application properties", func() {
-		qName := generateName("consumer should filter messages based on application properties")
-		connection, err := Dial(context.Background(), "amqp://", nil)
-		Expect(err).To(BeNil())
-		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
-			Name: qName,
-		})
-		Expect(err).To(BeNil())
-		Expect(queueInfo).NotTo(BeNil())
+		var (
+			qName      string
+			connection *AmqpConnection
+		)
+		BeforeEach(func() {
+			qName = generateName("consumer should filter messages based on application properties")
+			var err error
+			connection, err = Dial(context.Background(), "amqp://", nil)
+			Expect(err).ToNot(HaveOccurred())
+			queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+				Name: qName,
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(queueInfo).NotTo(BeNil())
 
-		publishMessagesWithMessageLogic(qName, "ignoredKey", 7, func(msg *amqp.Message) {
-			msg.ApplicationProperties = map[string]interface{}{"ignoredKey": "ignoredValue"}
+			publishMessagesWithMessageLogic(qName, "ignoredKey", 7, func(msg *amqp.Message) {
+				msg.ApplicationProperties = map[string]interface{}{"ignoredKey": "ignoredValue"}
+			})
+
+			publishMessagesWithMessageLogic(qName, "key1", 10, func(msg *amqp.Message) {
+				msg.ApplicationProperties = map[string]interface{}{"key1": "value1", "constFilterKey": "constFilterValue"}
+			})
+
+			publishMessagesWithMessageLogic(qName, "key2", 10, func(msg *amqp.Message) {
+				msg.ApplicationProperties = map[string]interface{}{"key2": "value2", "constFilterKey": "constFilterValue"}
+			})
+
+			publishMessagesWithMessageLogic(qName, "key3", 10, func(msg *amqp.Message) {
+				msg.ApplicationProperties = map[string]interface{}{"key3": "value3", "constFilterKey": "constFilterValue"}
+			})
 		})
 
-		publishMessagesWithMessageLogic(qName, "key1", 10, func(msg *amqp.Message) {
-			msg.ApplicationProperties = map[string]interface{}{"key1": "value1", "constFilterKey": "constFilterValue"}
+		AfterEach(func() {
+			Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(Succeed())
+			Expect(connection.Close(context.Background())).To(Succeed())
 		})
 
-		publishMessagesWithMessageLogic(qName, "key2", 10, func(msg *amqp.Message) {
-			msg.ApplicationProperties = map[string]interface{}{"key2": "value2", "constFilterKey": "constFilterValue"}
-		})
-
-		publishMessagesWithMessageLogic(qName, "key3", 10, func(msg *amqp.Message) {
-			msg.ApplicationProperties = map[string]interface{}{"key3": "value3", "constFilterKey": "constFilterValue"}
-		})
-
-		var wg sync.WaitGroup
-		wg.Add(3)
 		DescribeTable("consumer should filter messages based on application properties", func(key string, value any, label string) {
 
 			consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
@@ -375,93 +384,96 @@ var _ = Describe("Consumer stream test", func() {
 				Expect(dc.Accept(context.Background())).To(BeNil())
 			}
 			Expect(consumer.Close(context.Background())).To(BeNil())
-			wg.Done()
 		},
 			Entry("key1 value1", "key1", "value1", "key1"),
 			Entry("key2 value2", "key2", "value2", "key2"),
 			Entry("key3 value3", "key3", "value3", "key3"),
 		)
-		go func() {
-			wg.Wait()
-			Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
-			Expect(connection.Close(context.Background())).To(BeNil())
-		}()
-
 	})
 
 	Describe("consumer should filter messages based on properties", func() {
 		/*
 			Test the consumer should filter messages based on properties
 		*/
-		// TODO: defer cleanup to delete the stream queue
-		qName := generateName("consumer should filter messages based on properties")
-		qName += time.Now().String()
-		connection, err := Dial(context.Background(), "amqp://", nil)
-		Expect(err).To(BeNil())
-		queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
-			Name: qName,
+		var (
+			qName      string
+			connection *AmqpConnection
+		)
+
+		BeforeEach(func() {
+			qName = generateName("consumer should filter messages based on properties")
+			qName += time.Now().String()
+			var err error
+			connection, err = Dial(context.Background(), "amqp://", nil)
+			Expect(err).ToNot(HaveOccurred())
+			queueInfo, err := connection.Management().DeclareQueue(context.Background(), &StreamQueueSpecification{
+				Name: qName,
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(queueInfo).NotTo(BeNil())
+
+			publishMessagesWithMessageLogic(qName, "MessageID", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{MessageID: "MessageID"}
+			})
+
+			publishMessagesWithMessageLogic(qName, "Subject", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{Subject: ptr("Subject")}
+			})
+
+			publishMessagesWithMessageLogic(qName, "ReplyTo", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{ReplyTo: ptr("ReplyTo")}
+			})
+
+			publishMessagesWithMessageLogic(qName, "ContentType", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{ContentType: ptr("ContentType")}
+			})
+
+			publishMessagesWithMessageLogic(qName, "ContentEncoding", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{ContentEncoding: ptr("ContentEncoding")}
+			})
+
+			publishMessagesWithMessageLogic(qName, "GroupID", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{GroupID: ptr("GroupID")}
+			})
+
+			publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}
+			})
+
+			// GroupSequence
+			publishMessagesWithMessageLogic(qName, "GroupSequence", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{GroupSequence: ptr(uint32(137))}
+			})
+
+			// ReplyToGroupID
+			publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}
+			})
+
+			// CreationTime
+
+			publishMessagesWithMessageLogic(qName, "CreationTime", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{CreationTime: ptr(createDateTime())}
+			})
+
+			// AbsoluteExpiryTime
+
+			publishMessagesWithMessageLogic(qName, "AbsoluteExpiryTime", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{AbsoluteExpiryTime: ptr(createDateTime())}
+			})
+
+			// CorrelationID
+
+			publishMessagesWithMessageLogic(qName, "CorrelationID", 10, func(msg *amqp.Message) {
+				msg.Properties = &amqp.MessageProperties{CorrelationID: "CorrelationID"}
+			})
 		})
-		Expect(err).To(BeNil())
-		Expect(queueInfo).NotTo(BeNil())
 
-		publishMessagesWithMessageLogic(qName, "MessageID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{MessageID: "MessageID"}
+		AfterEach(func() {
+			Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+			Expect(connection.Close(context.Background())).To(BeNil())
 		})
 
-		publishMessagesWithMessageLogic(qName, "Subject", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{Subject: ptr("Subject")}
-		})
-
-		publishMessagesWithMessageLogic(qName, "ReplyTo", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ReplyTo: ptr("ReplyTo")}
-		})
-
-		publishMessagesWithMessageLogic(qName, "ContentType", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ContentType: ptr("ContentType")}
-		})
-
-		publishMessagesWithMessageLogic(qName, "ContentEncoding", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ContentEncoding: ptr("ContentEncoding")}
-		})
-
-		publishMessagesWithMessageLogic(qName, "GroupID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{GroupID: ptr("GroupID")}
-		})
-
-		publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}
-		})
-
-		// GroupSequence
-		publishMessagesWithMessageLogic(qName, "GroupSequence", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{GroupSequence: ptr(uint32(137))}
-		})
-
-		// ReplyToGroupID
-		publishMessagesWithMessageLogic(qName, "ReplyToGroupID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{ReplyToGroupID: ptr("ReplyToGroupID")}
-		})
-
-		// CreationTime
-
-		publishMessagesWithMessageLogic(qName, "CreationTime", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{CreationTime: ptr(createDateTime())}
-		})
-
-		// AbsoluteExpiryTime
-
-		publishMessagesWithMessageLogic(qName, "AbsoluteExpiryTime", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{AbsoluteExpiryTime: ptr(createDateTime())}
-		})
-
-		// CorrelationID
-
-		publishMessagesWithMessageLogic(qName, "CorrelationID", 10, func(msg *amqp.Message) {
-			msg.Properties = &amqp.MessageProperties{CorrelationID: "CorrelationID"}
-		})
-
-		var wg sync.WaitGroup
-		wg.Add(12)
 		DescribeTable("consumer should filter messages based on properties", func(properties *amqp.MessageProperties, label string) {
 
 			consumer, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
@@ -533,7 +545,6 @@ var _ = Describe("Consumer stream test", func() {
 				Expect(dc.Accept(context.Background())).To(BeNil())
 			}
 			Expect(consumer.Close(context.Background())).To(BeNil())
-			wg.Done()
 		},
 			Entry("MessageID", &amqp.MessageProperties{MessageID: "MessageID"}, "MessageID"),
 			Entry("Subject", &amqp.MessageProperties{Subject: ptr("Subject")}, "Subject"),
@@ -548,11 +559,6 @@ var _ = Describe("Consumer stream test", func() {
 			Entry("AbsoluteExpiryTime", &amqp.MessageProperties{AbsoluteExpiryTime: ptr(createDateTime())}, "AbsoluteExpiryTime"),
 			Entry("CorrelationID", &amqp.MessageProperties{CorrelationID: "CorrelationID"}, "CorrelationID"),
 		)
-		go func() {
-			wg.Wait()
-			Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
-			Expect(connection.Close(context.Background())).To(BeNil())
-		}()
 	})
 
 	It("SQL filter consumer", func() {
