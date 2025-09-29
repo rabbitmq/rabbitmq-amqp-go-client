@@ -350,19 +350,11 @@ const (
 	Headers TExchangeType = "headers"
 )
 
-type ExchangeType struct {
-	Type TExchangeType
-}
-
-func (e ExchangeType) String() string {
-	return string(e.Type)
-}
-
 // IExchangeSpecification represents the specification of an exchange
 type IExchangeSpecification interface {
 	name() string
 	isAutoDelete() bool
-	exchangeType() ExchangeType
+	exchangeType() TExchangeType
 	arguments() map[string]any
 }
 
@@ -380,8 +372,8 @@ func (d *DirectExchangeSpecification) isAutoDelete() bool {
 	return d.IsAutoDelete
 }
 
-func (d *DirectExchangeSpecification) exchangeType() ExchangeType {
-	return ExchangeType{Type: Direct}
+func (d *DirectExchangeSpecification) exchangeType() TExchangeType {
+	return Direct
 }
 
 func (d *DirectExchangeSpecification) arguments() map[string]any {
@@ -402,8 +394,8 @@ func (t *TopicExchangeSpecification) isAutoDelete() bool {
 	return t.IsAutoDelete
 }
 
-func (t *TopicExchangeSpecification) exchangeType() ExchangeType {
-	return ExchangeType{Type: Topic}
+func (t *TopicExchangeSpecification) exchangeType() TExchangeType {
+	return Topic
 }
 
 func (t *TopicExchangeSpecification) arguments() map[string]any {
@@ -424,8 +416,8 @@ func (f *FanOutExchangeSpecification) isAutoDelete() bool {
 	return f.IsAutoDelete
 }
 
-func (f *FanOutExchangeSpecification) exchangeType() ExchangeType {
-	return ExchangeType{Type: FanOut}
+func (f *FanOutExchangeSpecification) exchangeType() TExchangeType {
+	return FanOut
 }
 
 func (f *FanOutExchangeSpecification) arguments() map[string]any {
@@ -446,8 +438,8 @@ func (h *HeadersExchangeSpecification) isAutoDelete() bool {
 	return h.IsAutoDelete
 }
 
-func (h *HeadersExchangeSpecification) exchangeType() ExchangeType {
-	return ExchangeType{Type: Headers}
+func (h *HeadersExchangeSpecification) exchangeType() TExchangeType {
+	return Headers
 }
 
 func (h *HeadersExchangeSpecification) arguments() map[string]any {
@@ -469,8 +461,8 @@ func (c *CustomExchangeSpecification) isAutoDelete() bool {
 	return c.IsAutoDelete
 }
 
-func (c *CustomExchangeSpecification) exchangeType() ExchangeType {
-	return ExchangeType{Type: TExchangeType(c.ExchangeTypeName)}
+func (c *CustomExchangeSpecification) exchangeType() TExchangeType {
+	return TExchangeType(c.ExchangeTypeName)
 }
 
 func (c *CustomExchangeSpecification) arguments() map[string]any {
