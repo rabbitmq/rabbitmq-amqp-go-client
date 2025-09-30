@@ -92,9 +92,9 @@ func (a *AmqpQueue) Arguments(arguments map[string]any) {
 	a.arguments = arguments
 }
 
-func (a *AmqpQueue) QueueType(queueType QueueType) {
-	if len(queueType.String()) != 0 {
-		a.arguments["x-queue-type"] = queueType.String()
+func (a *AmqpQueue) QueueType(queueType TQueueType) {
+	if len(string(queueType)) != 0 {
+		a.arguments["x-queue-type"] = string(queueType)
 	}
 }
 

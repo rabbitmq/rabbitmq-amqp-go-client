@@ -3,6 +3,7 @@ package rabbitmqamqp
 import (
 	"context"
 	"errors"
+
 	"github.com/Azure/go-amqp"
 )
 
@@ -23,14 +24,14 @@ type AmqpExchange struct {
 	management   *AmqpManagement
 	arguments    map[string]any
 	isAutoDelete bool
-	exchangeType ExchangeType
+	exchangeType TExchangeType
 }
 
 func newAmqpExchange(management *AmqpManagement, name string) *AmqpExchange {
 	return &AmqpExchange{management: management,
 		name:         name,
 		arguments:    make(map[string]any),
-		exchangeType: ExchangeType{Type: Direct},
+		exchangeType: Direct,
 	}
 }
 
@@ -46,7 +47,7 @@ func (e *AmqpExchange) Declare(ctx context.Context) (*AmqpExchangeInfo, error) {
 	kv := make(map[string]any)
 	kv["auto_delete"] = e.isAutoDelete
 	kv["durable"] = true
-	kv["type"] = e.exchangeType.String()
+	kv["type"] = string(e.exchangeType)
 	if e.arguments != nil {
 		kv["arguments"] = e.arguments
 	}
@@ -78,14 +79,14 @@ func (e *AmqpExchange) Delete(ctx context.Context) error {
 	return err
 }
 
-func (e *AmqpExchange) ExchangeType(exchangeType ExchangeType) {
-	if len(exchangeType.Type) > 0 {
+func (e *AmqpExchange) ExchangeType(exchangeType TExchangeType) {
+	if len(exchangeType) > 0 {
 		e.exchangeType = exchangeType
 	}
 }
 
 func (e *AmqpExchange) GetExchangeType() TExchangeType {
-	return e.exchangeType.Type
+	return e.exchangeType
 }
 
 func (e *AmqpExchange) Name() string {
