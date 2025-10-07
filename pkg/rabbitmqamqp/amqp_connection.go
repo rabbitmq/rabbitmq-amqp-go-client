@@ -45,6 +45,20 @@ func (o OAuth2Options) Clone() *OAuth2Options {
 
 }
 
+// TopologyRecoveryOptions is used to configure the topology recovery behavior of the connection.
+// See [TopologyRecoveryDisabled], [TopologyRecoveryOnlyTransientQueues], and [TopologyRecoveryAllEnabled] for more information.
+type TopologyRecoveryOptions byte
+
+const (
+	// TopologyRecoveryDisabled disables the topology recovery.
+	TopologyRecoveryDisabled TopologyRecoveryOptions = iota
+	// TopologyRecoveryOnlyTransientQueues recovers only queues declared as exclusive and/or auto delete, and
+	// related bindings. Exchanges are not recovered.
+	TopologyRecoveryOnlyTransientQueues
+	// TopologyRecoveryAllEnabled recovers all the topology. All exchanges, queues, and bindings are recovered.
+	TopologyRecoveryAllEnabled
+)
+
 type AmqpConnOptions struct {
 	// wrapper for amqp.ConnOptions
 	ContainerID string
@@ -75,6 +89,9 @@ type AmqpConnOptions struct {
 	// RecoveryConfiguration is used to configure the recovery behavior of the connection.
 	// when the connection is closed unexpectedly.
 	RecoveryConfiguration *RecoveryConfiguration
+
+	// TopologyRecoveryOptions is used to configure the topology recovery behavior of the connection.
+	TopologyRecoveryOptions TopologyRecoveryOptions
 
 	// The OAuth2Options is used to configure the connection with OAuth2 token.
 	OAuth2Options *OAuth2Options
@@ -116,16 +133,17 @@ type AmqpConnection struct {
 	properties        map[string]any
 	featuresAvailable *featuresAvailable
 
-	azureConnection *amqp.Conn
-	management      *AmqpManagement
-	lifeCycle       *LifeCycle
-	amqpConnOptions *AmqpConnOptions
-	address         string
-	session         *amqp.Session
-	refMap          *sync.Map
-	entitiesTracker *entitiesTracker
-	mutex           sync.RWMutex
-	closed          bool
+	azureConnection         *amqp.Conn
+	management              *AmqpManagement
+	lifeCycle               *LifeCycle
+	amqpConnOptions         *AmqpConnOptions
+	address                 string
+	session                 *amqp.Session
+	refMap                  *sync.Map
+	entitiesTracker         *entitiesTracker
+	topologyRecoveryRecords *topologyRecoveryRecords
+	mutex                   sync.RWMutex
+	closed                  bool
 }
 
 func (a *AmqpConnection) Properties() map[string]any {
@@ -321,15 +339,18 @@ func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*A
 	if err != nil {
 		return nil, err
 	}
-
 	// create the connection
 	conn := &AmqpConnection{
-		management:        newAmqpManagement(),
-		lifeCycle:         NewLifeCycle(),
-		amqpConnOptions:   connOptions,
-		entitiesTracker:   newEntitiesTracker(),
-		featuresAvailable: newFeaturesAvailable(),
+		management:              newAmqpManagement(connOptions.TopologyRecoveryOptions),
+		lifeCycle:               NewLifeCycle(),
+		amqpConnOptions:         connOptions,
+		entitiesTracker:         newEntitiesTracker(),
+		topologyRecoveryRecords: newTopologyRecoveryRecords(),
+		featuresAvailable:       newFeaturesAvailable(),
 	}
+
+	// management needs to access the connection to manage the recovery records
+	conn.management.topologyRecoveryRecords = conn.topologyRecoveryRecords
 
 	err = conn.open(ctx, address, connOptions)
 	if err != nil {
@@ -497,6 +518,7 @@ func (a *AmqpConnection) maybeReconnect() {
 
 		if err == nil {
 			a.restartEntities()
+			// TODO: integration point for topology recovery
 			a.lifeCycle.SetState(&StateOpen{})
 			return
 		}

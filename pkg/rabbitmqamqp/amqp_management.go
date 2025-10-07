@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -23,11 +24,16 @@ type AmqpManagement struct {
 	sender    *amqp.Sender
 	receiver  *amqp.Receiver
 	lifeCycle *LifeCycle
+	// Topology Recovery Options and Records are references from AmqpConnection
+	// to manage the topology recovery records.
+	topologyRecoveryOptions TopologyRecoveryOptions
+	topologyRecoveryRecords *topologyRecoveryRecords
 }
 
-func newAmqpManagement() *AmqpManagement {
+func newAmqpManagement(topologyRecovery TopologyRecoveryOptions) *AmqpManagement {
 	return &AmqpManagement{
-		lifeCycle: NewLifeCycle(),
+		lifeCycle:               NewLifeCycle(),
+		topologyRecoveryOptions: topologyRecovery,
 	}
 }
 
@@ -180,16 +186,41 @@ func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueS
 
 	amqpQueue := newAmqpQueue(a, specification.name())
 	amqpQueue.AutoDelete(specification.isAutoDelete())
+	// TODO: config tweak to record only exclusive queues
 	amqpQueue.Exclusive(specification.isExclusive())
 	amqpQueue.QueueType(specification.queueType())
 	amqpQueue.Arguments(specification.buildArguments())
+	info, err := amqpQueue.Declare(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	return amqpQueue.Declare(ctx)
+	if a.shouldAddQueueRecoveryRecord(specification) {
+		recoveryRecord := queueRecoveryRecord{
+			queueName: specification.name(),
+			queueType: specification.queueType(),
+		}
+		if specification.queueType() == Classic {
+			recoveryRecord.autoDelete = ptr(specification.isAutoDelete())
+			recoveryRecord.exclusive = ptr(specification.isExclusive())
+		}
+		a.topologyRecoveryRecords.addQueueRecord(recoveryRecord)
+	}
+
+	return info, nil
 }
 
 func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	q := newAmqpQueue(a, name)
-	return q.Delete(ctx)
+	err := q.Delete(ctx)
+	if err != nil {
+		return err
+	}
+	a.topologyRecoveryRecords.removeQueueRecord(queueRecoveryRecord{
+		queueName: name,
+	})
+	a.topologyRecoveryRecords.removeBindingRecordByDestinationQueue(name)
+	return nil
 }
 
 func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification IExchangeSpecification) (*AmqpExchangeInfo, error) {
@@ -201,12 +232,30 @@ func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecificat
 	exchange.AutoDelete(exchangeSpecification.isAutoDelete())
 	exchange.ExchangeType(exchangeSpecification.exchangeType())
 	exchange.Arguments(exchangeSpecification.arguments())
-	return exchange.Declare(ctx)
+	r, err := exchange.Declare(ctx)
+	if err != nil {
+		return nil, err
+	}
+	a.topologyRecoveryRecords.addExchangeRecord(exchangeRecoveryRecord{
+		exchangeName: exchangeSpecification.name(),
+		exchangeType: exchangeSpecification.exchangeType(),
+		autoDelete:   exchangeSpecification.isAutoDelete(),
+		arguments:    exchangeSpecification.arguments(),
+	})
+	return r, nil
 }
 
 func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error {
 	e := newAmqpExchange(a, name)
-	return e.Delete(ctx)
+	err := e.Delete(ctx)
+	if err != nil {
+		return err
+	}
+	a.topologyRecoveryRecords.removeExchangeRecord(exchangeRecoveryRecord{
+		exchangeName: name,
+	})
+	a.topologyRecoveryRecords.removeBindingRecordBySourceExchange(name)
+	return nil
 }
 
 func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBindingSpecification) (string, error) {
@@ -219,13 +268,31 @@ func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBinding
 	bind.Destination(bindingSpecification.destination(), bindingSpecification.isDestinationQueue())
 	bind.BindingKey(bindingSpecification.bindingKey())
 	bind.Arguments(bindingSpecification.arguments())
-	return bind.Bind(ctx)
-
+	r, err := bind.Bind(ctx)
+	if err != nil {
+		return "", err
+	}
+	a.topologyRecoveryRecords.addBindingRecord(bindingRecoveryRecord{
+		sourceExchange:     bindingSpecification.sourceExchange(),
+		destination:        bindingSpecification.destination(),
+		isDestinationQueue: bindingSpecification.isDestinationQueue(),
+		bindingKey:         bindingSpecification.bindingKey(),
+		arguments:          bindingSpecification.arguments(),
+		path:               r,
+	})
+	return r, nil
 }
+
 func (a *AmqpManagement) Unbind(ctx context.Context, path string) error {
 	bind := newAMQPBinding(a)
-	return bind.Unbind(ctx, path)
+	err := bind.Unbind(ctx, path)
+	if err != nil {
+		return err
+	}
+	a.topologyRecoveryRecords.removeBindingRecord(path)
+	return nil
 }
+
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*AmqpQueueInfo, error) {
 	path, err := queueAddress(&queueName)
 	if err != nil {
@@ -256,4 +323,20 @@ func (a *AmqpManagement) NotifyStatusChange(channel chan *StateChanged) {
 
 func (a *AmqpManagement) State() ILifeCycleState {
 	return a.lifeCycle.State()
+}
+
+func (a *AmqpManagement) shouldAddQueueRecoveryRecord(specification IQueueSpecification) bool {
+	isTransient := specification.isExclusive() || specification.isAutoDelete()
+	return a.topologyRecoveryOptions == TopologyRecoveryAllEnabled ||
+		(a.topologyRecoveryOptions == TopologyRecoveryOnlyTransientQueues && isTransient)
+}
+
+func (a *AmqpManagement) isQueueDestinationForBindingTransient(binding IBindingSpecification) bool {
+	if !binding.isDestinationQueue() {
+		return false
+	}
+	return slices.ContainsFunc(a.topologyRecoveryRecords.queues, func(queue queueRecoveryRecord) bool {
+		isTransient := (queue.autoDelete != nil && *queue.autoDelete) || (queue.exclusive != nil && *queue.exclusive)
+		return queue.queueName == binding.destination() && isTransient
+	})
 }
