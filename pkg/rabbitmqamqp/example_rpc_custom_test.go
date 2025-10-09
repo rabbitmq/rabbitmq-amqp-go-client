@@ -1,3 +1,6 @@
+//go:build rmq.example
+// +build rmq.example
+
 package rabbitmqamqp_test
 
 import (

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/Azure/go-amqp"
@@ -28,6 +29,11 @@ type AmqpManagement struct {
 	// to manage the topology recovery records.
 	topologyRecoveryOptions TopologyRecoveryOptions
 	topologyRecoveryRecords *topologyRecoveryRecords
+	// isRecovering indicates whether we're currently recovering topology
+	// to prevent duplicate recovery records. Protected by atomic operations
+	// since recovery happens in a separate goroutine while public API methods
+	// can be called from user goroutines.
+	isRecovering atomic.Bool
 }
 
 func newAmqpManagement(topologyRecovery TopologyRecoveryOptions) *AmqpManagement {
@@ -195,7 +201,7 @@ func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueS
 		return nil, err
 	}
 
-	if a.shouldAddQueueRecoveryRecord(specification) {
+	if !a.isRecovering.Load() && a.shouldAddQueueRecoveryRecord(specification) {
 		recoveryRecord := queueRecoveryRecord{
 			queueName: specification.name(),
 			queueType: specification.queueType(),
@@ -216,9 +222,7 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	a.topologyRecoveryRecords.removeQueueRecord(queueRecoveryRecord{
-		queueName: name,
-	})
+	a.topologyRecoveryRecords.removeQueueRecord(name)
 	a.topologyRecoveryRecords.removeBindingRecordByDestinationQueue(name)
 	return nil
 }
@@ -236,12 +240,16 @@ func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecificat
 	if err != nil {
 		return nil, err
 	}
-	a.topologyRecoveryRecords.addExchangeRecord(exchangeRecoveryRecord{
-		exchangeName: exchangeSpecification.name(),
-		exchangeType: exchangeSpecification.exchangeType(),
-		autoDelete:   exchangeSpecification.isAutoDelete(),
-		arguments:    exchangeSpecification.arguments(),
-	})
+
+	if !a.isRecovering.Load() && a.shouldAddExchangeRecoveryRecord(exchangeSpecification) {
+		a.topologyRecoveryRecords.addExchangeRecord(exchangeRecoveryRecord{
+			exchangeName: exchangeSpecification.name(),
+			exchangeType: exchangeSpecification.exchangeType(),
+			autoDelete:   exchangeSpecification.isAutoDelete(),
+			arguments:    exchangeSpecification.arguments(),
+		})
+	}
+
 	return r, nil
 }
 
@@ -251,9 +259,7 @@ func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error 
 	if err != nil {
 		return err
 	}
-	a.topologyRecoveryRecords.removeExchangeRecord(exchangeRecoveryRecord{
-		exchangeName: name,
-	})
+	a.topologyRecoveryRecords.removeExchangeRecord(name)
 	a.topologyRecoveryRecords.removeBindingRecordBySourceExchange(name)
 	return nil
 }
@@ -272,14 +278,18 @@ func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBinding
 	if err != nil {
 		return "", err
 	}
-	a.topologyRecoveryRecords.addBindingRecord(bindingRecoveryRecord{
-		sourceExchange:     bindingSpecification.sourceExchange(),
-		destination:        bindingSpecification.destination(),
-		isDestinationQueue: bindingSpecification.isDestinationQueue(),
-		bindingKey:         bindingSpecification.bindingKey(),
-		arguments:          bindingSpecification.arguments(),
-		path:               r,
-	})
+
+	if !a.isRecovering.Load() && a.shouldAddBindingRecoveryRecord(bindingSpecification) {
+		a.topologyRecoveryRecords.addBindingRecord(bindingRecoveryRecord{
+			sourceExchange:     bindingSpecification.sourceExchange(),
+			destination:        bindingSpecification.destination(),
+			isDestinationQueue: bindingSpecification.isDestinationQueue(),
+			bindingKey:         bindingSpecification.bindingKey(),
+			arguments:          bindingSpecification.arguments(),
+			path:               r,
+		})
+	}
+
 	return r, nil
 }
 
@@ -328,7 +338,25 @@ func (a *AmqpManagement) State() ILifeCycleState {
 func (a *AmqpManagement) shouldAddQueueRecoveryRecord(specification IQueueSpecification) bool {
 	isTransient := specification.isExclusive() || specification.isAutoDelete()
 	return a.topologyRecoveryOptions == TopologyRecoveryAllEnabled ||
-		(a.topologyRecoveryOptions == TopologyRecoveryOnlyTransientQueues && isTransient)
+		(a.topologyRecoveryOptions == TopologyRecoveryOnlyTransient && isTransient)
+}
+
+func (a *AmqpManagement) shouldAddExchangeRecoveryRecord(specification IExchangeSpecification) bool {
+	isTransient := specification.isAutoDelete()
+	return a.topologyRecoveryOptions == TopologyRecoveryAllEnabled ||
+		(a.topologyRecoveryOptions == TopologyRecoveryOnlyTransient && isTransient)
+}
+
+func (a *AmqpManagement) shouldAddBindingRecoveryRecord(specification IBindingSpecification) bool {
+	if a.topologyRecoveryOptions == TopologyRecoveryAllEnabled {
+		return true
+	}
+	if a.topologyRecoveryOptions == TopologyRecoveryOnlyTransient {
+		if a.isExchangeSourceForBindingTransient(specification) || a.isQueueDestinationForBindingTransient(specification) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *AmqpManagement) isQueueDestinationForBindingTransient(binding IBindingSpecification) bool {
@@ -339,4 +367,12 @@ func (a *AmqpManagement) isQueueDestinationForBindingTransient(binding IBindingS
 		isTransient := (queue.autoDelete != nil && *queue.autoDelete) || (queue.exclusive != nil && *queue.exclusive)
 		return queue.queueName == binding.destination() && isTransient
 	})
+}
+
+func (a *AmqpManagement) isExchangeSourceForBindingTransient(binding IBindingSpecification) bool {
+	result := slices.ContainsFunc(a.topologyRecoveryRecords.exchanges, func(exchange exchangeRecoveryRecord) bool {
+		isTransient := exchange.autoDelete
+		return exchange.exchangeName == binding.sourceExchange() && isTransient
+	})
+	return result
 }

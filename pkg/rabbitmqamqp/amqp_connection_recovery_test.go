@@ -367,7 +367,7 @@ var _ = Describe("Recovery connection test", func() {
 
 				BeforeEach(func() {
 					var err error
-					conn, err = Dial(context.Background(), "amqp://", nil)
+					conn, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryAllEnabled})
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -458,7 +458,7 @@ var _ = Describe("Recovery connection test", func() {
 
 				BeforeEach(func() {
 					var err error
-					conn, err = Dial(context.Background(), "amqp://", nil)
+					conn, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryAllEnabled})
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -659,7 +659,7 @@ var _ = Describe("Recovery connection test", func() {
 
 			BeforeEach(func() {
 				var err error
-				conn, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransientQueues})
+				conn, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransient})
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -686,7 +686,7 @@ var _ = Describe("Recovery connection test", func() {
 				})
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() {
-					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransientQueues})
+					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransient})
 					_ = c.Management().DeleteExchange(context.Background(), e.Name())
 					_ = c.Management().DeleteQueue(context.Background(), q.Name())
 					_ = c.Management().Unbind(context.Background(), b)
@@ -709,8 +709,10 @@ var _ = Describe("Recovery connection test", func() {
 				queueRecord := conn.topologyRecoveryRecords.queues[0]
 				Expect(queueRecord).ToNot(BeNil())
 				Expect(queueRecord.queueName).To(Equal(qt.Name()))
-				Expect(queueRecord.autoDelete).To(BeTrueBecause("queue was declared as auto delete"))
-				Expect(queueRecord.exclusive).To(BeTrueBecause("queue was declared as exclusive"))
+				Expect(queueRecord.autoDelete).ToNot(BeNil())
+				Expect(*queueRecord.autoDelete).To(BeTrueBecause("queue was declared as auto delete"))
+				Expect(queueRecord.exclusive).ToNot(BeNil())
+				Expect(*queueRecord.exclusive).To(BeTrueBecause("queue was declared as exclusive"))
 
 				bt, err := conn.Management().Bind(context.Background(), &ExchangeToQueueBindingSpecification{
 					SourceExchange:   e.Name(),
@@ -726,6 +728,422 @@ var _ = Describe("Recovery connection test", func() {
 				Expect(bindingRecord.isDestinationQueue).To(BeTrueBecause("binding was declared with a queue destination"))
 				Expect(bindingRecord.bindingKey).To(Equal("test-binding-key"))
 				Expect(bindingRecord.path).To(Equal(bt))
+			})
+
+			It("should record auto-delete exchanges as transient", func() {
+				e, err := conn.Management().DeclareExchange(context.Background(), &DirectExchangeSpecification{
+					Name:         generateName("transient-exchange"),
+					IsAutoDelete: true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransient})
+					_ = c.Management().DeleteExchange(context.Background(), e.Name())
+					_ = c.Close(context.Background())
+				})
+
+				By("keeping the auto-delete exchange record")
+				Expect(conn.topologyRecoveryRecords.exchanges).To(HaveLen(1))
+				exchangeRecord := conn.topologyRecoveryRecords.exchanges[0]
+				Expect(exchangeRecord).ToNot(BeNil())
+				Expect(exchangeRecord.exchangeName).To(Equal(e.Name()))
+				Expect(exchangeRecord.exchangeType).To(Equal(Direct))
+				Expect(exchangeRecord.autoDelete).To(BeTrueBecause("exchange was declared as auto delete"))
+			})
+
+			It("should not record persistent exchanges", func() {
+				e, err := conn.Management().DeclareExchange(context.Background(), &TopicExchangeSpecification{
+					Name:         generateName("persistent-topic-exchange"),
+					IsAutoDelete: false,
+				})
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransient})
+					_ = c.Management().DeleteExchange(context.Background(), e.Name())
+					_ = c.Close(context.Background())
+				})
+
+				By("not keeping the persistent exchange record")
+				Expect(conn.topologyRecoveryRecords.exchanges).To(BeEmpty())
+			})
+		})
+
+		Context("with TopologyRecoveryDisabled", func() {
+			var (
+				conn *AmqpConnection
+			)
+
+			BeforeEach(func() {
+				var err error
+				conn, err = Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryDisabled})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AfterEach(func() {
+				Expect(conn.Close(context.Background())).To(Succeed())
+			})
+
+			It("should not record any exchanges", func() {
+				e1, err := conn.Management().DeclareExchange(context.Background(), &DirectExchangeSpecification{
+					Name:         generateName("persistent-exchange-disabled"),
+					IsAutoDelete: false,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				e2, err := conn.Management().DeclareExchange(context.Background(), &FanOutExchangeSpecification{
+					Name:         generateName("transient-exchange-disabled"),
+					IsAutoDelete: true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryDisabled})
+					_ = c.Management().DeleteExchange(context.Background(), e1.Name())
+					_ = c.Management().DeleteExchange(context.Background(), e2.Name())
+					_ = c.Close(context.Background())
+				})
+
+				By("not keeping any exchange records regardless of auto-delete flag")
+				Expect(conn.topologyRecoveryRecords.exchanges).To(BeEmpty())
+			})
+
+			It("should not record any queues", func() {
+				q1, err := conn.Management().DeclareQueue(context.Background(), &ClassicQueueSpecification{
+					Name:         generateName("persistent-queue-disabled"),
+					IsAutoDelete: false,
+					IsExclusive:  false,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				q2, err := conn.Management().DeclareQueue(context.Background(), &ClassicQueueSpecification{
+					Name:         generateName("transient-queue-disabled"),
+					IsAutoDelete: true,
+					IsExclusive:  true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryDisabled})
+					_ = c.Management().DeleteQueue(context.Background(), q1.Name())
+					_ = c.Management().DeleteQueue(context.Background(), q2.Name())
+					_ = c.Close(context.Background())
+				})
+
+				By("not keeping any queue records regardless of transient flags")
+				Expect(conn.topologyRecoveryRecords.queues).To(BeEmpty())
+			})
+
+			It("should not record any bindings", func() {
+				q, err := conn.Management().DeclareQueue(context.Background(), &ClassicQueueSpecification{
+					Name:        generateName("queue-disabled"),
+					IsExclusive: true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				b, err := conn.Management().Bind(context.Background(), &ExchangeToQueueBindingSpecification{
+					SourceExchange:   "amq.direct",
+					DestinationQueue: q.Name(),
+					BindingKey:       "test-binding-key",
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryDisabled})
+					_ = c.Management().Unbind(context.Background(), b)
+					_ = c.Management().DeleteQueue(context.Background(), q.Name())
+					_ = c.Close(context.Background())
+				})
+
+				By("not keeping any binding records")
+				Expect(conn.topologyRecoveryRecords.bindings).To(BeEmpty())
+			})
+		})
+
+		Context("exchange recovery behavior with different types", func() {
+			It("should handle all exchange types with TopologyRecoveryAllEnabled", func() {
+				conn, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryAllEnabled})
+				Expect(err).ToNot(HaveOccurred())
+				defer conn.Close(context.Background())
+
+				exchangeSpecs := []IExchangeSpecification{
+					&DirectExchangeSpecification{
+						Name:         generateName("direct-ex"),
+						IsAutoDelete: false,
+					},
+					&TopicExchangeSpecification{
+						Name:         generateName("topic-ex"),
+						IsAutoDelete: false,
+					},
+					&FanOutExchangeSpecification{
+						Name:         generateName("fanout-ex"),
+						IsAutoDelete: true,
+					},
+					&HeadersExchangeSpecification{
+						Name:         generateName("headers-ex"),
+						IsAutoDelete: true,
+					},
+				}
+
+				for _, spec := range exchangeSpecs {
+					_, err := conn.Management().DeclareExchange(context.Background(), spec)
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", nil)
+					for _, spec := range exchangeSpecs {
+						_ = c.Management().DeleteExchange(context.Background(), spec.name())
+					}
+					_ = c.Close(context.Background())
+				})
+
+				By("recording all exchange types")
+				Expect(conn.topologyRecoveryRecords.exchanges).To(HaveLen(4))
+
+				By("verifying each exchange record")
+				for i, spec := range exchangeSpecs {
+					record := conn.topologyRecoveryRecords.exchanges[i]
+					Expect(record.exchangeName).To(Equal(spec.name()))
+					Expect(record.exchangeType).To(Equal(spec.exchangeType()))
+					Expect(record.autoDelete).To(Equal(spec.isAutoDelete()))
+				}
+			})
+
+			It("should handle only auto-delete exchanges with TopologyRecoveryOnlyTransientQueues", func() {
+				conn, err := Dial(context.Background(), "amqp://", &AmqpConnOptions{TopologyRecoveryOptions: TopologyRecoveryOnlyTransient})
+				Expect(err).ToNot(HaveOccurred())
+				defer conn.Close(context.Background())
+
+				// Persistent exchanges - should NOT be recorded
+				persistentExchanges := []IExchangeSpecification{
+					&DirectExchangeSpecification{
+						Name:         generateName("persistent-direct"),
+						IsAutoDelete: false,
+					},
+					&TopicExchangeSpecification{
+						Name:         generateName("persistent-topic"),
+						IsAutoDelete: false,
+					},
+				}
+
+				// Transient exchanges - SHOULD be recorded
+				transientExchanges := []IExchangeSpecification{
+					&FanOutExchangeSpecification{
+						Name:         generateName("transient-fanout"),
+						IsAutoDelete: true,
+					},
+					&HeadersExchangeSpecification{
+						Name:         generateName("transient-headers"),
+						IsAutoDelete: true,
+					},
+				}
+
+				allExchanges := append(persistentExchanges, transientExchanges...)
+
+				for _, spec := range allExchanges {
+					_, err := conn.Management().DeclareExchange(context.Background(), spec)
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				DeferCleanup(func() {
+					c, _ := Dial(context.Background(), "amqp://", nil)
+					for _, spec := range allExchanges {
+						_ = c.Management().DeleteExchange(context.Background(), spec.name())
+					}
+					_ = c.Close(context.Background())
+				})
+
+				By("recording only auto-delete exchanges")
+				Expect(conn.topologyRecoveryRecords.exchanges).To(HaveLen(2))
+
+				By("verifying that only transient exchanges were recorded")
+				for i, spec := range transientExchanges {
+					record := conn.topologyRecoveryRecords.exchanges[i]
+					Expect(record.exchangeName).To(Equal(spec.name()))
+					Expect(record.exchangeType).To(Equal(spec.exchangeType()))
+					Expect(record.autoDelete).To(BeTrue())
+				}
+			})
+		})
+
+		Context("end-to-end tests", func() {
+			var (
+				env         *Environment
+				containerId string
+			)
+
+			BeforeEach(func() {
+				containerId = CurrentSpecReport().LeafNodeText
+				env = NewEnvironment("amqp://", &AmqpConnOptions{
+					TopologyRecoveryOptions: TopologyRecoveryOnlyTransient,
+					ContainerID:             containerId,
+					SASLType:                amqp.SASLTypeAnonymous(),
+					RecoveryConfiguration: &RecoveryConfiguration{
+						ActiveRecovery:           true,
+						BackOffReconnectInterval: 2 * time.Second,
+						MaxReconnectAttempts:     5,
+					},
+					Id: containerId,
+				})
+			})
+
+			AfterEach(func(ctx context.Context) {
+				env.CloseConnections(ctx)
+			})
+
+			It("should recover the topology", func(ctx context.Context) {
+				conn, err := env.NewConnection(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				ch := make(chan *StateChanged, 1)
+				conn.NotifyStatusChange(ch)
+
+				exchange, err := conn.Management().DeclareExchange(ctx, &DirectExchangeSpecification{
+					Name:         generateName("direct-ad-exchange"),
+					IsAutoDelete: true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				queue, err := conn.Management().DeclareQueue(ctx, &ClassicQueueSpecification{
+					Name:         generateName("classic-ad-excl-queue"),
+					IsAutoDelete: true,
+					IsExclusive:  true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = conn.Management().Bind(ctx, &ExchangeToQueueBindingSpecification{
+					SourceExchange:   exchange.Name(),
+					DestinationQueue: queue.Name(),
+					BindingKey:       "test-binding-key",
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				producer, err := conn.NewPublisher(
+					ctx,
+					&ExchangeAddress{Exchange: exchange.Name(), Key: "test-binding-key"},
+					nil,
+				)
+				Expect(err).ToNot(HaveOccurred())
+
+				msg := NewMessage([]byte("hello"))
+				result, err := producer.Publish(ctx, msg)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result.Outcome).To(Equal(&StateAccepted{}))
+
+				consumer, err := conn.NewConsumer(ctx, queue.Name(), nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				msgReceived, err := consumer.Receive(ctx)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(msgReceived.Message().GetData()).To(Equal([]byte("hello")))
+				Expect(msgReceived.Accept(ctx)).To(Succeed())
+
+				// Drop connection
+				Eventually(func() error {
+					return testhelper.DropConnectionContainerID(containerId)
+				}).WithTimeout(5*time.Second).WithPolling(400*time.Millisecond).
+					Should(Succeed(), "expected connection to be closed")
+				stateChange := new(StateChanged)
+				Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(Receive(&stateChange))
+				Expect(stateChange.From).To(Equal(&StateOpen{}))
+				Expect(stateChange.To).To(BeAssignableToTypeOf(&StateClosed{}))
+
+				// Receive reconnecting state
+				Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(Receive())
+
+				By("recovering the connection")
+				// Await reconnection
+				Eventually(func() (bool, error) {
+					conn, err := testhelper.GetConnectionByContainerID(containerId)
+					return conn != nil, err
+				}).WithTimeout(6 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(BeTrueBecause("expected connection to be reconnected"))
+				stateChange = new(StateChanged)
+				Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(Receive(&stateChange))
+				Expect(stateChange.To).To(Equal(&StateOpen{}))
+
+				By("publishing and consuming again")
+				// Publish again
+				msg = NewMessage([]byte("hello again"))
+				result, err = producer.Publish(ctx, msg)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result.Outcome).To(Equal(&StateAccepted{}))
+
+				// Consume again
+				msgReceived, err = consumer.Receive(ctx)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(msgReceived.Message().GetData()).To(Equal([]byte("hello again")))
+				Expect(msgReceived.Accept(ctx)).To(Succeed())
+
+				Expect(conn.Close(ctx)).To(Succeed())
+			})
+
+			It("should not duplicate recovery records", func(ctx context.Context) {
+				conn, err := env.NewConnection(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				q, err := conn.Management().DeclareQueue(ctx, &ClassicQueueSpecification{
+					Name:         generateName("non-duplicate-records-queue"),
+					IsAutoDelete: true,
+					IsExclusive:  true,
+				})
+				Expect(err).ToNot(HaveOccurred())
+				_, err = conn.Management().Bind(ctx, &ExchangeToQueueBindingSpecification{
+					SourceExchange:   "amq.direct",
+					DestinationQueue: q.Name(),
+					BindingKey:       "non-duplicate-records-binding-key",
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(conn.topologyRecoveryRecords.queues).To(HaveLen(1))
+				Expect(conn.topologyRecoveryRecords.bindings).To(HaveLen(1))
+
+				producer, err := conn.NewPublisher(ctx, &ExchangeAddress{Exchange: "amq.direct", Key: "non-duplicate-records-binding-key"}, nil)
+				Expect(err).ToNot(HaveOccurred())
+
+				msg := NewMessage([]byte("hello"))
+				result, err := producer.Publish(ctx, msg)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result.Outcome).To(Equal(&StateAccepted{}))
+
+				ch := make(chan *StateChanged, 1)
+				conn.NotifyStatusChange(ch)
+
+				// Drop connection
+				Eventually(func() error {
+					return testhelper.DropConnectionContainerID(containerId)
+				}).WithTimeout(5*time.Second).WithPolling(400*time.Millisecond).
+					Should(Succeed(), "expected connection to be closed")
+				stateChange := new(StateChanged)
+				Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(Receive(&stateChange))
+				Expect(stateChange.From).To(Equal(&StateOpen{}))
+				Expect(stateChange.To).To(BeAssignableToTypeOf(&StateClosed{}))
+
+				// Receive reconnecting state
+				Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(Receive())
+
+				By("recovering the connection")
+				// Await reconnection
+				Eventually(func() (bool, error) {
+					conn, err := testhelper.GetConnectionByContainerID(containerId)
+					return conn != nil, err
+				}).WithTimeout(6 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(BeTrueBecause("expected connection to be reconnected"))
+				stateChange = new(StateChanged)
+				Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).
+					Should(Receive(&stateChange))
+				Expect(stateChange.To).To(Equal(&StateOpen{}))
+
+				By("verifying that the recovery records are not duplicated")
+				Expect(conn.topologyRecoveryRecords.queues).To(HaveLen(1))
+				Expect(conn.topologyRecoveryRecords.bindings).To(HaveLen(1))
+
+				_ = conn.Close(ctx)
 			})
 		})
 	})

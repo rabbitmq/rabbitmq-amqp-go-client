@@ -210,9 +210,9 @@ func (t *topologyRecoveryRecords) addQueueRecord(record queueRecoveryRecord) {
 	t.queues = append(t.queues, record)
 }
 
-func (t *topologyRecoveryRecords) removeQueueRecord(record queueRecoveryRecord) {
+func (t *topologyRecoveryRecords) removeQueueRecord(queueName string) {
 	t.queues = slices.DeleteFunc(t.queues, func(r queueRecoveryRecord) bool {
-		return r.queueName == record.queueName
+		return r.queueName == queueName
 	})
 }
 
@@ -220,9 +220,9 @@ func (t *topologyRecoveryRecords) addExchangeRecord(record exchangeRecoveryRecor
 	t.exchanges = append(t.exchanges, record)
 }
 
-func (t *topologyRecoveryRecords) removeExchangeRecord(record exchangeRecoveryRecord) {
+func (t *topologyRecoveryRecords) removeExchangeRecord(exchangeName string) {
 	t.exchanges = slices.DeleteFunc(t.exchanges, func(r exchangeRecoveryRecord) bool {
-		return r.exchangeName == record.exchangeName
+		return r.exchangeName == exchangeName
 	})
 }
 

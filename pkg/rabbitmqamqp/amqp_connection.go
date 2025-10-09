@@ -108,15 +108,16 @@ func (a *AmqpConnOptions) isOAuth2() bool {
 func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
 
 	cloned := &AmqpConnOptions{
-		ContainerID:  a.ContainerID,
-		IdleTimeout:  a.IdleTimeout,
-		MaxFrameSize: a.MaxFrameSize,
-		MaxSessions:  a.MaxSessions,
-		Properties:   a.Properties,
-		SASLType:     a.SASLType,
-		TLSConfig:    a.TLSConfig,
-		WriteTimeout: a.WriteTimeout,
-		Id:           a.Id,
+		ContainerID:             a.ContainerID,
+		IdleTimeout:             a.IdleTimeout,
+		MaxFrameSize:            a.MaxFrameSize,
+		MaxSessions:             a.MaxSessions,
+		Properties:              a.Properties,
+		SASLType:                a.SASLType,
+		TLSConfig:               a.TLSConfig,
+		WriteTimeout:            a.WriteTimeout,
+		Id:                      a.Id,
+		TopologyRecoveryOptions: a.TopologyRecoveryOptions,
 	}
 	if a.OAuth2Options != nil {
 		cloned.OAuth2Options = a.OAuth2Options.Clone()
@@ -126,7 +127,6 @@ func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
 	}
 
 	return cloned
-
 }
 
 type AmqpConnection struct {
@@ -517,8 +517,8 @@ func (a *AmqpConnection) maybeReconnect() {
 		cancel()
 
 		if err == nil {
+			a.recoverTopology()
 			a.restartEntities()
-			// TODO: integration point for topology recovery
 			a.lifeCycle.SetState(&StateOpen{})
 			return
 		}
@@ -571,6 +571,39 @@ func (a *AmqpConnection) restartEntities() {
 	Info("Entity restart complete",
 		"publisherFails", publisherFails,
 		"consumerFails", consumerFails)
+}
+
+func (a *AmqpConnection) recoverTopology() {
+	Debug("Recovering topology")
+	// Set the isRecovering flag to prevent duplicate recovery records.
+	// Using atomic operations since this runs in the recovery goroutine
+	// while public API methods can be called from user goroutines.
+	a.management.isRecovering.Store(true)
+	defer func() {
+		a.management.isRecovering.Store(false)
+	}()
+
+	for _, exchange := range a.topologyRecoveryRecords.exchanges {
+		Debug("Recovering exchange", "exchange", exchange.exchangeName)
+		_, err := a.Management().DeclareExchange(context.Background(), exchange.toIExchangeSpecification())
+		if err != nil {
+			Error("Failed to recover exchange", "error", err, "ID", a.Id(), "exchange", exchange.exchangeName)
+		}
+	}
+	for _, queue := range a.topologyRecoveryRecords.queues {
+		Debug("Recovering queue", "queue", queue.queueName)
+		_, err := a.Management().DeclareQueue(context.Background(), queue.toIQueueSpecification())
+		if err != nil {
+			Error("Failed to recover queue", "error", err, "ID", a.Id(), "queue", queue.queueName)
+		}
+	}
+	for _, binding := range a.topologyRecoveryRecords.bindings {
+		Debug("Recovering binding", "bind source", binding.sourceExchange, "bind destination", binding.destination)
+		_, err := a.Management().Bind(context.Background(), binding.toIBindingSpecification())
+		if err != nil {
+			Error("Failed to recover binding", "error", err, "ID", a.Id(), "bind source", binding.sourceExchange, "bind destination", binding.destination)
+		}
+	}
 }
 
 func (a *AmqpConnection) close() {
