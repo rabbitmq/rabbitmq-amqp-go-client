@@ -46,15 +46,15 @@ func (o OAuth2Options) Clone() *OAuth2Options {
 }
 
 // TopologyRecoveryOptions is used to configure the topology recovery behavior of the connection.
-// See [TopologyRecoveryDisabled], [TopologyRecoveryOnlyTransientQueues], and [TopologyRecoveryAllEnabled] for more information.
+// See [TopologyRecoveryDisabled], [TopologyRecoveryOnlyTransient], and [TopologyRecoveryAllEnabled] for more information.
 type TopologyRecoveryOptions byte
 
 const (
-	// TopologyRecoveryDisabled disables the topology recovery.
-	TopologyRecoveryDisabled TopologyRecoveryOptions = iota
-	// TopologyRecoveryOnlyTransientQueues recovers only queues declared as exclusive and/or auto delete, and
+	// TopologyRecoveryOnlyTransient recovers only queues declared as exclusive and/or auto delete, and
 	// related bindings. Exchanges are not recovered.
-	TopologyRecoveryOnlyTransientQueues
+	TopologyRecoveryOnlyTransient TopologyRecoveryOptions = iota
+	// TopologyRecoveryDisabled disables the topology recovery.
+	TopologyRecoveryDisabled
 	// TopologyRecoveryAllEnabled recovers all the topology. All exchanges, queues, and bindings are recovered.
 	TopologyRecoveryAllEnabled
 )
