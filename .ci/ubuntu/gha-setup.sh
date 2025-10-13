@@ -7,11 +7,13 @@ set -o xtrace
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 readonly script_dir
 echo "[INFO] script_dir: '$script_dir'"
-readonly rabbitmq_image=rabbitmq:4.2-rc-management-alpine
-
+readonly rabbitmq_image=${RABBITMQ_IMAGE:-rabbitmq:4.2-rc-management-alpine}
 
 readonly docker_name_prefix='rabbitmq-amqp-go-client'
 readonly docker_network_name="$docker_name_prefix-network"
+
+declare -r rabbitmq_docker_name="$docker_name_prefix-rabbitmq"
+declare -r toxiproxy_docker_name="$docker_name_prefix-toxiproxy"
 
 if [[ ! -v GITHUB_ACTIONS ]]
 then
@@ -48,9 +50,6 @@ then
 fi
 
 set -o nounset
-
-declare -r rabbitmq_docker_name="$docker_name_prefix-rabbitmq"
-declare -r toxiproxy_docker_name="$docker_name_prefix-toxiproxy"
 
 function start_toxiproxy
 {

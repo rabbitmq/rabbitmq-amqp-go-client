@@ -45,6 +45,20 @@ func (o OAuth2Options) Clone() *OAuth2Options {
 
 }
 
+// TopologyRecoveryOptions is used to configure the topology recovery behavior of the connection.
+// See [TopologyRecoveryDisabled], [TopologyRecoveryOnlyTransient], and [TopologyRecoveryAllEnabled] for more information.
+type TopologyRecoveryOptions byte
+
+const (
+	// TopologyRecoveryOnlyTransient recovers only queues declared as exclusive and/or auto delete, and
+	// related bindings. Exchanges are not recovered.
+	TopologyRecoveryOnlyTransient TopologyRecoveryOptions = iota
+	// TopologyRecoveryDisabled disables the topology recovery.
+	TopologyRecoveryDisabled
+	// TopologyRecoveryAllEnabled recovers all the topology. All exchanges, queues, and bindings are recovered.
+	TopologyRecoveryAllEnabled
+)
+
 type AmqpConnOptions struct {
 	// wrapper for amqp.ConnOptions
 	ContainerID string
@@ -76,6 +90,9 @@ type AmqpConnOptions struct {
 	// when the connection is closed unexpectedly.
 	RecoveryConfiguration *RecoveryConfiguration
 
+	// TopologyRecoveryOptions is used to configure the topology recovery behavior of the connection.
+	TopologyRecoveryOptions TopologyRecoveryOptions
+
 	// The OAuth2Options is used to configure the connection with OAuth2 token.
 	OAuth2Options *OAuth2Options
 
@@ -91,15 +108,16 @@ func (a *AmqpConnOptions) isOAuth2() bool {
 func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
 
 	cloned := &AmqpConnOptions{
-		ContainerID:  a.ContainerID,
-		IdleTimeout:  a.IdleTimeout,
-		MaxFrameSize: a.MaxFrameSize,
-		MaxSessions:  a.MaxSessions,
-		Properties:   a.Properties,
-		SASLType:     a.SASLType,
-		TLSConfig:    a.TLSConfig,
-		WriteTimeout: a.WriteTimeout,
-		Id:           a.Id,
+		ContainerID:             a.ContainerID,
+		IdleTimeout:             a.IdleTimeout,
+		MaxFrameSize:            a.MaxFrameSize,
+		MaxSessions:             a.MaxSessions,
+		Properties:              a.Properties,
+		SASLType:                a.SASLType,
+		TLSConfig:               a.TLSConfig,
+		WriteTimeout:            a.WriteTimeout,
+		Id:                      a.Id,
+		TopologyRecoveryOptions: a.TopologyRecoveryOptions,
 	}
 	if a.OAuth2Options != nil {
 		cloned.OAuth2Options = a.OAuth2Options.Clone()
@@ -109,23 +127,23 @@ func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
 	}
 
 	return cloned
-
 }
 
 type AmqpConnection struct {
 	properties        map[string]any
 	featuresAvailable *featuresAvailable
 
-	azureConnection *amqp.Conn
-	management      *AmqpManagement
-	lifeCycle       *LifeCycle
-	amqpConnOptions *AmqpConnOptions
-	address         string
-	session         *amqp.Session
-	refMap          *sync.Map
-	entitiesTracker *entitiesTracker
-	mutex           sync.RWMutex
-	closed          bool
+	azureConnection         *amqp.Conn
+	management              *AmqpManagement
+	lifeCycle               *LifeCycle
+	amqpConnOptions         *AmqpConnOptions
+	address                 string
+	session                 *amqp.Session
+	refMap                  *sync.Map
+	entitiesTracker         *entitiesTracker
+	topologyRecoveryRecords *topologyRecoveryRecords
+	mutex                   sync.RWMutex
+	closed                  bool
 }
 
 func (a *AmqpConnection) Properties() map[string]any {
@@ -321,15 +339,18 @@ func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*A
 	if err != nil {
 		return nil, err
 	}
-
 	// create the connection
 	conn := &AmqpConnection{
-		management:        newAmqpManagement(),
-		lifeCycle:         NewLifeCycle(),
-		amqpConnOptions:   connOptions,
-		entitiesTracker:   newEntitiesTracker(),
-		featuresAvailable: newFeaturesAvailable(),
+		management:              newAmqpManagement(connOptions.TopologyRecoveryOptions),
+		lifeCycle:               NewLifeCycle(),
+		amqpConnOptions:         connOptions,
+		entitiesTracker:         newEntitiesTracker(),
+		topologyRecoveryRecords: newTopologyRecoveryRecords(),
+		featuresAvailable:       newFeaturesAvailable(),
 	}
+
+	// management needs to access the connection to manage the recovery records
+	conn.management.topologyRecoveryRecords = conn.topologyRecoveryRecords
 
 	err = conn.open(ctx, address, connOptions)
 	if err != nil {
@@ -496,6 +517,7 @@ func (a *AmqpConnection) maybeReconnect() {
 		cancel()
 
 		if err == nil {
+			a.recoverTopology()
 			a.restartEntities()
 			a.lifeCycle.SetState(&StateOpen{})
 			return
@@ -549,6 +571,39 @@ func (a *AmqpConnection) restartEntities() {
 	Info("Entity restart complete",
 		"publisherFails", publisherFails,
 		"consumerFails", consumerFails)
+}
+
+func (a *AmqpConnection) recoverTopology() {
+	Debug("Recovering topology")
+	// Set the isRecovering flag to prevent duplicate recovery records.
+	// Using atomic operations since this runs in the recovery goroutine
+	// while public API methods can be called from user goroutines.
+	a.management.isRecovering.Store(true)
+	defer func() {
+		a.management.isRecovering.Store(false)
+	}()
+
+	for _, exchange := range a.topologyRecoveryRecords.exchanges {
+		Debug("Recovering exchange", "exchange", exchange.exchangeName)
+		_, err := a.Management().DeclareExchange(context.Background(), exchange.toIExchangeSpecification())
+		if err != nil {
+			Error("Failed to recover exchange", "error", err, "ID", a.Id(), "exchange", exchange.exchangeName)
+		}
+	}
+	for _, queue := range a.topologyRecoveryRecords.queues {
+		Debug("Recovering queue", "queue", queue.queueName)
+		_, err := a.Management().DeclareQueue(context.Background(), queue.toIQueueSpecification())
+		if err != nil {
+			Error("Failed to recover queue", "error", err, "ID", a.Id(), "queue", queue.queueName)
+		}
+	}
+	for _, binding := range a.topologyRecoveryRecords.bindings {
+		Debug("Recovering binding", "bind source", binding.sourceExchange, "bind destination", binding.destination)
+		_, err := a.Management().Bind(context.Background(), binding.toIBindingSpecification())
+		if err != nil {
+			Error("Failed to recover binding", "error", err, "ID", a.Id(), "bind source", binding.sourceExchange, "bind destination", binding.destination)
+		}
+	}
 }
 
 func (a *AmqpConnection) close() {
