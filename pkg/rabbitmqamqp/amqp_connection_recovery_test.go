@@ -1096,7 +1096,7 @@ var _ = Describe("Recovery connection test", func() {
 				_ = conn.Close(ctx)
 			})
 
-			It("should recover auto-generated queues bound to persistent exchanges", func(ctx context.Context) {
+			It("recovers auto-gen queues", func(ctx context.Context) {
 				conn, err := env.NewConnection(ctx)
 				Expect(err).ToNot(HaveOccurred())
 				ch := make(chan *StateChanged, 1)
