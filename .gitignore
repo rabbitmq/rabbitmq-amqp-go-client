@@ -22,16 +22,19 @@ go.work
 go.work.sum
 
 # env file
-.env
-.envrc
+.env*
+
+# JetBrains
 .idea/
+
+# Left over files from tests
 coverage.txt
-.DS_Store
 .ci/ubuntu/log/rabbitmq.log
 
 # Visual Studio Code
 .vscode/*
-!.vscode/settings.json
+# Settings file has paths that are specific to the user, so we don't want to commit it
+# !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
@@ -40,3 +43,28 @@ coverage.txt
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# General
+.DS_Store
+__MACOSX/
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
