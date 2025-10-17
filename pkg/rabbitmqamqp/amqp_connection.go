@@ -440,7 +440,7 @@ func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *
 		return fmt.Errorf("failed to open TLS connection: %w", err)
 	}
 	if err != nil {
-		Error("Failed to open connection", ExtractWithoutPassword(address), err, "ID", connOptions.Id)
+		Error("Failed to open connection", "url", ExtractWithoutPassword(address), "error", err, "ID", connOptions.Id)
 		return fmt.Errorf("failed to open connection: %w", err)
 	}
 	a.properties = azureConnection.Properties()
