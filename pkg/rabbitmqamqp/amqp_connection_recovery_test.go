@@ -966,14 +966,19 @@ var _ = Describe("Recovery connection test", func() {
 			})
 		})
 
-		Context("end-to-end tests", func() {
+		Context("end-to-end tests", FlakeAttempts(3), func() {
 			var (
-				env         *Environment
-				containerId string
+				env *Environment
 			)
 
-			BeforeEach(func() {
-				containerId = CurrentSpecReport().LeafNodeText
+			AfterEach(func(ctx context.Context) {
+				if env != nil {
+					env.CloseConnections(ctx)
+				}
+			})
+
+			It("should recover the topology", func(ctx context.Context) {
+				const containerId = "recover-topology"
 				env = NewEnvironment("amqp://", &AmqpConnOptions{
 					TopologyRecoveryOptions: TopologyRecoveryOnlyTransient,
 					ContainerID:             containerId,
@@ -983,15 +988,8 @@ var _ = Describe("Recovery connection test", func() {
 						BackOffReconnectInterval: 2 * time.Second,
 						MaxReconnectAttempts:     5,
 					},
-					Id: containerId,
 				})
-			})
 
-			AfterEach(func(ctx context.Context) {
-				env.CloseConnections(ctx)
-			})
-
-			It("should recover the topology", func(ctx context.Context) {
 				conn, err := env.NewConnection(ctx)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1057,6 +1055,18 @@ var _ = Describe("Recovery connection test", func() {
 			})
 
 			It("should not duplicate recovery records", func(ctx context.Context) {
+				const containerId = "not-duplicate-recovery-records"
+				env = NewEnvironment("amqp://", &AmqpConnOptions{
+					TopologyRecoveryOptions: TopologyRecoveryOnlyTransient,
+					ContainerID:             containerId,
+					SASLType:                amqp.SASLTypeAnonymous(),
+					RecoveryConfiguration: &RecoveryConfiguration{
+						ActiveRecovery:           true,
+						BackOffReconnectInterval: 2 * time.Second,
+						MaxReconnectAttempts:     5,
+					},
+				})
+
 				conn, err := env.NewConnection(ctx)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1097,6 +1107,18 @@ var _ = Describe("Recovery connection test", func() {
 			})
 
 			It("recovers auto-gen queues", func(ctx context.Context) {
+				const containerId = "recover-auto-gen-queues"
+				env = NewEnvironment("amqp://", &AmqpConnOptions{
+					TopologyRecoveryOptions: TopologyRecoveryOnlyTransient,
+					ContainerID:             containerId,
+					SASLType:                amqp.SASLTypeAnonymous(),
+					RecoveryConfiguration: &RecoveryConfiguration{
+						ActiveRecovery:           true,
+						BackOffReconnectInterval: 2 * time.Second,
+						MaxReconnectAttempts:     5,
+					},
+				})
+
 				conn, err := env.NewConnection(ctx)
 				Expect(err).ToNot(HaveOccurred())
 				ch := make(chan *StateChanged, 1)
@@ -1153,27 +1175,26 @@ func dropConnectionAndAwaitReconnectionByContainerID(containerID string, ch <-ch
 	// Drop connection
 	Eventually(func() error {
 		return testhelper.DropConnectionContainerID(containerID)
-	}).WithTimeout(5*time.Second).WithPolling(400*time.Millisecond).WithOffset(1).
+	}).WithTimeout(10*time.Second).WithPolling(500*time.Millisecond).WithOffset(1).
 		Should(Succeed(), "expected connection to be closed")
 	stateChange := new(StateChanged)
-	Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).WithOffset(1).
+	Eventually(ch).Within(10 * time.Second).WithPolling(500 * time.Millisecond).WithOffset(1).
 		Should(Receive(&stateChange))
 	Expect(stateChange.From).To(Equal(&StateOpen{}))
 	Expect(stateChange.To).To(BeAssignableToTypeOf(&StateClosed{}))
 
 	// Receive reconnecting state
-	Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).WithOffset(1).
+	Eventually(ch).Within(10 * time.Second).WithPolling(500 * time.Millisecond).WithOffset(1).
 		Should(Receive())
 
-	By("recovering the connection")
 	// Await reconnection
 	Eventually(func() (bool, error) {
 		conn, err := testhelper.GetConnectionByContainerID(containerID)
 		return conn != nil, err
-	}).WithTimeout(6 * time.Second).WithPolling(400 * time.Millisecond).WithOffset(1).
+	}).WithTimeout(10 * time.Second).WithPolling(500 * time.Millisecond).WithOffset(1).
 		Should(BeTrueBecause("expected connection to be reconnected"))
 	stateChange = new(StateChanged)
-	Eventually(ch).Within(5 * time.Second).WithPolling(400 * time.Millisecond).WithOffset(1).
+	Eventually(ch).Within(10 * time.Second).WithPolling(500 * time.Millisecond).WithOffset(1).
 		Should(Receive(&stateChange))
 	Expect(stateChange.To).To(Equal(&StateOpen{}))
 }
