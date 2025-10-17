@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 	"time"
+
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func main() {
@@ -44,7 +45,7 @@ func main() {
 	// this is valid for the connection lifecycle
 	amqpConnection.NotifyStatusChange(stateChanged)
 
-	rmq.Info("AMQP connection opened.\n")
+	rmq.Info("AMQP connection opened")
 	// Create the management interface for the connection
 	// so we can declare exchanges, queues, and bindings
 	management := amqpConnection.Management()
@@ -94,21 +95,21 @@ func main() {
 			deliveryContext, err := consumer.Receive(ctx)
 			if errors.Is(err, context.Canceled) {
 				// The consumer was closed correctly
-				rmq.Info("[Consumer]", "consumer closed. Context", err)
+				rmq.Info("[Consumer] Consumer closed", "context", err)
 				return
 			}
 			if err != nil {
 				// An error occurred receiving the message
-				rmq.Error("[Consumer]", "Error receiving message", err)
+				rmq.Error("[Consumer] Error receiving message", "error", err)
 				return
 			}
 
-			rmq.Info("[Consumer]", "Received message",
+			rmq.Info("[Consumer] Received message", "message",
 				fmt.Sprintf("%s", deliveryContext.Message().Data))
 
 			err = deliveryContext.Accept(context.Background())
 			if err != nil {
-				rmq.Error("Error accepting message", err)
+				rmq.Error("[Consumer] Error accepting message", "error", err)
 				return
 			}
 		}
@@ -172,27 +173,27 @@ func main() {
 	err = management.Unbind(context.TODO(), bindingPath)
 
 	if err != nil {
-		rmq.Error("Error unbinding: %v\n", err)
+		rmq.Error("Error unbinding", "error", err)
 		return
 	}
 
 	err = management.DeleteExchange(context.TODO(), exchangeInfo.Name())
 	if err != nil {
-		rmq.Error("Error deleting exchange: %v\n", err)
+		rmq.Error("Error deleting exchange", "error", err)
 		return
 	}
 
 	// Purge the queue
 	purged, err := management.PurgeQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
-		rmq.Error("Error purging queue: %v\n", err)
+		rmq.Error("Error purging queue", "error", err)
 		return
 	}
-	rmq.Info("Purged %d messages from the queue.\n", purged)
+	rmq.Info("Purged messages from the queue", "count", purged)
 
 	err = management.DeleteQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
-		rmq.Error("Error deleting queue: %v\n", err)
+		rmq.Error("Error deleting queue", "error", err)
 		return
 	}
 
@@ -200,11 +201,11 @@ func main() {
 	// to create new connections
 	err = env.CloseConnections(context.Background())
 	if err != nil {
-		rmq.Error("Error closing connection: %v\n", err)
+		rmq.Error("Error closing connection", "error", err)
 		return
 	}
 
-	rmq.Info("AMQP connection closed.\n")
+	rmq.Info("AMQP connection closed")
 	// not necessary. It waits for the status change to be printed
 	time.Sleep(100 * time.Millisecond)
 	close(stateChanged)

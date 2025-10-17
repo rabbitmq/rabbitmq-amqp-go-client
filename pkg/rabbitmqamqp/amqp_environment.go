@@ -3,9 +3,10 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/go-amqp"
 	"sync"
 	"sync/atomic"
+
+	"github.com/Azure/go-amqp"
 )
 
 type TEndPointStrategy int
@@ -83,7 +84,7 @@ func (e *Environment) NewConnection(ctx context.Context) (*AmqpConnection, error
 		}
 		connection, err := Dial(ctx, addr.Address, cloned)
 		if err != nil {
-			Error("Failed to open connection", ExtractWithoutPassword(addr.Address), err)
+			Error("Failed to open connection", "url", ExtractWithoutPassword(addr.Address), "error", err)
 			lastError = err
 			continue
 		}
