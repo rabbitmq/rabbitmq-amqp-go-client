@@ -8,6 +8,7 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 readonly script_dir
 echo "[INFO] script_dir: '$script_dir'"
 readonly rabbitmq_image=${RABBITMQ_IMAGE:-rabbitmq:4.2-rc-management-alpine}
+readonly toxiproxy_image=${TOXIPROXY_IMAGE:-ghcr.io/shopify/toxiproxy:latest}
 
 readonly docker_name_prefix='rabbitmq-amqp-go-client'
 readonly docker_network_name="$docker_name_prefix-network"
@@ -63,9 +64,9 @@ function start_toxiproxy
             --name "$toxiproxy_docker_name" \
             --hostname "$toxiproxy_docker_name" \
             --publish 8474:8474 \
-            --publish 55670-55680:55670-55680 \
+            --publish 8080-8090:8080-8090 \
             --network "$docker_network_name" \
-            'ghcr.io/shopify/toxiproxy:latest'
+            "$toxiproxy_image"
     fi
 }
 
