@@ -13,7 +13,7 @@ import (
 
 type echoRpcServer struct {
 	conn   *rabbitmqamqp.AmqpConnection
-	server rabbitmqamqp.RpcServer
+	server rabbitmqamqp.Responder
 }
 
 func (s *echoRpcServer) stop(ctx context.Context) {
@@ -25,7 +25,7 @@ func newEchoRpcServer(conn *rabbitmqamqp.AmqpConnection) *echoRpcServer {
 	conn.Management().DeclareQueue(context.TODO(), &rabbitmqamqp.QuorumQueueSpecification{
 		Name: rpcServerQueueName,
 	})
-	srv, err := conn.NewRpcServer(context.TODO(), rabbitmqamqp.RpcServerOptions{
+	srv, err := conn.NewResponder(context.TODO(), rabbitmqamqp.ResponderOptions{
 		RequestQueue: rpcServerQueueName,
 		Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 			fmt.Printf("echo: %s\n", request.GetData())

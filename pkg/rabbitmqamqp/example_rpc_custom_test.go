@@ -38,7 +38,7 @@ func Example_customCorrelationId() {
 		panic(err)
 	}
 
-	server, err := srvConn.NewRpcServer(context.TODO(), rabbitmqamqp.RpcServerOptions{
+	server, err := srvConn.NewResponder(context.TODO(), rabbitmqamqp.ResponderOptions{
 		RequestQueue: rpcServerQueueNameCustom,
 		Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 			fmt.Printf("Received: %s\n", request.GetData())

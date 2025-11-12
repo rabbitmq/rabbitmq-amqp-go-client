@@ -30,8 +30,8 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 	var (
 		clientConn   *rabbitmqamqp.AmqpConnection
 		serverConn   *rabbitmqamqp.AmqpConnection
-		rpcClient    rabbitmqamqp.RpcClient
-		rpcServer    rabbitmqamqp.RpcServer
+		rpcClient    rabbitmqamqp.Requester
+		rpcServer    rabbitmqamqp.Responder
 		rpcQueueName string
 	)
 
@@ -73,7 +73,7 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 			RequestQueueName: rpcQueueName,
 		})
 		Ω(err).ShouldNot(HaveOccurred())
-		rpcServer, err = serverConn.NewRpcServer(ctx, rabbitmqamqp.RpcServerOptions{
+		rpcServer, err = serverConn.NewResponder(ctx, rabbitmqamqp.ResponderOptions{
 			RequestQueue: rpcQueueName,
 			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				m.Lock()

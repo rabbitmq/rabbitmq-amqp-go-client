@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// RpcClient is an interface for making RPC (Remote Procedure Call) requests over AMQP.
+// Requester is an interface for making RPC (Remote Procedure Call) requests over AMQP.
 // Implementations of this interface should handle the sending of requests and
 // the receiving of corresponding replies, managing correlation IDs and timeouts.
 //
@@ -33,7 +33,7 @@ import (
 //   - `Message` provides a basic AMQP message structure for RPC requests.
 //   - `Publish` sends the request message and returns a channel that will receive
 //     the reply message, or be closed if a timeout occurs or the client is closed.
-type RpcClient interface {
+type Requester interface {
 	Close(context.Context) error
 	Message(body []byte) *amqp.Message
 	Publish(context.Context, *amqp.Message) (<-chan *amqp.Message, error)

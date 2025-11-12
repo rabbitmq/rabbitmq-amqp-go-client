@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("RpcClient", func() {
+var _ = Describe("Requester", func() {
 	var (
 		conn      *AmqpConnection
 		queueName string

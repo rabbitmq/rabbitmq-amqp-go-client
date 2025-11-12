@@ -11,25 +11,25 @@ import (
 	"github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
-type echoRpcServer struct {
+type echoResponder struct {
 	conn   *rabbitmqamqp.AmqpConnection
-	server rabbitmqamqp.RpcServer
+	server rabbitmqamqp.Responder
 }
 
-func (s *echoRpcServer) stop(ctx context.Context) {
+func (s *echoResponder) stop(ctx context.Context) {
 	s.server.Close(ctx)
 	s.conn.Close(ctx)
 }
 
-func newEchoRpcServer(conn *rabbitmqamqp.AmqpConnection) *echoRpcServer {
+func newEchoResponder(conn *rabbitmqamqp.AmqpConnection) *echoResponder {
 	_, err := conn.Management().DeclareQueue(context.TODO(), &rabbitmqamqp.QuorumQueueSpecification{
-		Name: rpcServerQueueName,
+		Name: requestQueue,
 	})
 	if err != nil {
 		panic(err)
 	}
-	srv, err := conn.NewRpcServer(context.TODO(), rabbitmqamqp.RpcServerOptions{
-		RequestQueue: rpcServerQueueName,
+	srv, err := conn.NewResponder(context.TODO(), rabbitmqamqp.ResponderOptions{
+		RequestQueue: requestQueue,
 		Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 			return request, nil
 		},
@@ -37,13 +37,13 @@ func newEchoRpcServer(conn *rabbitmqamqp.AmqpConnection) *echoRpcServer {
 	if err != nil {
 		panic(err)
 	}
-	return &echoRpcServer{
+	return &echoResponder{
 		conn:   conn,
 		server: srv,
 	}
 }
 
-const rpcServerQueueName = "rpc-queue"
+const requestQueue = "go-amqp1.0-request-queue"
 
 func main() {
 	// Dial rabbit for RPC server connection
@@ -52,7 +52,7 @@ func main() {
 		panic(err)
 	}
 
-	srv := newEchoRpcServer(srvConn)
+	srv := newEchoResponder(srvConn)
 
 	// Dial rabbit for RPC client connection
 	clientConn, err := rabbitmqamqp.Dial(context.TODO(), "amqp://localhost:5672", nil)
@@ -60,8 +60,8 @@ func main() {
 		panic(err)
 	}
 
-	rpcClient, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
-		RequestQueueName: rpcServerQueueName,
+	requester, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
+		RequestQueueName: requestQueue,
 	})
 	if err != nil {
 		panic(err)
@@ -94,7 +94,7 @@ func main() {
 			continue
 		}
 
-		resp, err := rpcClient.Publish(context.TODO(), amqp.NewMessage([]byte(message)))
+		resp, err := requester.Publish(context.TODO(), amqp.NewMessage([]byte(message)))
 		if err != nil {
 			fmt.Printf("Error calling RPC: %v\n", err)
 			continue

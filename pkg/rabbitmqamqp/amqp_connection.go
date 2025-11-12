@@ -192,10 +192,10 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 	return newConsumer(ctx, a, destinationAdd, options)
 }
 
-// NewRpcServer creates a new RPC server that processes requests from the
+// NewResponder creates a new RPC server that processes requests from the
 // specified queue. The requestQueue in options is mandatory, while other
 // fields are optional and will use defaults if not provided.
-func (a *AmqpConnection) NewRpcServer(ctx context.Context, options RpcServerOptions) (RpcServer, error) {
+func (a *AmqpConnection) NewResponder(ctx context.Context, options ResponderOptions) (Responder, error) {
 	if err := options.validate(); err != nil {
 		return nil, fmt.Errorf("rpc server options validation: %w", err)
 	}
@@ -231,7 +231,7 @@ func (a *AmqpConnection) NewRpcServer(ctx context.Context, options RpcServerOpti
 		replyPostProcessor = defaultReplyPostProcessor
 	}
 
-	server := &amqpRpcServer{
+	server := &amqpResponder{
 		requestHandler:         handler,
 		requestQueue:           options.RequestQueue,
 		publisher:              publisher,
@@ -246,12 +246,12 @@ func (a *AmqpConnection) NewRpcServer(ctx context.Context, options RpcServerOpti
 
 // NewRequester creates a new RPC client that sends requests to the specified queue
 // and receives replies on a dynamically created reply queue.
-func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOptions) (RpcClient, error) {
+func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOptions) (Requester, error) {
 	if options == nil {
 		return nil, fmt.Errorf("options cannot be nil")
 	}
 	if options.RequestQueueName == "" {
-		return nil, fmt.Errorf("requestQueueName is mandatory")
+		return nil, fmt.Errorf("request QueueName is mandatory")
 	}
 
 	// Create publisher for sending requests
