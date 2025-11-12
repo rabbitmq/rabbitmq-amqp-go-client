@@ -58,7 +58,7 @@ func Example() {
 		panic(err)
 	}
 
-	rpcClient, err := clientConn.NewRpcClient(context.TODO(), &rabbitmqamqp.RpcClientOptions{
+	rpcClient, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
 		RequestQueueName: rpcServerQueueName,
 	})
 	if err != nil {

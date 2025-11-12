@@ -86,16 +86,16 @@ var defaultReplyCorrelationIdExtractor CorrelationIdExtractor = func(message *am
 // address for the reply queue. The function must return the modified message.
 //
 // The default `RequestPostProcessor` implementation (used when `RequestPostProcessor`
-// is not explicitly set in `RpcClientOptions`) performs the following:
+// is not explicitly set in `RequesterOptions`) performs the following:
 //   - Assigns the `correlationID` to the `MessageID` property of the `amqp.Message`.
 //   - Sets the `ReplyTo` message property to a client-generated exclusive auto-delete queue.
 type RequestPostProcessor func(request *amqp.Message, correlationID any) *amqp.Message
 
 var DefaultRpcRequestTimeout = 30 * time.Second
 
-// RpcClientOptions is a struct that contains the options for the RPC client.
+// RequesterOptions is a struct that contains the options for the RPC client.
 // It is used to configure the RPC client.
-type RpcClientOptions struct {
+type RequesterOptions struct {
 	// The name of the queue to send requests to. This queue must exist.
 	//
 	// Mandatory.
@@ -130,7 +130,7 @@ type outstandingRequest struct {
 	// err    error
 }
 
-type amqpRpcClient struct {
+type amqpRequester struct {
 	requestQueue           ITargetAddress
 	replyToQueue           ITargetAddress
 	publisher              *Publisher
@@ -149,7 +149,7 @@ type amqpRpcClient struct {
 // Close shuts down the RPC client, closing its underlying publisher and consumer.
 // It ensures that all pending requests are cleaned up by closing their respective
 // channels. This method is safe to call multiple times.
-func (a *amqpRpcClient) Close(ctx context.Context) error {
+func (a *amqpRequester) Close(ctx context.Context) error {
 	var err error
 	a.closer.Do(func() {
 		a.mu.Lock()
@@ -173,7 +173,7 @@ func (a *amqpRpcClient) Close(ctx context.Context) error {
 	return err
 }
 
-func (a *amqpRpcClient) Message(body []byte) *amqp.Message {
+func (a *amqpRequester) Message(body []byte) *amqp.Message {
 	return amqp.NewMessage(body)
 }
 
@@ -184,9 +184,9 @@ func (a *amqpRpcClient) Message(body []byte) *amqp.Message {
 // an `outstandingRequest` is created and stored, and a channel is returned
 // for the reply. The channel will be closed if the request times out or the
 // client is closed before a reply is received.
-func (a *amqpRpcClient) Publish(ctx context.Context, message *amqp.Message) (<-chan *amqp.Message, error) {
+func (a *amqpRequester) Publish(ctx context.Context, message *amqp.Message) (<-chan *amqp.Message, error) {
 	if a.isClosed() {
-		return nil, fmt.Errorf("rpc client is closed")
+		return nil, fmt.Errorf("requester is closed")
 	}
 	replyTo, err := a.replyToQueue.toAddress()
 	if err != nil {
@@ -220,7 +220,7 @@ func (a *amqpRpcClient) Publish(ctx context.Context, message *amqp.Message) (<-c
 	return ch, nil
 }
 
-func (a *amqpRpcClient) isClosed() bool {
+func (a *amqpRequester) isClosed() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.closed
@@ -231,7 +231,7 @@ func (a *amqpRpcClient) isClosed() bool {
 // If a request's `sentAt` timestamp is older than the `requestTimeout`,
 // its channel is closed, and the request is removed from `pendingRequests`.
 // The goroutine exits when the `done` channel is closed, typically when the client is closed.
-func (a *amqpRpcClient) requestTimeoutTask() {
+func (a *amqpRequester) requestTimeoutTask() {
 	t := time.NewTicker(a.requestTimeout)
 	defer t.Stop()
 	for {
@@ -260,7 +260,7 @@ func (a *amqpRpcClient) requestTimeoutTask() {
 // corresponding request's channel, and the request is removed from `pendingRequests`.
 // If no match is found, the message is requeued. The goroutine exits when the `done`
 // channel is closed, typically when the client is closed.
-func (a *amqpRpcClient) messageReceivedHandler() {
+func (a *amqpRequester) messageReceivedHandler() {
 	for {
 		select {
 		case <-a.done:

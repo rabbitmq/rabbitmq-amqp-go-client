@@ -70,7 +70,7 @@ func Example_customCorrelationId() {
 	}
 	defer clientConn.Close(context.Background())
 
-	rpcClient, err := clientConn.NewRpcClient(context.TODO(), &rabbitmqamqp.RpcClientOptions{
+	rpcClient, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
 		RequestQueueName:      rpcServerQueueNameCustom,
 		CorrelationIdSupplier: &customCorrelationIDSupplier{},
 		CorrelationIdExtractor: func(message *amqp.Message) any {

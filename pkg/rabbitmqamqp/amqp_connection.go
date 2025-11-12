@@ -244,9 +244,9 @@ func (a *AmqpConnection) NewRpcServer(ctx context.Context, options RpcServerOpti
 	return server, nil
 }
 
-// NewRpcClient creates a new RPC client that sends requests to the specified queue
+// NewRequester creates a new RPC client that sends requests to the specified queue
 // and receives replies on a dynamically created reply queue.
-func (a *AmqpConnection) NewRpcClient(ctx context.Context, options *RpcClientOptions) (RpcClient, error) {
+func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOptions) (RpcClient, error) {
 	if options == nil {
 		return nil, fmt.Errorf("options cannot be nil")
 	}
@@ -305,7 +305,7 @@ func (a *AmqpConnection) NewRpcClient(ctx context.Context, options *RpcClientOpt
 		correlationIdExtractor = defaultReplyCorrelationIdExtractor
 	}
 
-	client := &amqpRpcClient{
+	client := &amqpRequester{
 		requestQueue:           requestQueue,
 		replyToQueue:           &QueueAddress{Queue: replyQueueName},
 		publisher:              publisher,

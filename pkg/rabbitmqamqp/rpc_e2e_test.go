@@ -69,7 +69,7 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 		m := sync.Mutex{}
 		messagesReceivedByServer := 0
 		var err error
-		rpcClient, err = clientConn.NewRpcClient(ctx, &rabbitmqamqp.RpcClientOptions{
+		rpcClient, err = clientConn.NewRequester(ctx, &rabbitmqamqp.RequesterOptions{
 			RequestQueueName: rpcQueueName,
 		})
 		Ω(err).ShouldNot(HaveOccurred())
@@ -147,11 +147,11 @@ func ExampleRpcClient() {
 
 	// Create RPC client options
 	// RequestQueueName is mandatory. The queue must exist.
-	options := rabbitmqamqp.RpcClientOptions{
+	options := rabbitmqamqp.RequesterOptions{
 		RequestQueueName: "rpc-queue",
 	}
 	// Create a new RPC client
-	rpcClient, err := conn.NewRpcClient(context.TODO(), &options)
+	rpcClient, err := conn.NewRequester(context.TODO(), &options)
 	if err != nil {
 		panic(err)
 	}
@@ -200,13 +200,13 @@ func ExampleRpcClient_customCorrelationID() {
 	defer conn.Close(context.TODO())
 
 	// Create RPC client options
-	options := rabbitmqamqp.RpcClientOptions{
+	options := rabbitmqamqp.RequesterOptions{
 		RequestQueueName:      "rpc-queue", // the queue must exist
 		CorrelationIdSupplier: &fooCorrelationIdSupplier{},
 	}
 
 	// Create a new RPC client
-	rpcClient, _ := conn.NewRpcClient(context.TODO(), &options)
+	rpcClient, _ := conn.NewRequester(context.TODO(), &options)
 	pendingRequestCh, _ := rpcClient.Publish(context.TODO(), rpcClient.Message([]byte("hello world")))
 	replyFromServer := <-pendingRequestCh
 	fmt.Printf("reply correlation ID: %s\n", replyFromServer.Properties.CorrelationID)

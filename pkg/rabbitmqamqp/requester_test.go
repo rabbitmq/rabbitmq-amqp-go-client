@@ -85,7 +85,7 @@ var _ = Describe("RpcClient", func() {
 		// Server goroutine to handle incoming requests
 		go pongRpcServer(ctx, publisher, consumer)
 
-		client, err := conn.NewRpcClient(ctx, &RpcClientOptions{
+		client, err := conn.NewRequester(ctx, &RequesterOptions{
 			RequestQueueName: queueName,
 		})
 		Ω(err).ShouldNot(HaveOccurred())
@@ -110,7 +110,7 @@ var _ = Describe("RpcClient", func() {
 
 	It("uses a custom correlation id extractor and post processor", func(ctx SpecContext) {
 		go pongRpcServer(ctx, publisher, consumer)
-		client, err := conn.NewRpcClient(ctx, &RpcClientOptions{
+		client, err := conn.NewRequester(ctx, &RequesterOptions{
 			RequestQueueName: queueName,
 			CorrelationIdExtractor: func(message *amqp.Message) any {
 				return message.ApplicationProperties["correlationId"]
