@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	amqp "github.com/Azure/go-amqp"
+	"github.com/Azure/go-amqp"
 )
 
-// RpcServerHandler is a function that processes a request message and returns a response message.
+// ResponderHandler is a function that processes a request message and returns a response message.
 // If the server wants to send a response to the client, it must return a response message.
 // If the function returns nil, the server will not send a response.
 // If the server does not send a response message, this high level RPC server doesn't make much sense,
@@ -22,9 +22,9 @@ import (
 //	func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 //		return amqp.NewMessage([]byte(fmt.Sprintf("Pong: %s", request.GetData()))), nil
 //	}
-type RpcServerHandler func(ctx context.Context, request *amqp.Message) (*amqp.Message, error)
+type ResponderHandler func(ctx context.Context, request *amqp.Message) (*amqp.Message, error)
 
-var noOpHandler RpcServerHandler = func(_ context.Context, _ *amqp.Message) (*amqp.Message, error) {
+var noOpHandler ResponderHandler = func(_ context.Context, _ *amqp.Message) (*amqp.Message, error) {
 	return nil, nil
 }
 
@@ -54,9 +54,9 @@ var defaultReplyPostProcessor ReplyPostProcessor = func(reply *amqp.Message, cor
 	return reply
 }
 
-// RpcServer is Remote Procedure Call server that receives a message, process them,
+// Responder is Remote Procedure Call server that receives a message, process them,
 // and sends a response.
-type RpcServer interface {
+type Responder interface {
 	// Close the RPC server and its underlying resources.
 	Close(context.Context) error
 	// Pause the server to stop receiving messages.
@@ -65,7 +65,7 @@ type RpcServer interface {
 	Unpause() error
 }
 
-type RpcServerOptions struct {
+type ResponderOptions struct {
 	// RequestQueue is the name of the queue to subscribe to. This queue must be pre-declared.
 	// The RPC server does not declare the queue, it is the responsibility of the caller to declare the queue.
 	//
@@ -86,7 +86,7 @@ type RpcServerOptions struct {
 	// 		}
 	//
 	// Mandatory.
-	Handler RpcServerHandler
+	Handler ResponderHandler
 	// CorrectionIdExtractor is a function that extracts a correction ID from the request message.
 	// The returned value should be an AMQP type that can be binary encoded.
 	//
@@ -121,17 +121,17 @@ type RpcServerOptions struct {
 	ReplyPostProcessor ReplyPostProcessor
 }
 
-func (r *RpcServerOptions) validate() error {
+func (r *ResponderOptions) validate() error {
 	if r.RequestQueue == "" {
 		return fmt.Errorf("requestQueue is mandatory")
 	}
 	return nil
 }
 
-type amqpRpcServer struct {
+type amqpResponder struct {
 	// TODO: handle state changes for reconnections
 	mu                     sync.Mutex
-	requestHandler         RpcServerHandler
+	requestHandler         ResponderHandler
 	requestQueue           string
 	publisher              *Publisher
 	consumer               *Consumer
@@ -145,7 +145,7 @@ type amqpRpcServer struct {
 // are closed gracefully and only once, even if Close is called multiple times.
 // The provided context (ctx) controls the timeout for the close operation, ensuring the operation
 // does not exceed the context's deadline.
-func (a *amqpRpcServer) Close(ctx context.Context) error {
+func (a *amqpResponder) Close(ctx context.Context) error {
 	// TODO: wait for unsettled messages
 	a.closer.Do(func() {
 		a.mu.Lock()
@@ -168,14 +168,14 @@ func (a *amqpRpcServer) Close(ctx context.Context) error {
 	return nil
 }
 
-func (a *amqpRpcServer) Pause() {
+func (a *amqpResponder) Pause() {
 	err := a.consumer.pause(context.Background())
 	if err != nil {
 		Warn("Did not pause consumer", "error", err)
 	}
 }
 
-func (a *amqpRpcServer) Unpause() error {
+func (a *amqpResponder) Unpause() error {
 	a.mu.Lock()
 	if a.closed {
 		a.mu.Unlock()
@@ -190,7 +190,7 @@ func (a *amqpRpcServer) Unpause() error {
 	return nil
 }
 
-func (a *amqpRpcServer) handle() {
+func (a *amqpResponder) handle() {
 	/*
 		The RPC server has the following behavior:
 		- when receiving a message request:
@@ -259,12 +259,12 @@ func (a *amqpRpcServer) handle() {
 	}
 }
 
-func (a *amqpRpcServer) isClosed() bool {
+func (a *amqpResponder) isClosed() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.closed
 }
 
-func (a *amqpRpcServer) issueCredits(credits uint32) error {
+func (a *amqpResponder) issueCredits(credits uint32) error {
 	return a.consumer.issueCredits(credits)
 }

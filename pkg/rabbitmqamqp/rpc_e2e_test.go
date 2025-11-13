@@ -30,8 +30,8 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 	var (
 		clientConn   *rabbitmqamqp.AmqpConnection
 		serverConn   *rabbitmqamqp.AmqpConnection
-		rpcClient    rabbitmqamqp.RpcClient
-		rpcServer    rabbitmqamqp.RpcServer
+		requester    rabbitmqamqp.Requester
+		responder    rabbitmqamqp.Responder
 		rpcQueueName string
 	)
 
@@ -59,8 +59,8 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		_ = rpcClient.Close(ctx)
-		_ = rpcServer.Close(ctx)
+		_ = requester.Close(ctx)
+		_ = responder.Close(ctx)
 		Ω(clientConn.Close(ctx)).Should(Succeed())
 		Ω(serverConn.Close(ctx)).Should(Succeed())
 	})
@@ -69,11 +69,11 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 		m := sync.Mutex{}
 		messagesReceivedByServer := 0
 		var err error
-		rpcClient, err = clientConn.NewRpcClient(ctx, &rabbitmqamqp.RpcClientOptions{
+		requester, err = clientConn.NewRequester(ctx, &rabbitmqamqp.RequesterOptions{
 			RequestQueueName: rpcQueueName,
 		})
 		Ω(err).ShouldNot(HaveOccurred())
-		rpcServer, err = serverConn.NewRpcServer(ctx, rabbitmqamqp.RpcServerOptions{
+		responder, err = serverConn.NewResponder(ctx, rabbitmqamqp.ResponderOptions{
 			RequestQueue: rpcQueueName,
 			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				m.Lock()
@@ -95,9 +95,9 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 		By("sending and waiting sequentially")
 		var expectedFibonacciNumbers [10]int = [10]int{1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
 		for i := 1; i <= 10; i++ {
-			msg := rpcClient.Message([]byte{})
+			msg := requester.Message([]byte{})
 			msg.ApplicationProperties = map[string]any{"x": i}
-			pendingRequestCh, err := rpcClient.Publish(ctx, msg)
+			pendingRequestCh, err := requester.Publish(ctx, msg)
 			Ω(err).ShouldNot(HaveOccurred())
 			select {
 			case m := <-pendingRequestCh:
@@ -112,9 +112,9 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 		By("sending a batch and receiving replies")
 		responseChans := make([]<-chan *amqp.Message, 0, 10)
 		for i := 1; i <= 10; i++ {
-			msg := rpcClient.Message([]byte{})
+			msg := requester.Message([]byte{})
 			msg.ApplicationProperties = map[string]any{"x": i}
-			ch, err := rpcClient.Publish(ctx, msg)
+			ch, err := requester.Publish(ctx, msg)
 			Ω(err).ShouldNot(HaveOccurred())
 			responseChans = append(responseChans, ch)
 		}
@@ -130,12 +130,12 @@ var _ = Describe("RPC E2E", Label("e2e"), func() {
 		}
 		Expect(messagesReceivedByServer).To(Equal(20))
 
-		Expect(rpcClient.Close(ctx)).To(Succeed())
-		Expect(rpcServer.Close(ctx)).To(Succeed())
+		Expect(requester.Close(ctx)).To(Succeed())
+		Expect(responder.Close(ctx)).To(Succeed())
 	})
 })
 
-func ExampleRpcClient() {
+func ExampleRequester() {
 	// open a connection
 	conn, err := rabbitmqamqp.Dial(context.TODO(), "amqp://localhost:5672", &rabbitmqamqp.AmqpConnOptions{
 		Properties: map[string]any{"connection_name": "example rpc client"},
@@ -147,23 +147,23 @@ func ExampleRpcClient() {
 
 	// Create RPC client options
 	// RequestQueueName is mandatory. The queue must exist.
-	options := rabbitmqamqp.RpcClientOptions{
+	options := rabbitmqamqp.RequesterOptions{
 		RequestQueueName: "rpc-queue",
 	}
 	// Create a new RPC client
-	rpcClient, err := conn.NewRpcClient(context.TODO(), &options)
+	requester, err := conn.NewRequester(context.TODO(), &options)
 	if err != nil {
 		panic(err)
 	}
-	defer rpcClient.Close(context.TODO())
+	defer requester.Close(context.TODO())
 
 	// Create an AMQP message with some initial data
-	msg := rpcClient.Message([]byte("hello world"))
+	msg := requester.Message([]byte("hello world"))
 	// Add some application properties to the message
 	msg.ApplicationProperties = map[string]any{"example": "rpc"}
 
 	// Send the message to the server
-	pendingRequestCh, err := rpcClient.Publish(context.TODO(), msg)
+	pendingRequestCh, err := requester.Publish(context.TODO(), msg)
 	if err != nil {
 		panic(err)
 	}
@@ -185,7 +185,7 @@ func (c *fooCorrelationIdSupplier) Get() any {
 	return fmt.Sprintf("foo-%d", c.count)
 }
 
-func ExampleRpcClient_customCorrelationID() {
+func ExampleRequester_customCorrelationID() {
 	// type fooCorrelationIdSupplier struct {
 	// 	count int
 	// }
@@ -200,13 +200,13 @@ func ExampleRpcClient_customCorrelationID() {
 	defer conn.Close(context.TODO())
 
 	// Create RPC client options
-	options := rabbitmqamqp.RpcClientOptions{
+	options := rabbitmqamqp.RequesterOptions{
 		RequestQueueName:      "rpc-queue", // the queue must exist
 		CorrelationIdSupplier: &fooCorrelationIdSupplier{},
 	}
 
 	// Create a new RPC client
-	rpcClient, _ := conn.NewRpcClient(context.TODO(), &options)
+	rpcClient, _ := conn.NewRequester(context.TODO(), &options)
 	pendingRequestCh, _ := rpcClient.Publish(context.TODO(), rpcClient.Message([]byte("hello world")))
 	replyFromServer := <-pendingRequestCh
 	fmt.Printf("reply correlation ID: %s\n", replyFromServer.Properties.CorrelationID)

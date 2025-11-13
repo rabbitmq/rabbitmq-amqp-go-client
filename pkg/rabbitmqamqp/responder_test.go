@@ -12,7 +12,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 )
 
-var _ = Describe("RpcServer", func() {
+var _ = Describe("Responder", func() {
 	var (
 		conn         *AmqpConnection
 		requestQueue string
@@ -48,7 +48,7 @@ var _ = Describe("RpcServer", func() {
 			requestPublisher.Close(ctx)
 		})
 
-		server, err := conn.NewRpcServer(context.Background(), RpcServerOptions{
+		server, err := conn.NewResponder(context.Background(), ResponderOptions{
 			RequestQueue: requestQueue,
 			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				if request.Properties == nil {
@@ -92,7 +92,7 @@ var _ = Describe("RpcServer", func() {
 
 	It("stops the handler when the RPC server closes", func(ctx SpecContext) {
 		// setup
-		server, err := conn.NewRpcServer(context.Background(), RpcServerOptions{
+		server, err := conn.NewResponder(context.Background(), ResponderOptions{
 			RequestQueue: requestQueue,
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -137,7 +137,7 @@ var _ = Describe("RpcServer", func() {
 			reply.ApplicationProperties["test"] = "success"
 			return reply
 		}
-		server, err := conn.NewRpcServer(context.Background(), RpcServerOptions{
+		server, err := conn.NewResponder(context.Background(), ResponderOptions{
 			RequestQueue: requestQueue,
 			Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 				m := amqp.NewMessage(request.GetData())

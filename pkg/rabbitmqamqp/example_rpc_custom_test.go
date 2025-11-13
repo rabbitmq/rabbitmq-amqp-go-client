@@ -38,7 +38,7 @@ func Example_customCorrelationId() {
 		panic(err)
 	}
 
-	server, err := srvConn.NewRpcServer(context.TODO(), rabbitmqamqp.RpcServerOptions{
+	server, err := srvConn.NewResponder(context.TODO(), rabbitmqamqp.ResponderOptions{
 		RequestQueue: rpcServerQueueNameCustom,
 		Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 			fmt.Printf("Received: %s\n", request.GetData())
@@ -70,7 +70,7 @@ func Example_customCorrelationId() {
 	}
 	defer clientConn.Close(context.Background())
 
-	rpcClient, err := clientConn.NewRpcClient(context.TODO(), &rabbitmqamqp.RpcClientOptions{
+	rpcClient, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
 		RequestQueueName:      rpcServerQueueNameCustom,
 		CorrelationIdSupplier: &customCorrelationIDSupplier{},
 		CorrelationIdExtractor: func(message *amqp.Message) any {
