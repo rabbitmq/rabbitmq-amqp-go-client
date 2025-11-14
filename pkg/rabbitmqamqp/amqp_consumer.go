@@ -130,9 +130,16 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 			}
 		}
 	}
+	// define a variable  *amqp.ReceiverOptions type
+	var receiverOptions *amqp.ReceiverOptions
 
-	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd,
-		createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce))
+	if c.options != nil && c.options.isDirectReplyToEnable() {
+		receiverOptions = createDynamicReceiverLinkOptions(c.options)
+	} else {
+		receiverOptions = createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce)
+	}
+
+	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd, receiverOptions)
 	if err != nil {
 		return err
 	}

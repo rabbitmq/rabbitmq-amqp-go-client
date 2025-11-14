@@ -2,9 +2,10 @@ package rabbitmqamqp
 
 import (
 	"fmt"
-	"github.com/Azure/go-amqp"
 	"math/rand"
 	"time"
+
+	"github.com/Azure/go-amqp"
 )
 
 const AtMostOnce = 0
@@ -66,6 +67,21 @@ func createReceiverLinkOptions(address string, options IConsumerOptions, deliver
 		Filters:                   getLinkFilters(options),
 	}
 	return result
+}
+
+func createDynamicReceiverLinkOptions(options IConsumerOptions) *amqp.ReceiverOptions {
+	prop := make(map[string]any)
+	prop["paired"] = true
+
+	return &amqp.ReceiverOptions{
+		Name:                      getLinkName(options),
+		SourceCapabilities:        []string{"rabbitmq:volatile-queue"},
+		SourceExpiryPolicy:        amqp.ExpiryPolicyLinkDetach,
+		DynamicAddress:            true,
+		RequestedSenderSettleMode: amqp.SenderSettleModeSettled.Ptr(),
+		Credit:                    getInitialCredits(options),
+		Filters:                   getLinkFilters(options),
+	}
 }
 
 func random(max int) int {
