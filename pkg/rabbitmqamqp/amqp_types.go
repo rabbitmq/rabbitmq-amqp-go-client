@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
 )
@@ -44,6 +45,11 @@ type IConsumerOptions interface {
 
 	// validate the consumer options based on the available features
 	validate(available *featuresAvailable) error
+
+	// isDirectReplyToEnable indicates if the direct reply to feature is enabled
+	// mostly used for RPC consumers.
+	// see https://www.rabbitmq.com/docs/next/direct-reply-to#overview
+	isDirectReplyToEnable() bool
 }
 
 func getInitialCredits(co IConsumerOptions) int32 {
@@ -92,6 +98,9 @@ type ConsumerOptions struct {
 	InitialCredits int32
 	// The id of the consumer
 	Id string
+
+	//
+	DirectReplyToEnable bool
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -111,7 +120,17 @@ func (aco *ConsumerOptions) id() string {
 }
 
 func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
+	// direct reply to is supported since RabbitMQ 4.2.0
+	if aco.DirectReplyToEnable {
+		if !available.is42rMore {
+			return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
+		}
+
 	return nil
+}
+
+func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
+	return aco.DirectReplyToEnable
 }
 
 type IOffsetSpecification interface {
