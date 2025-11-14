@@ -86,8 +86,12 @@ func (mo *managementOptions) id() string {
 	return "management"
 }
 
-func (mo *managementOptions) validate(available *featuresAvailable) error {
+func (mo *managementOptions) validate(_ *featuresAvailable) error {
 	return nil
+}
+
+func (mo *managementOptions) isDirectReplyToEnable() bool {
+	return false
 }
 
 // ConsumerOptions represents the options for quorum and classic queues
@@ -121,10 +125,9 @@ func (aco *ConsumerOptions) id() string {
 
 func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 	// direct reply to is supported since RabbitMQ 4.2.0
-	if aco.DirectReplyToEnable {
-		if !available.is42rMore {
-			return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
-		}
+	if aco.DirectReplyToEnable && !available.is42rMore {
+		return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
+	}
 
 	return nil
 }
@@ -235,8 +238,7 @@ type StreamConsumerOptions struct {
 	// see the interface implementations
 	Offset              IOffsetSpecification
 	StreamFilterOptions *StreamFilterOptions
-
-	Id string
+	Id                  string
 }
 
 func (sco *StreamConsumerOptions) linkName() string {
@@ -360,6 +362,10 @@ func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
 		return nil
 	}
 	return nil
+}
+
+func (sco *StreamConsumerOptions) isDirectReplyToEnable() bool {
+	return false
 }
 
 ///// PublisherOptions /////
