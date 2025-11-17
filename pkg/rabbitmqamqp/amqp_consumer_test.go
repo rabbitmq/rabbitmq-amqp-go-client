@@ -228,7 +228,13 @@ var _ = Describe("Consumer direct reply to", func() {
 		Expect(e).To(BeNil())
 		qc, err := consumer.GetQueue()
 		Expect(err).To(BeNil())
-		Expect(r).To(Equal(qc))
+		Expect(qc).To(Equal(qName))
+
+		qResult := &QueueAddress{Queue: qName}
+		rqResultName, e := qResult.toAddress()
+		Expect(e).To(BeNil())
+
+		Expect(r).To(Equal(rqResultName))
 		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
