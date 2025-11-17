@@ -52,9 +52,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	_ = srvConn.Management().DeleteQueue(context.TODO(), requestQueue)
 
 	srv := newEchoResponder(srvConn)
+	reply, _ := srv.server.GetRequestQueue()
 
+	fmt.Printf("request queue %s \n", reply)
 	// Dial rabbit for RPC client connection
 	clientConn, err := rabbitmqamqp.Dial(context.TODO(), "amqp://localhost:5672", nil)
 	if err != nil {
@@ -63,11 +66,15 @@ func main() {
 
 	requester, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
 		RequestQueueName: requestQueue,
-		DirectReplyTo:    true,
+		// Enable Direct Reply To feature
+		// see: https://www.rabbitmq.com/direct-reply-to.html
+		DirectReplyTo: true,
 	})
 	if err != nil {
 		panic(err)
 	}
+	reply, _ = requester.GetReplyQueue()
+	fmt.Printf("replyTo to %s \n", reply)
 
 	// Set up a channel to listen for OS signals
 	sigs := make(chan os.Signal, 1)
@@ -95,7 +102,6 @@ func main() {
 		if message == "" {
 			continue
 		}
-
 		resp, err := requester.Publish(context.TODO(), amqp.NewMessage([]byte(message)))
 		if err != nil {
 			fmt.Printf("Error calling RPC: %v\n", err)

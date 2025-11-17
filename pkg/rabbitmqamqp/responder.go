@@ -63,6 +63,8 @@ type Responder interface {
 	Pause()
 	// Unpause requests to receive messages again.
 	Unpause() error
+
+	GetRequestQueue() (string, error)
 }
 
 type ResponderOptions struct {
@@ -188,6 +190,10 @@ func (a *amqpResponder) Unpause() error {
 		return fmt.Errorf("error unpausing RPC server: %w", err)
 	}
 	return nil
+}
+
+func (a *amqpResponder) GetRequestQueue() (string, error) {
+	return a.consumer.GetQueue()
 }
 
 func (a *amqpResponder) handle() {

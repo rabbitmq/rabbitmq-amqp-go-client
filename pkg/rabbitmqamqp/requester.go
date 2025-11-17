@@ -37,6 +37,7 @@ type Requester interface {
 	Close(context.Context) error
 	Message(body []byte) *amqp.Message
 	Publish(context.Context, *amqp.Message) (<-chan *amqp.Message, error)
+	GetReplyQueue() (string, error)
 }
 
 // CorrelationIdSupplier is an interface for providing correlation IDs for RPC requests.
@@ -222,6 +223,10 @@ func (a *amqpRequester) Publish(ctx context.Context, message *amqp.Message) (<-c
 	}
 	a.mu.Unlock()
 	return ch, nil
+}
+
+func (a *amqpRequester) GetReplyQueue() (string, error) {
+	return a.consumer.GetQueue()
 }
 
 func (a *amqpRequester) isClosed() bool {
