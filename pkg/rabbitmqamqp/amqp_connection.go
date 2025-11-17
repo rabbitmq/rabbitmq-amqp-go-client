@@ -184,18 +184,16 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 
 	if options != nil && options.isDirectReplyToEnable() {
 		return newConsumer(ctx, a, "", options)
-	} else {
-		destination := &QueueAddress{
-			Queue: queueName,
-		}
-		destinationAdd, err := destination.toAddress()
-		if err != nil {
-			return nil, err
-		}
-		return newConsumer(ctx, a, destinationAdd, options)
-
 	}
 
+	destination := &QueueAddress{
+		Queue: queueName,
+	}
+	destinationAdd, err := destination.toAddress()
+	if err != nil {
+		return nil, err
+	}
+	return newConsumer(ctx, a, destinationAdd, options)
 }
 
 // NewResponder creates a new RPC server that processes requests from the

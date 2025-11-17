@@ -33,6 +33,7 @@ import (
 //   - `Message` provides a basic AMQP message structure for RPC requests.
 //   - `Publish` sends the request message and returns a channel that will receive
 //     the reply message, or be closed if a timeout occurs or the client is closed.
+//   - `GetReplyQueue` returns the address of the reply queue used by the requester.
 type Requester interface {
 	Close(context.Context) error
 	Message(body []byte) *amqp.Message

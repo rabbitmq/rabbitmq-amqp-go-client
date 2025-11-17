@@ -101,7 +101,7 @@ func (c *Consumer) Id() string {
 
 func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IConsumerOptions) (*Consumer, error) {
 	id := fmt.Sprintf("consumer-%s", uuid.New().String())
-	if options != nil && options.id() != "" {
+	if options != nil && len(options.id()) > 0 {
 		id = options.id()
 	}
 
