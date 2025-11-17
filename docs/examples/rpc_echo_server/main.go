@@ -73,7 +73,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	reply, _ = requester.GetReplyQueue()
+	reply, err = requester.GetReplyQueue()
+	if err != nil {
+		panic(fmt.Errorf("failed to get reply queue: %w", err))
+	}
 	fmt.Printf("replyTo to %s \n", reply)
 
 	// Set up a channel to listen for OS signals
