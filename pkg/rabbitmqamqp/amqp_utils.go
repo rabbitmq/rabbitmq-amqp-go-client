@@ -3,6 +3,7 @@ package rabbitmqamqp
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"time"
 
 	"github.com/Azure/go-amqp"
@@ -108,4 +109,35 @@ func validateMessageAnnotationKey(key string) error {
 		return fmt.Errorf("message annotation key must start with 'x-': %s", key)
 	}
 	return nil
+}
+
+// url decode path segments
+func decodePathSegments(segment string) (string, error) {
+	decoded, err := url.PathUnescape(segment)
+	if err != nil {
+		return "", err
+	}
+	return decoded, nil
+}
+
+// remove /queue/ prefix from the queue address
+func trimQueueAddress(address string) (string, error) {
+	prefix := "/queues/"
+	if len(address) < len(prefix) || address[:len(prefix)] != prefix {
+		return "", fmt.Errorf("invalid queue address: %s", address)
+	}
+	return address[len(prefix):], nil
+}
+
+// trim and decode queue name from the queue address
+func parseQueueAddress(address string) (string, error) {
+	trimmed, err := trimQueueAddress(address)
+	if err != nil {
+		return "", err
+	}
+	decoded, err := decodePathSegments(trimmed)
+	if err != nil {
+		return "", err
+	}
+	return decoded, nil
 }

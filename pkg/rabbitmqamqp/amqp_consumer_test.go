@@ -208,3 +208,46 @@ var _ = Describe("Consumer pause and unpause", func() {
 		}
 	}, SpecTimeout(time.Second*10))
 })
+
+var _ = Describe("Consumer direct reply to", func() {
+	It("Queue address should be the same passed by the user", func() {
+		qName := generateNameWithDateTime("Queue address should be the same passed by the user")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queue).NotTo(BeNil())
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{})
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		//q := &QueueAddress{Queue: qName}
+		//r, e := q.toAddress()
+		//Expect(e).To(BeNil())
+		//Expect(r).To(Equal(consumer.GetQueue()))
+		Expect(consumer.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+	It("Queue address should be the dynamic name starting from rabbitmq-queue", func() {
+
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+
+		consumer, err := connection.NewConsumer(context.Background(), "", &ConsumerOptions{
+			DirectReplyTo: true,
+		})
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		addr, err := consumer.GetQueue()
+		Expect(err).To(BeNil())
+		Expect(addr).NotTo(ContainSubstring("/queues/"))
+		Expect(addr).To(ContainSubstring("amq.rabbitmq.reply-to"))
+		Expect(consumer.Close(context.Background())).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+})

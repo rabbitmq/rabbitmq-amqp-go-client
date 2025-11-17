@@ -174,9 +174,7 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAd
 
 // NewConsumer creates a new Consumer that listens to the provided Queue
 func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options IConsumerOptions) (*Consumer, error) {
-	destination := &QueueAddress{
-		Queue: queueName,
-	}
+
 	if options != nil {
 		err := options.validate(a.featuresAvailable)
 		if err != nil {
@@ -184,12 +182,20 @@ func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, opti
 		}
 	}
 
-	destinationAdd, err := destination.toAddress()
-	if err != nil {
-		return nil, err
+	if options != nil && options.isDirectReplyToEnable() {
+		return newConsumer(ctx, a, "", options)
+	} else {
+		destination := &QueueAddress{
+			Queue: queueName,
+		}
+		destinationAdd, err := destination.toAddress()
+		if err != nil {
+			return nil, err
+		}
+		return newConsumer(ctx, a, destinationAdd, options)
+
 	}
 
-	return newConsumer(ctx, a, destinationAdd, options)
 }
 
 // NewResponder creates a new RPC server that processes requests from the
@@ -264,18 +270,23 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 	}
 
 	replyQueueName := options.ReplyToQueueName
-	if len(replyQueueName) == 0 {
-		replyQueueName = generateNameWithDefaultPrefix()
-	}
+	queueName := ""
+	if !options.DirectReplyTo {
 
-	// Declare reply queue as exclusive, auto-delete classic queue
-	q, err := a.management.DeclareQueue(ctx, &ClassicQueueSpecification{
-		Name:         replyQueueName,
-		IsExclusive:  true,
-		IsAutoDelete: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to declare reply queue: %w", err)
+		if len(replyQueueName) == 0 {
+			replyQueueName = generateNameWithDefaultPrefix()
+		}
+
+		// Declare reply queue as exclusive, auto-delete classic queue
+		q, err := a.management.DeclareQueue(ctx, &ClassicQueueSpecification{
+			Name:         replyQueueName,
+			IsExclusive:  true,
+			IsAutoDelete: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to declare reply queue: %w", err)
+		}
+		queueName = q.Name()
 	}
 
 	// Set defaults for optional fields
@@ -318,13 +329,23 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 	}
 
 	// Create consumer for receiving replies
-	consumer, err := a.NewConsumer(ctx, q.Name(), nil)
+	consumer, err := a.NewConsumer(ctx, queueName, &ConsumerOptions{
+		DirectReplyTo: options.DirectReplyTo,
+	})
 	if err != nil {
 		_ = publisher.Close(ctx) // cleanup publisher on failure
 		return nil, fmt.Errorf("failed to create consumer: %w", err)
 	}
 
 	client.consumer = consumer
+	reply, err := consumer.GetQueue()
+	if err != nil {
+		_ = publisher.Close(ctx) // cleanup publisher on failure
+		_ = consumer.Close(ctx)
+		return nil, fmt.Errorf("failed to get reply queue: %w", err)
+	}
+
+	client.replyToQueue = &QueueAddress{Queue: reply}
 
 	go client.messageReceivedHandler()
 	go client.requestTimeoutTask()

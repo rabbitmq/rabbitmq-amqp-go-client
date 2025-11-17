@@ -120,6 +120,10 @@ type RequesterOptions struct {
 	//
 	// Optional. If not set, a default timeout of 30 seconds will be used.
 	RequestTimeout time.Duration
+
+	// If true, the requester will set the 'Direct-Reply-To' feature for RabbitMQ.
+	// see: https://www.rabbitmq.com/direct-reply-to.html
+	DirectReplyTo bool
 }
 
 type outstandingRequest struct {

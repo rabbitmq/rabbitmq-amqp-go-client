@@ -104,7 +104,7 @@ type ConsumerOptions struct {
 	Id string
 
 	//
-	DirectReplyToEnable bool
+	DirectReplyTo bool
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -125,7 +125,7 @@ func (aco *ConsumerOptions) id() string {
 
 func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 	// direct reply to is supported since RabbitMQ 4.2.0
-	if aco.DirectReplyToEnable && !available.is42rMore {
+	if aco.DirectReplyTo && !available.is42rMore {
 		return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
 	}
 
@@ -133,7 +133,7 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 }
 
 func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
-	return aco.DirectReplyToEnable
+	return aco.DirectReplyTo
 }
 
 type IOffsetSpecification interface {

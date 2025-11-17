@@ -90,6 +90,9 @@ type Consumer struct {
 	currentOffset int64
 
 	state consumerState
+
+	// see GetQueue method for more details.
+	queue string
 }
 
 func (c *Consumer) Id() string {
@@ -144,6 +147,8 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 		return err
 	}
 
+	c.queue = receiver.Address()
+
 	c.receiver.Swap(receiver)
 	return nil
 }
@@ -165,6 +170,13 @@ func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
 func (c *Consumer) Close(ctx context.Context) error {
 	c.connection.entitiesTracker.removeConsumer(c)
 	return c.receiver.Load().Close(ctx)
+}
+
+// GetQueue returns the queue the consumer is connected to.
+// When the user sets the destination address to a dynamic address, this function will return the dynamic address.
+// like direct-reply-to address. In other cases, it will return the queue address.
+func (c *Consumer) GetQueue() (string, error) {
+	return parseQueueAddress(c.queue)
 }
 
 // pause drains the credits of the receiver and stops issuing new credits.

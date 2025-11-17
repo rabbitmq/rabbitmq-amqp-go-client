@@ -30,6 +30,7 @@ func newEchoResponder(conn *rabbitmqamqp.AmqpConnection) *echoResponder {
 	}
 	srv, err := conn.NewResponder(context.TODO(), rabbitmqamqp.ResponderOptions{
 		RequestQueue: requestQueue,
+
 		Handler: func(ctx context.Context, request *amqp.Message) (*amqp.Message, error) {
 			return request, nil
 		},
@@ -62,6 +63,7 @@ func main() {
 
 	requester, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
 		RequestQueueName: requestQueue,
+		DirectReplyTo:    true,
 	})
 	if err != nil {
 		panic(err)
