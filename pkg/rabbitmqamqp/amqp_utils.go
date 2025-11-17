@@ -120,7 +120,7 @@ func decodePathSegments(segment string) (string, error) {
 	return decoded, nil
 }
 
-// remove /queue/ prefix from the queue address
+// remove /queues/ prefix from the queue address
 func trimQueueAddress(address string) (string, error) {
 	prefix := "/queues/"
 	if len(address) < len(prefix) || address[:len(prefix)] != prefix {
