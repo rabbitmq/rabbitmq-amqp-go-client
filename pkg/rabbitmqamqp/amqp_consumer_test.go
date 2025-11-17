@@ -232,7 +232,7 @@ var _ = Describe("Consumer direct reply to", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
-	It("Queue address should be the dynamic name starting from rabbitmq-queue", func() {
+	It("Queue address should be the dynamic name containing amq.rabbitmq.reply-to", func() {
 
 		connection, err := Dial(context.Background(), "amqp://", nil)
 		Expect(err).To(BeNil())
