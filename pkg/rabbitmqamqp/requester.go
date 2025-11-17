@@ -225,6 +225,9 @@ func (a *amqpRequester) Publish(ctx context.Context, message *amqp.Message) (<-c
 	return ch, nil
 }
 
+// GetReplyQueue returns where the Requester expects to receive replies.
+// When the user sets the destination address to a dynamic address, this function will return the dynamic address.
+// like direct-reply-to address. In other cases, it will return the queue address.
 func (a *amqpRequester) GetReplyQueue() (string, error) {
 	return a.consumer.GetQueue()
 }
