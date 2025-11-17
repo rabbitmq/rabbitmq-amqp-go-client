@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
 )
@@ -44,6 +45,11 @@ type IConsumerOptions interface {
 
 	// validate the consumer options based on the available features
 	validate(available *featuresAvailable) error
+
+	// isDirectReplyToEnable indicates if the direct reply to feature is enabled
+	// mostly used for RPC consumers.
+	// see https://www.rabbitmq.com/docs/next/direct-reply-to#overview
+	isDirectReplyToEnable() bool
 }
 
 func getInitialCredits(co IConsumerOptions) int32 {
@@ -80,8 +86,12 @@ func (mo *managementOptions) id() string {
 	return "management"
 }
 
-func (mo *managementOptions) validate(available *featuresAvailable) error {
+func (mo *managementOptions) validate(_ *featuresAvailable) error {
 	return nil
+}
+
+func (mo *managementOptions) isDirectReplyToEnable() bool {
+	return false
 }
 
 // ConsumerOptions represents the options for quorum and classic queues
@@ -92,6 +102,9 @@ type ConsumerOptions struct {
 	InitialCredits int32
 	// The id of the consumer
 	Id string
+
+	//
+	DirectReplyTo bool
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -111,7 +124,16 @@ func (aco *ConsumerOptions) id() string {
 }
 
 func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
+	// direct reply to is supported since RabbitMQ 4.2.0
+	if aco.DirectReplyTo && !available.is42rMore {
+		return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
+	}
+
 	return nil
+}
+
+func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
+	return aco.DirectReplyTo
 }
 
 type IOffsetSpecification interface {
@@ -216,8 +238,7 @@ type StreamConsumerOptions struct {
 	// see the interface implementations
 	Offset              IOffsetSpecification
 	StreamFilterOptions *StreamFilterOptions
-
-	Id string
+	Id                  string
 }
 
 func (sco *StreamConsumerOptions) linkName() string {
@@ -341,6 +362,10 @@ func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
 		return nil
 	}
 	return nil
+}
+
+func (sco *StreamConsumerOptions) isDirectReplyToEnable() bool {
+	return false
 }
 
 ///// PublisherOptions /////

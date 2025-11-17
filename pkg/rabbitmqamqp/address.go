@@ -3,6 +3,7 @@ package rabbitmqamqp
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -97,20 +98,23 @@ func purgeQueueAddress(queue *string) (string, error) {
 
 // encodePathSegments takes a string and returns its percent-encoded representation.
 func encodePathSegments(input string) string {
-	var encoded strings.Builder
+	encoded := url.QueryEscape(input)
+	return strings.ReplaceAll(encoded, "+", "%20")
 
-	// Iterate over each character in the input string
-	for _, char := range input {
-		// Check if the character is an unreserved character (i.e., it doesn't need encoding)
-		if isUnreserved(char) {
-			encoded.WriteRune(char) // Append as is
-		} else {
-			// Encode character To %HH format
-			encoded.WriteString(fmt.Sprintf("%%%02X", char))
-		}
-	}
-
-	return encoded.String()
+	//var encoded strings.Builder
+	//
+	//// Iterate over each character in the input string
+	//for _, char := range input {
+	//	// Check if the character is an unreserved character (i.e., it doesn't need encoding)
+	//	if isUnreserved(char) {
+	//		encoded.WriteRune(char) // Append as is
+	//	} else {
+	//		// Encode character To %HH format
+	//		encoded.WriteString(fmt.Sprintf("%%%02X", char))
+	//	}
+	//}
+	//
+	//return encoded.String()
 }
 
 //// Decode takes a percent-encoded string and returns its decoded representation.
@@ -124,14 +128,14 @@ func encodePathSegments(input string) string {
 //	return decoded, nil
 //}
 
-// isUnreserved checks if a character is an unreserved character in percent encoding
-// Unreserved characters are: A-Z, a-z, 0-9, -, ., _, ~
-func isUnreserved(char rune) bool {
-	return (char >= 'A' && char <= 'Z') ||
-		(char >= 'a' && char <= 'z') ||
-		(char >= '0' && char <= '9') ||
-		char == '-' || char == '.' || char == '_' || char == '~'
-}
+//// isUnreserved checks if a character is an unreserved character in percent encoding
+//// Unreserved characters are: A-Z, a-z, 0-9, -, ., _, ~
+//func isUnreserved(char rune) bool {
+//	return (char >= 'A' && char <= 'Z') ||
+//		(char >= 'a' && char <= 'z') ||
+//		(char >= '0' && char <= '9') ||
+//		char == '-' || char == '.' || char == '_' || char == '~'
+//}
 
 func bindingPath() string {
 	return "/" + bindings

@@ -33,10 +33,12 @@ import (
 //   - `Message` provides a basic AMQP message structure for RPC requests.
 //   - `Publish` sends the request message and returns a channel that will receive
 //     the reply message, or be closed if a timeout occurs or the client is closed.
+//   - `GetReplyQueue` returns the address of the reply queue used by the requester.
 type Requester interface {
 	Close(context.Context) error
 	Message(body []byte) *amqp.Message
 	Publish(context.Context, *amqp.Message) (<-chan *amqp.Message, error)
+	GetReplyQueue() (string, error)
 }
 
 // CorrelationIdSupplier is an interface for providing correlation IDs for RPC requests.
@@ -120,6 +122,10 @@ type RequesterOptions struct {
 	//
 	// Optional. If not set, a default timeout of 30 seconds will be used.
 	RequestTimeout time.Duration
+
+	// If true, the requester will set the 'Direct-Reply-To' feature for RabbitMQ.
+	// see: https://www.rabbitmq.com/direct-reply-to.html
+	DirectReplyTo bool
 }
 
 type outstandingRequest struct {
@@ -218,6 +224,13 @@ func (a *amqpRequester) Publish(ctx context.Context, message *amqp.Message) (<-c
 	}
 	a.mu.Unlock()
 	return ch, nil
+}
+
+// GetReplyQueue returns where the Requester expects to receive replies.
+// When the user sets the destination address to a dynamic address, this function will return the dynamic address.
+// like direct-reply-to address. In other cases, it will return the queue address.
+func (a *amqpRequester) GetReplyQueue() (string, error) {
+	return a.consumer.GetQueue()
 }
 
 func (a *amqpRequester) isClosed() bool {

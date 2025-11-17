@@ -2,9 +2,11 @@ package rabbitmqamqp
 
 import (
 	"fmt"
-	"github.com/Azure/go-amqp"
 	"math/rand"
+	"net/url"
 	"time"
+
+	"github.com/Azure/go-amqp"
 )
 
 const AtMostOnce = 0
@@ -68,6 +70,21 @@ func createReceiverLinkOptions(address string, options IConsumerOptions, deliver
 	return result
 }
 
+func createDynamicReceiverLinkOptions(options IConsumerOptions) *amqp.ReceiverOptions {
+	prop := make(map[string]any)
+	prop["paired"] = true
+
+	return &amqp.ReceiverOptions{
+		Name:                      getLinkName(options),
+		SourceCapabilities:        []string{"rabbitmq:volatile-queue"},
+		SourceExpiryPolicy:        amqp.ExpiryPolicyLinkDetach,
+		DynamicAddress:            true,
+		RequestedSenderSettleMode: amqp.SenderSettleModeSettled.Ptr(),
+		Credit:                    getInitialCredits(options),
+		Filters:                   getLinkFilters(options),
+	}
+}
+
 func random(max int) int {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	return r.Intn(max)
@@ -92,4 +109,35 @@ func validateMessageAnnotationKey(key string) error {
 		return fmt.Errorf("message annotation key must start with 'x-': %s", key)
 	}
 	return nil
+}
+
+// url decode path segments
+func decodePathSegments(segment string) (string, error) {
+	decoded, err := url.PathUnescape(segment)
+	if err != nil {
+		return "", err
+	}
+	return decoded, nil
+}
+
+// remove /queues/ prefix from the queue address
+func trimQueueAddress(address string) (string, error) {
+	prefix := "/queues/"
+	if len(address) < len(prefix) || address[:len(prefix)] != prefix {
+		return "", fmt.Errorf("invalid queue address: %s", address)
+	}
+	return address[len(prefix):], nil
+}
+
+// trim and decode queue name from the queue address
+func parseQueueAddress(address string) (string, error) {
+	trimmed, err := trimQueueAddress(address)
+	if err != nil {
+		return "", err
+	}
+	decoded, err := decodePathSegments(trimmed)
+	if err != nil {
+		return "", err
+	}
+	return decoded, nil
 }
