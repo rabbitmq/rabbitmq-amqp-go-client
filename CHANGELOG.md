@@ -4,8 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [[0.4.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.4.0)]
 
-This release focuses on improving stability during reconnection.
-
 ## 0.4.0 - 2025-18-11
 - [Release 0.4.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.4.0)
 
