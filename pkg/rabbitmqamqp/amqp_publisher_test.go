@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"context"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,6 +43,22 @@ var _ = Describe("AMQP publisher ", func() {
 		exchangeName := "Nope"
 		publisher, err := connection.NewPublisher(context.Background(), &ExchangeAddress{Exchange: exchangeName}, nil)
 		Expect(err).NotTo(BeNil())
+		Expect(publisher).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+	It("NewPublisher should fail for a non-existing queue", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		Expect(connection).NotTo(BeNil())
+		queueName := generateNameWithDateTime("NonExistingQueue")
+
+		// Try to create a publisher to a queue that doesn't exist
+		// This MUST fail at the NewPublisher step
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: queueName}, nil)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("amqp:not-found"))
+		Expect(err.Error()).To(ContainSubstring("no queue"))
 		Expect(publisher).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
