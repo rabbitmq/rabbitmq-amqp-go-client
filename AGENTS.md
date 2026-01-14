@@ -1,0 +1,214 @@
+# AGENTS.md
+
+This document provides guidance for AI coding assistants working with the RabbitMQ AMQP 1.0 Go Client library.
+
+## Project Overview
+
+This is a Go client library for RabbitMQ 4.x that provides a wrapper around the Azure `go-amqp` client. The library simplifies working with AMQP 1.0 protocol in RabbitMQ, providing high-level abstractions for common operations like publishing, consuming, RPC patterns, and queue management.
+
+## Key Dependencies
+
+- `github.com/Azure/go-amqp v1.5.1` - Core AMQP 1.0 implementation
+- `github.com/google/uuid` - UUID generation
+- `github.com/golang-jwt/jwt/v5` - JWT token handling (for OAuth2)
+- Testing: `github.com/onsi/ginkgo/v2` and `github.com/onsi/gomega`
+
+## Project Structure
+
+```
+pkg/rabbitmqamqp/          # Main package with all client functionality
+  - amqp_connection.go      # Connection management
+  - amqp_consumer.go        # Consumer implementation
+  - amqp_publisher.go        # Publisher implementation
+  - amqp_queue.go           # Queue operations
+  - amqp_exchange.go        # Exchange operations
+  - amqp_management.go      # Management API operations
+  - requester.go            # RPC requester (client side)
+  - responder.go            # RPC responder (server side)
+  - entities.go             # Queue specifications and types
+  - amqp_types.go           # Type aliases and interfaces
+  - common.go               # Shared utilities and constants
+  - converters.go           # Message conversion utilities
+  - address.go              # Address parsing
+  - uri.go                  # URI handling
+  - websocket_dialer.go     # WebSocket support
+  - log.go                  # Logging utilities
+  - life_cycle.go           # Lifecycle management
+  - *_test.go               # Test files
+
+docs/examples/             # Example code demonstrating usage
+```
+
+## Core Interfaces and Types
+
+### Main Client Interfaces
+
+- **`AmqpEnvironment`** - Main entry point for creating connections, publishers, consumers
+- **`AmqpConnection`** - Represents an AMQP connection
+- **`AmqpPublisher`** - Interface for publishing messages
+- **`AmqpConsumer`** - Interface for consuming messages
+- **`Requester`** - Interface for RPC client operations (formerly RpcClient)
+- **`Responder`** - Interface for RPC server operations (formerly RpcServer)
+- **`AmqpQueue`** - Interface for queue management operations
+- **`AmqpExchange`** - Interface for exchange operations
+- **`AmqpManagement`** - Interface for management API operations
+
+### Queue Types
+
+- `Quorum` - Quorum queue type
+- `Classic` - Classic queue type
+- `Stream` - Stream queue type
+
+### Consumer Options
+
+- **`IConsumerOptions`** - Interface for configuring consumers
+  - `linkName()` - Link name (defaults to random UUID)
+  - `initialCredits()` - Initial credits (defaults to 256)
+  - `linkFilters()` - Link filters for stream consumers
+  - `id()` - Consumer ID
+  - `isDirectReplyToEnable()` - Enable direct reply-to for RPC
+
+### Queue Specifications
+
+- **`IQueueSpecification`** - Interface for queue specifications
+- **`QuorumQueueSpecification`** - Specification for quorum queues
+- **`ClassicQueueSpecification`** - Specification for classic queues
+- **`StreamQueueSpecification`** - Specification for stream queues
+
+## Code Conventions
+
+### Naming
+
+- Interfaces typically start with `I` (e.g., `IConsumerOptions`, `IQueueSpecification`)
+- Private methods use lowercase (e.g., `linkName()`, `initialCredits()`)
+- Public methods use PascalCase (e.g., `Close()`, `Publish()`)
+- Constants use camelCase (e.g., `linkPairName`, `managementNodeAddress`)
+
+### Error Handling
+
+- Functions return `error` as the last return value
+- Use descriptive error messages with context
+- Check for nil before dereferencing pointers
+
+### Context Usage
+
+- Most operations accept `context.Context` as the first parameter
+- Use context for cancellation and timeouts
+- Always pass context through the call chain
+
+### Logging
+
+- Use the logging functions from `log.go`:
+  - `Info()`, `Error()`, `Debug()`, `Warn()`
+- Logging follows structured logging patterns with key-value pairs
+
+## Common Patterns
+
+### Creating a Connection
+
+```go
+env, err := rabbitmqamqp.NewAmqpEnvironment(ctx, rabbitmqamqp.NewAmqpEnvironmentOptions().
+    SetHost("localhost").
+    SetUser("guest").
+    SetPassword("guest"))
+```
+
+### Publishing Messages
+
+```go
+publisher, err := connection.NewAmqpPublisher(ctx, rabbitmqamqp.NewAmqpPublisherOptions().
+    SetTarget("my-queue"))
+    
+msg := &amqp.Message{
+    Body: []byte("Hello, RabbitMQ!"),
+}
+err = publisher.Publish(ctx, msg)
+```
+
+### Consuming Messages
+
+```go
+consumer, err := connection.NewAmqpConsumer(ctx, rabbitmqamqp.NewAmqpConsumerOptions().
+    SetSource("my-queue").
+    SetInitialCredits(100))
+
+msgChan := consumer.Receive(ctx)
+for msg := range msgChan {
+    // Process message
+    msg.Accept(ctx)
+}
+```
+
+### RPC Pattern
+
+**Requester (Client):**
+```go
+requester, err := connection.NewRequester(ctx, rabbitmqamqp.NewRequesterOptions().
+    SetRequestQueue("rpc-queue"))
+
+msg := requester.Message([]byte("request"))
+replyChan, err := requester.Publish(ctx, msg)
+reply := <-replyChan
+```
+
+**Responder (Server):**
+```go
+responder, err := connection.NewResponder(ctx, rabbitmqamqp.NewResponderOptions().
+    SetRequestQueue("rpc-queue"))
+
+msgChan := responder.Receive(ctx)
+for msg := range msgChan {
+    // Process request and send reply
+    responder.Send(ctx, msg, replyMsg)
+}
+```
+
+## Testing
+
+- Tests use Ginkgo/Gomega framework
+- Test files follow the pattern `*_test.go`
+- Test utilities are in `test_utils.go`
+- Integration tests may require a running RabbitMQ instance
+- Use `make test` to run all tests
+
+## Important Constants
+
+- `AMQPS` - Protocol constant for AMQPS
+- `StreamFilterValue` - Header key for stream filtering
+- `commandReplyTo` - Direct reply-to address (`"$me"`)
+- `managementNodeAddress` - Management API address (`"/management"`)
+- `linkPairName` - Default management link name
+
+## Breaking Changes
+
+- In v0.4.0, `RpcClient` was renamed to `Requester` and `RpcServer` was renamed to `Responder`
+- Always check the CHANGELOG.md for breaking changes between versions
+
+## Common Tasks
+
+### Adding a New Feature
+
+1. Define interfaces if needed (following the `I` prefix convention)
+2. Implement the feature in the appropriate file
+3. Add tests in corresponding `*_test.go` file
+4. Update documentation if needed
+5. Add examples in `docs/examples/` if applicable
+
+### Modifying Existing Code
+
+1. Check for related tests and update them
+2. Ensure backward compatibility or document breaking changes
+3. Update CHANGELOG.md for user-facing changes
+4. Follow existing code patterns and conventions
+
+### Working with Azure go-amqp
+
+- This library wraps Azure's go-amqp client
+- Type aliases are defined in `amqp_types.go` (e.g., `DeliveryState`, `StateAccepted`)
+- When updating Azure dependency, check for breaking changes in their changelog
+
+## Resources
+
+- [RabbitMQ Client Libraries Documentation](https://www.rabbitmq.com/client-libraries/amqp-client-libraries)
+- [Examples Directory](docs/examples/)
+- [Azure go-amqp Repository](https://github.com/Azure/go-amqp)
