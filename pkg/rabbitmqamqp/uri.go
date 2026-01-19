@@ -119,16 +119,10 @@ func ParseURI(uri string) (URI, error) {
 }
 
 // Extract the Uri by omitting the password
-
-func ExtractWithoutPassword(raw string) string {
-	u, err := url.Parse(raw)
+func ExtractWithoutPassword(addr string) string {
+	u, err := ParseURI(addr)
 	if err != nil {
-		return "<invalid-url>"
+		return ""
 	}
-
-	if u.User != nil {
-		u.User = url.User(u.User.Username())
-	}
-
-	return u.String()
+	return u.Scheme + "://" + u.Username + "@*****" + u.Host + ":" + strconv.Itoa(u.Port) + u.Vhost
 }
