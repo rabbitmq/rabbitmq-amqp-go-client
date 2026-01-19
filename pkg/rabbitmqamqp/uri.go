@@ -13,13 +13,15 @@ import (
 )
 
 var (
-	errURIScheme     = errors.New("AMQP scheme must be either 'amqp://' or 'amqps://'")
+	errURIScheme     = errors.New("AMQP scheme must be either 'amqp://', 'amqps://', 'ws://' or 'wss://'")
 	errURIWhitespace = errors.New("URI must not contain whitespace")
 )
 
 var schemePorts = map[string]int{
 	"amqp":  5672,
 	"amqps": 5671,
+	"wss":   15675,
+	"ws":    15675,
 }
 
 var defaultURI = URI{
@@ -118,10 +120,15 @@ func ParseURI(uri string) (URI, error) {
 
 // Extract the Uri by omitting the password
 
-func ExtractWithoutPassword(addr string) string {
-	u, err := ParseURI(addr)
+func ExtractWithoutPassword(raw string) string {
+	u, err := url.Parse(raw)
 	if err != nil {
-		return ""
+		return "<invalid-url>"
 	}
-	return u.Scheme + "://" + u.Username + "@*****" + u.Host + ":" + strconv.Itoa(u.Port) + u.Vhost
+
+	if u.User != nil {
+		u.User = url.User(u.User.Username())
+	}
+
+	return u.String()
 }
