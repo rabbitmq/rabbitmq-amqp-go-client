@@ -3,15 +3,19 @@ package rabbitmqamqp
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 var ErrConnectionClosed = errors.New("connection is closed")
@@ -453,10 +457,45 @@ func (a *AmqpConnection) open(ctx context.Context, address string, connOptions *
 		TLSConfig:    connOptions.TLSConfig,
 		WriteTimeout: connOptions.WriteTimeout,
 	}
-	azureConnection, err = amqp.Dial(ctx, address, amqpLiteConnOptions)
-	if err != nil && (connOptions.TLSConfig != nil || uri.Scheme == AMQPS) {
-		Error("Failed to open TLS connection", fmt.Sprintf("%s://%s", uri.Scheme, uri.Host), err, "ID", connOptions.Id)
-		return fmt.Errorf("failed to open TLS connection: %w", err)
+
+	u, err := url.Parse(address)
+	if err != nil {
+		return err
+	}
+
+	if u.Scheme == "ws" || u.Scheme == "wss" {
+
+		wsAddress, wsHeaders, err := sanitizeWebSocketURL(address)
+		if err != nil {
+			Error("Failed to sanitize websocket URL", "url", ExtractWithoutPassword(address), "error", err, "ID", connOptions.Id)
+			return fmt.Errorf("failed to sanitize websocket URL: %w", err)
+		}
+
+		// Create a WebSocket dialer
+		dialer := websocket.DefaultDialer
+		if u.Scheme == "wss" && connOptions.TLSConfig != nil {
+			dialer.TLSClientConfig = connOptions.TLSConfig
+		}
+
+		// Dial the WebSocket server
+		wsConn, _, err := dialer.Dial(wsAddress, wsHeaders)
+		if err != nil {
+			Error("Failed to open a websocket connection", "url", ExtractWithoutPassword(wsAddress), "error", err, "ID", connOptions.Id)
+			return fmt.Errorf("failed to open a websocket connection: %w", err)
+		}
+
+		// Wrap the WebSocket connection in a WebSocketConn
+		neConn := NewWebSocketConn(wsConn)
+		azureConnection, err = amqp.NewConn(ctx, neConn, amqpLiteConnOptions)
+		if err != nil {
+			Error("Failed to open AMQP over WebSocket connection", "url", ExtractWithoutPassword(address), "error", err, "ID", connOptions.Id)
+		}
+	} else {
+		azureConnection, err = amqp.Dial(ctx, address, amqpLiteConnOptions)
+		if err != nil && (connOptions.TLSConfig != nil || uri.Scheme == AMQPS) {
+			Error("Failed to open TLS connection", fmt.Sprintf("%s://%s", uri.Scheme, uri.Host), err, "ID", connOptions.Id)
+			return fmt.Errorf("failed to open TLS connection: %w", err)
+		}
 	}
 	if err != nil {
 		Error("Failed to open connection", "url", ExtractWithoutPassword(address), "error", err, "ID", connOptions.Id)
@@ -701,3 +740,36 @@ func (a *AmqpConnection) RefreshToken(background context.Context, token string) 
 }
 
 //*** end management section ***
+
+// sanitizeWebSocketURL ensures the URL is correctly formatted for the Gorilla websocket dialer.
+func sanitizeWebSocketURL(rawURL string) (string, http.Header, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if u.Scheme != "ws" && u.Scheme != "wss" {
+		return "", nil, fmt.Errorf("invalid websocket scheme: %s", u.Scheme)
+	}
+
+	// Prepare Headers for Auth
+	headers := http.Header{}
+	if u.User != nil {
+		username := u.User.Username()
+		password, _ := u.User.Password()
+
+		// Construct Basic Auth Header manually
+		auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+		headers.Add("Authorization", "Basic "+auth)
+
+		u.User = nil
+	}
+
+	if u.Path == "" {
+		u.Path = "/"
+	} else if u.Path[0] != '/' {
+		u.Path = "/" + u.Path
+	}
+
+	return u.String(), headers, nil
+}
