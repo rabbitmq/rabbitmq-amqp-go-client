@@ -754,6 +754,11 @@ func sanitizeWebSocketURL(rawURL string) (string, http.Header, error) {
 
 	// Prepare Headers for Auth
 	headers := http.Header{}
+	// add sec-websocket-protocol amqp
+	// mandatory for AMQP over WebSocket
+	// https://www.rfc-editor.org/rfc/rfc6455.html
+	headers.Add("Sec-WebSocket-Protocol", "amqp")
+
 	if u.User != nil {
 		username := u.User.Username()
 		password, _ := u.User.Password()
@@ -761,9 +766,6 @@ func sanitizeWebSocketURL(rawURL string) (string, http.Header, error) {
 		// Construct Basic Auth Header manually
 		auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		headers.Add("Authorization", "Basic "+auth)
-		// add sec-websocket-protocol amqp
-		headers.Add("Sec-WebSocket-Protocol", "amqp")
-
 		u.User = nil
 	}
 
