@@ -12,3 +12,4 @@
 - [Broadcast](broadcast) - An example of how to use fanout to broadcast messages to multiple auto-deleted queues.
 - [RPC Echo](rpc_echo_server) - An example of how to implement RPC with the AMQP 1.0 client.
 - [SQL stream Filtering](sql_stream_filter) - An example of how to use SQL stream filtering with RabbitMQ Streams.
+- [Web Sockets](web_sockets) - An example of how to use Web Sockets with the AMQP 1.0 client.
