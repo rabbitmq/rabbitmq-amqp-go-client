@@ -761,6 +761,8 @@ func sanitizeWebSocketURL(rawURL string) (string, http.Header, error) {
 		// Construct Basic Auth Header manually
 		auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		headers.Add("Authorization", "Basic "+auth)
+		// add sec-websocket-protocol amqp
+		headers.Add("Sec-WebSocket-Protocol", "amqp")
 
 		u.User = nil
 	}
