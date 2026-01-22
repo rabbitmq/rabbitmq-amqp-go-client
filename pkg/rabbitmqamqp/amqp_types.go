@@ -50,6 +50,14 @@ type IConsumerOptions interface {
 	// mostly used for RPC consumers.
 	// see https://www.rabbitmq.com/docs/next/direct-reply-to#overview
 	isDirectReplyToEnable() bool
+
+	// preSettled indicates if the consumer should use pre-settled delivery mode.
+	// When enabled, messages arrive already settled from the broker, which makes
+	// settlement from the client with a disposition frame not necessary.
+	// This is the "fire-and-forget" or "at-most-once" mode. It should be faster
+	// but may result in message loss. It is fine for use cases like log streaming
+	// or sensor telemetry.
+	preSettled() bool
 }
 
 func getInitialCredits(co IConsumerOptions) int32 {
@@ -64,6 +72,13 @@ func getLinkFilters(co IConsumerOptions) []amqp.LinkFilter {
 		return nil
 	}
 	return co.linkFilters()
+}
+
+func getPreSettled(co IConsumerOptions) bool {
+	if co == nil {
+		return false
+	}
+	return co.preSettled()
 }
 
 type managementOptions struct {
@@ -94,6 +109,10 @@ func (mo *managementOptions) isDirectReplyToEnable() bool {
 	return false
 }
 
+func (mo *managementOptions) preSettled() bool {
+	return false
+}
+
 // ConsumerOptions represents the options for quorum and classic queues
 type ConsumerOptions struct {
 	//ReceiverLinkName: see the IConsumerOptions interface
@@ -105,6 +124,8 @@ type ConsumerOptions struct {
 
 	//
 	DirectReplyTo bool
+	// PreSettled: see the IConsumerOptions interface
+	PreSettled bool
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -134,6 +155,10 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 
 func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
 	return aco.DirectReplyTo
+}
+
+func (aco *ConsumerOptions) preSettled() bool {
+	return aco.PreSettled
 }
 
 type IOffsetSpecification interface {
@@ -365,6 +390,12 @@ func (sco *StreamConsumerOptions) validate(available *featuresAvailable) error {
 }
 
 func (sco *StreamConsumerOptions) isDirectReplyToEnable() bool {
+	return false
+}
+
+// for stream queues preSettled is always false.
+// preSettled does not make sense for stream consumers.
+func (sco *StreamConsumerOptions) preSettled() bool {
 	return false
 }
 

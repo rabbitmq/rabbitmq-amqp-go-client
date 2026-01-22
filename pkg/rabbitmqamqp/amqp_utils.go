@@ -45,13 +45,24 @@ func createSenderLinkOptions(address string, linkName string, deliveryMode int) 
 func createReceiverLinkOptions(address string, options IConsumerOptions, deliveryMode int) *amqp.ReceiverOptions {
 	prop := make(map[string]any)
 	prop["paired"] = true
-	receiverSettleMode := amqp.SenderSettleModeSettled.Ptr()
-	/// SndSettleMode = deliveryMode == DeliveryMode.AtMostOnce
-	//                    ? SenderSettleMode.Settled
-	//                    : SenderSettleMode.Unsettled,
 
-	if deliveryMode == AtLeastOnce {
-		receiverSettleMode = amqp.SenderSettleModeUnsettled.Ptr()
+	// Check if pre-settled mode is enabled
+	preSettled := getPreSettled(options)
+
+	var receiverSettleMode *amqp.SenderSettleMode
+	var settlementMode *amqp.ReceiverSettleMode
+
+	if preSettled {
+		// Pre-settled mode: AT_MOST_ONCE with auto-settle
+		receiverSettleMode = amqp.SenderSettleModeSettled.Ptr()
+		settlementMode = amqp.ReceiverSettleModeSecond.Ptr() // auto-settle
+	} else {
+		// Normal mode: use the provided deliveryMode
+		receiverSettleMode = amqp.SenderSettleModeSettled.Ptr()
+		if deliveryMode == AtLeastOnce {
+			receiverSettleMode = amqp.SenderSettleModeUnsettled.Ptr()
+		}
+		settlementMode = amqp.ReceiverSettleModeFirst.Ptr() // explicit settle
 	}
 
 	result := &amqp.ReceiverOptions{
@@ -61,7 +72,7 @@ func createReceiverLinkOptions(address string, options IConsumerOptions, deliver
 		Properties:                prop,
 		Durability:                0,
 		ExpiryTimeout:             0,
-		SettlementMode:            amqp.ReceiverSettleModeFirst.Ptr(),
+		SettlementMode:            settlementMode,
 		RequestedSenderSettleMode: receiverSettleMode,
 		ExpiryPolicy:              amqp.ExpiryPolicyLinkDetach,
 		Credit:                    getInitialCredits(options),

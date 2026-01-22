@@ -226,18 +226,18 @@ func (a *amqpResponder) handle() {
 			continue
 		}
 		// TODO: add a configurable timeout for the request handling
-		reply, err := a.requestHandler(context.Background(), request.message)
+		reply, err := a.requestHandler(context.Background(), request.Message())
 		if err != nil {
 			Error("Request handler returned error. Discarding request", "error", err)
 			request.Discard(context.Background(), nil)
 			continue
 		}
 
-		if reply != nil && request.message.Properties != nil && request.message.Properties.ReplyTo != nil {
-			setToProperty(reply, request.message.Properties.ReplyTo)
+		if reply != nil && request.Message().Properties != nil && request.Message().Properties.ReplyTo != nil {
+			setToProperty(reply, request.Message().Properties.ReplyTo)
 		}
 
-		correlationID := a.correlationIdExtractor(request.message)
+		correlationID := a.correlationIdExtractor(request.Message())
 		reply = a.replyPostProcessor(reply, correlationID)
 		if reply != nil {
 			err = callAndMaybeRetry(func() error {
@@ -260,7 +260,7 @@ func (a *amqpResponder) handle() {
 
 		err = request.Accept(context.Background())
 		if err != nil {
-			Error("Failed to accept request", "error", err, "messageId", request.message.Properties.MessageID)
+			Error("Failed to accept request", "error", err, "messageId", request.Message().Properties.MessageID)
 		}
 	}
 }
