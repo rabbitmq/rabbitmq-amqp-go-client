@@ -380,7 +380,7 @@ var _ = Describe("Consumer stream test", func() {
 				Expect(dc.Message()).NotTo(BeNil())
 				Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message_id:%d_label:%s", i, label)))
 
-				Expect(dc.message.ApplicationProperties).To(HaveKeyWithValue(key, value))
+				Expect(dc.Message().ApplicationProperties).To(HaveKeyWithValue(key, value))
 				Expect(dc.Accept(context.Background())).To(BeNil())
 			}
 			Expect(consumer.Close(context.Background())).To(BeNil())
@@ -495,51 +495,51 @@ var _ = Describe("Consumer stream test", func() {
 				// we test one by one because of the date time fields
 				// It is not possible to compare the whole structure due of the time
 				// It is not perfect but it is enough for the test
-				if dc.message.Properties.MessageID != nil {
-					Expect(dc.message.Properties.MessageID).To(Equal(properties.MessageID))
+				if dc.Message().Properties.MessageID != nil {
+					Expect(dc.Message().Properties.MessageID).To(Equal(properties.MessageID))
 				}
-				if dc.message.Properties.Subject != nil {
-					Expect(dc.message.Properties.Subject).To(Equal(properties.Subject))
+				if dc.Message().Properties.Subject != nil {
+					Expect(dc.Message().Properties.Subject).To(Equal(properties.Subject))
 				}
-				if dc.message.Properties.ReplyTo != nil {
-					Expect(dc.message.Properties.ReplyTo).To(Equal(properties.ReplyTo))
+				if dc.Message().Properties.ReplyTo != nil {
+					Expect(dc.Message().Properties.ReplyTo).To(Equal(properties.ReplyTo))
 				}
-				if dc.message.Properties.ContentType != nil {
-					Expect(dc.message.Properties.ContentType).To(Equal(properties.ContentType))
+				if dc.Message().Properties.ContentType != nil {
+					Expect(dc.Message().Properties.ContentType).To(Equal(properties.ContentType))
 				}
-				if dc.message.Properties.ContentEncoding != nil {
-					Expect(dc.message.Properties.ContentEncoding).To(Equal(properties.ContentEncoding))
+				if dc.Message().Properties.ContentEncoding != nil {
+					Expect(dc.Message().Properties.ContentEncoding).To(Equal(properties.ContentEncoding))
 				}
-				if dc.message.Properties.GroupID != nil {
-					Expect(dc.message.Properties.GroupID).To(Equal(properties.GroupID))
+				if dc.Message().Properties.GroupID != nil {
+					Expect(dc.Message().Properties.GroupID).To(Equal(properties.GroupID))
 				}
-				if dc.message.Properties.ReplyToGroupID != nil {
-					Expect(dc.message.Properties.ReplyToGroupID).To(Equal(properties.ReplyToGroupID))
+				if dc.Message().Properties.ReplyToGroupID != nil {
+					Expect(dc.Message().Properties.ReplyToGroupID).To(Equal(properties.ReplyToGroupID))
 				}
-				if dc.message.Properties.GroupSequence != nil {
-					Expect(dc.message.Properties.GroupSequence).To(Equal(properties.GroupSequence))
+				if dc.Message().Properties.GroupSequence != nil {
+					Expect(dc.Message().Properties.GroupSequence).To(Equal(properties.GroupSequence))
 				}
 
-				if dc.message.Properties.ReplyToGroupID != nil {
-					Expect(dc.message.Properties.ReplyToGroupID).To(Equal(properties.ReplyToGroupID))
+				if dc.Message().Properties.ReplyToGroupID != nil {
+					Expect(dc.Message().Properties.ReplyToGroupID).To(Equal(properties.ReplyToGroupID))
 				}
 
 				// here we compare only the year, month and day
 				// it is not perfect but it is enough for the test
-				if dc.message.Properties.CreationTime != nil {
-					Expect(dc.message.Properties.CreationTime.Year()).To(Equal(properties.CreationTime.Year()))
-					Expect(dc.message.Properties.CreationTime.Month()).To(Equal(properties.CreationTime.Month()))
-					Expect(dc.message.Properties.CreationTime.Day()).To(Equal(properties.CreationTime.Day()))
+				if dc.Message().Properties.CreationTime != nil {
+					Expect(dc.Message().Properties.CreationTime.Year()).To(Equal(properties.CreationTime.Year()))
+					Expect(dc.Message().Properties.CreationTime.Month()).To(Equal(properties.CreationTime.Month()))
+					Expect(dc.Message().Properties.CreationTime.Day()).To(Equal(properties.CreationTime.Day()))
 				}
 
-				if dc.message.Properties.AbsoluteExpiryTime != nil {
-					Expect(dc.message.Properties.AbsoluteExpiryTime.Year()).To(Equal(properties.AbsoluteExpiryTime.Year()))
-					Expect(dc.message.Properties.AbsoluteExpiryTime.Month()).To(Equal(properties.AbsoluteExpiryTime.Month()))
-					Expect(dc.message.Properties.AbsoluteExpiryTime.Day()).To(Equal(properties.AbsoluteExpiryTime.Day()))
+				if dc.Message().Properties.AbsoluteExpiryTime != nil {
+					Expect(dc.Message().Properties.AbsoluteExpiryTime.Year()).To(Equal(properties.AbsoluteExpiryTime.Year()))
+					Expect(dc.Message().Properties.AbsoluteExpiryTime.Month()).To(Equal(properties.AbsoluteExpiryTime.Month()))
+					Expect(dc.Message().Properties.AbsoluteExpiryTime.Day()).To(Equal(properties.AbsoluteExpiryTime.Day()))
 				}
 
-				if dc.message.Properties.CorrelationID != nil {
-					Expect(dc.message.Properties.CorrelationID).To(Equal(properties.CorrelationID))
+				if dc.Message().Properties.CorrelationID != nil {
+					Expect(dc.Message().Properties.CorrelationID).To(Equal(properties.CorrelationID))
 				}
 
 				Expect(dc.Accept(context.Background())).To(BeNil())

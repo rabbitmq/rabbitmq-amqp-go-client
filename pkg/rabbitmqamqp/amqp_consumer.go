@@ -9,6 +9,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// IDeliveryContext represents a delivery context for received messages.
+// It provides methods to access the message and settle it (accept, discard, requeue).
+type IDeliveryContext interface {
+	Message() *amqp.Message
+	Accept(ctx context.Context) error
+	Discard(ctx context.Context, e *amqp.Error) error
+	DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error
+	Requeue(ctx context.Context) error
+	RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error
+}
+
 type DeliveryContext struct {
 	receiver *amqp.Receiver
 	message  *amqp.Message
@@ -64,6 +75,36 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 		UndeliverableHere: false,
 		Annotations:       destination,
 	})
+}
+
+// PreSettledDeliveryContext represents a delivery context for pre-settled messages.
+// All settlement methods throw errors since the message is already settled.
+type PreSettledDeliveryContext struct {
+	message *amqp.Message
+}
+
+func (dc *PreSettledDeliveryContext) Message() *amqp.Message {
+	return dc.message
+}
+
+func (dc *PreSettledDeliveryContext) Accept(ctx context.Context) error {
+	return fmt.Errorf("auto-settle on, message is already disposed")
+}
+
+func (dc *PreSettledDeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
+	return fmt.Errorf("auto-settle on, message is already disposed")
+}
+
+func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+	return fmt.Errorf("auto-settle on, message is already disposed")
+}
+
+func (dc *PreSettledDeliveryContext) Requeue(ctx context.Context) error {
+	return fmt.Errorf("auto-settle on, message is already disposed")
+}
+
+func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+	return fmt.Errorf("auto-settle on, message is already disposed")
 }
 
 type consumerState byte
@@ -124,13 +165,18 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 		// In there is not a restart this code won't be executed.
 		if c.options != nil {
 			// here we assume it is a stream. So we recreate the options with the offset.
-			c.options = &StreamConsumerOptions{
+			streamOpts := &StreamConsumerOptions{
 				ReceiverLinkName: c.options.linkName(),
 				InitialCredits:   c.options.initialCredits(),
 				// we increment the offset by one to start from the next message.
 				// because the current was already consumed.
 				Offset: &OffsetValue{Offset: uint64(c.currentOffset + 1)},
 			}
+			// Preserve StreamFilterOptions if it's a StreamConsumerOptions
+			if sco, ok := c.options.(*StreamConsumerOptions); ok {
+				streamOpts.StreamFilterOptions = sco.StreamFilterOptions
+			}
+			c.options = streamOpts
 		}
 	}
 	// define a variable  *amqp.ReceiverOptions type
@@ -153,7 +199,7 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 	return nil
 }
 
-func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
+func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 	msg, err := c.receiver.Load().Receive(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -162,6 +208,11 @@ func (c *Consumer) Receive(ctx context.Context) (*DeliveryContext, error) {
 	if msg != nil && msg.Annotations != nil && msg.Annotations["x-stream-offset"] != nil {
 		// keep track of the current offset of the consumer
 		c.currentOffset = msg.Annotations["x-stream-offset"].(int64)
+	}
+
+	// Check if pre-settled mode is enabled
+	if c.options != nil && c.options.preSettled() {
+		return &PreSettledDeliveryContext{message: msg}, nil
 	}
 
 	return &DeliveryContext{receiver: c.receiver.Load(), message: msg}, nil

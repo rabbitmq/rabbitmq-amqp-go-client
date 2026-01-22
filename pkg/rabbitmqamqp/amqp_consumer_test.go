@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
@@ -296,4 +297,65 @@ var _ = Describe("Consumer direct reply to", func() {
 
 	})
 
+})
+
+var _ = Describe("Consumer pre-settled", func() {
+	It("should consume messages in pre-settled mode and throw error on settlement methods", func() {
+		qName := generateNameWithDateTime("Consumer pre-settled should consume messages in pre-settled mode")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queue).NotTo(BeNil())
+
+		// Publish messages
+		messageCount := 100
+		initialCredits := int32(messageCount / 10)
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, nil)
+		Expect(err).To(BeNil())
+		for i := 0; i < messageCount; i++ {
+			msg := &amqp.Message{
+				Data: [][]byte{[]byte(fmt.Sprintf("message-%d", i))},
+			}
+			_, err = publisher.Publish(context.Background(), msg)
+			Expect(err).To(BeNil())
+		}
+
+		// Create consumer with pre-settled enabled
+		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			InitialCredits: initialCredits,
+			PreSettled:     true,
+		})
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+		DeferCleanup(func() {
+			_ = consumer.Close(context.Background())
+		})
+
+		// Receive all messages
+		for i := 0; i < messageCount; i++ {
+			dc, err := consumer.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Message()).NotTo(BeNil())
+			Expect(string(dc.Message().Data[0])).To(Equal(fmt.Sprintf("message-%d", i)))
+
+			// Try to call Accept() and verify it throws an error
+			err = dc.Accept(context.Background())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("auto-settle on, message is already disposed"))
+		}
+
+		// Verify queue is empty (messages were consumed)
+		queueInfo, err := connection.Management().QueueInfo(context.Background(), qName)
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.messageCount).To(Equal(uint64(0)))
+	})
 })
