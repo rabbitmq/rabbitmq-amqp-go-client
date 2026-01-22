@@ -20,7 +20,7 @@ func main() {
 	rmq.Info("Pre-Settled example with AMQP Go AMQP 1.0 Client")
 
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	if err != nil {
 		rmq.Error("Error opening connection", err)
 		return
