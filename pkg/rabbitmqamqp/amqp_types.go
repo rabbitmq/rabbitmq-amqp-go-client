@@ -54,9 +54,7 @@ type IConsumerOptions interface {
 	// preSettled indicates if the consumer should use pre-settled delivery mode.
 	// When enabled, messages arrive already settled from the broker, which makes
 	// settlement from the client with a disposition frame not necessary.
-	// This is the "fire-and-forget" or "at-most-once" mode. It should be faster
-	// but may result in message loss. It is fine for use cases like log streaming
-	// or sensor telemetry.
+	// This is the "fire-and-forget" or "at-most-once" mode.
 	preSettled() bool
 }
 
