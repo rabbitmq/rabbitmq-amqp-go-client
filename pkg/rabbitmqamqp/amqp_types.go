@@ -48,7 +48,7 @@ type IConsumerOptions interface {
 
 	// isDirectReplyToEnable indicates if the direct reply to feature is enabled
 	// mostly used for RPC consumers.
-	// see https://www.rabbitmq.com/docs/next/direct-reply-to#overview
+	// see https://www.rabbitmq.com/docs/direct-reply-to#overview
 	isDirectReplyToEnable() bool
 
 	// preSettled indicates if the consumer should use pre-settled delivery mode.
@@ -111,6 +111,24 @@ func (mo *managementOptions) preSettled() bool {
 	return false
 }
 
+type ConsumerFeature byte
+
+const (
+	// DefaultSettle means that the consumer will be created with the default settings.
+	// message settle mode will be the default one (explicit settle) via IDeliveryContext
+	DefaultSettle ConsumerFeature = iota
+
+	// DirectReplyTo means that the consumer will be created with the direct reply to feature enabled.
+	// see https://www.rabbitmq.com/docs/direct-reply-to#overview message settle mode will be auto-settled
+	//for direct reply to consumers.
+	DirectReplyTo ConsumerFeature = iota
+
+	// PreSettled means that the consumer will be created with the pre-settled delivery mode.
+	// The server settles the deliveries as soon as they are sent to the consumer,
+	// so no acknowledgment is needed from the consumer side.
+	PreSettled ConsumerFeature = iota
+)
+
 // ConsumerOptions represents the options for quorum and classic queues
 type ConsumerOptions struct {
 	//ReceiverLinkName: see the IConsumerOptions interface
@@ -120,10 +138,9 @@ type ConsumerOptions struct {
 	// The id of the consumer
 	Id string
 
-	//
-	DirectReplyTo bool
-	// PreSettled: see the IConsumerOptions interface
-	PreSettled bool
+	// Feature represents the feature that should be enabled for the consumer.
+	// see ConsumerFeature for more details.
+	Feature ConsumerFeature
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -144,7 +161,7 @@ func (aco *ConsumerOptions) id() string {
 
 func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 	// direct reply to is supported since RabbitMQ 4.2.0
-	if aco.DirectReplyTo && !available.is42rMore {
+	if aco.Feature == DirectReplyTo && !available.is42rMore {
 		return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
 	}
 
@@ -152,11 +169,11 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 }
 
 func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
-	return aco.DirectReplyTo
+	return aco.Feature == DirectReplyTo
 }
 
 func (aco *ConsumerOptions) preSettled() bool {
-	return aco.PreSettled
+	return aco.Feature == PreSettled
 }
 
 type IOffsetSpecification interface {

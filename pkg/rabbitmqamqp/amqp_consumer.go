@@ -182,9 +182,13 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 	// define a variable  *amqp.ReceiverOptions type
 	var receiverOptions *amqp.ReceiverOptions
 
+	// by default, we create a normal receiver link
+	// but if direct-reply-to is enabled, we create a dynamic receiver link
 	if c.options != nil && c.options.isDirectReplyToEnable() {
 		receiverOptions = createDynamicReceiverLinkOptions(c.options)
 	} else {
+		// normal receiver link, inside createReceiverLinkOptions we check if pre-settled mode is enabled
+		// so, by default we use AtLeastOnce settlement mode even is not specified
 		receiverOptions = createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce)
 	}
 

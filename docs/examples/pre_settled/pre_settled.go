@@ -55,7 +55,7 @@ func main() {
 	// create consumer with pre-settled mode enabled
 
 	consumer, err := amqpConnection.NewConsumer(context.TODO(), "pre-settled-queue", &rmq.ConsumerOptions{
-		PreSettled: true,
+		Feature: rmq.PreSettled,
 	})
 	if err != nil {
 		rmq.Error("Error creating consumer", err)

@@ -177,6 +177,9 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAd
 }
 
 // NewConsumer creates a new Consumer that listens to the provided Queue
+// options is an IConsumerOptions that can be used to configure the consumer.
+// it can be nil, and the consumer will be created with default options.
+// see
 func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options IConsumerOptions) (*Consumer, error) {
 
 	if options != nil {
@@ -330,9 +333,13 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 		done:                   make(chan struct{}),
 	}
 
+	feature := DefaultSettle
+	if options.DirectReplyTo {
+		feature = DirectReplyTo
+	}
 	// Create consumer for receiving replies
 	consumer, err := a.NewConsumer(ctx, queueName, &ConsumerOptions{
-		DirectReplyTo: options.DirectReplyTo,
+		Feature: feature,
 	})
 	if err != nil {
 		_ = publisher.Close(ctx) // cleanup publisher on failure
