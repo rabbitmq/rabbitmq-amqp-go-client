@@ -22,7 +22,7 @@ var _ = Describe("AMQP Exchange test ", func() {
 	})
 
 	It("AMQP Exchange Declare with Default and Delete should succeed", func() {
-		const exchangeName = "AMQP Exchange Declare and Delete with Default should succeed"
+		const exchangeName = "AMQP Exchange Declare and Delete with DefaultSettle should succeed"
 		exchangeInfo, err := management.DeclareExchange(context.TODO(), &DirectExchangeSpecification{
 			Name: exchangeName,
 		})

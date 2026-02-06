@@ -26,7 +26,7 @@ var _ = Describe("NewConsumer tests", func() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Millisecond)
 		cancel()
-		_, err = connection.NewConsumer(ctx, qName, nil)
+		_, err = connection.NewConsumer(ctx, qName, &ConsumerOptions{})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("context canceled"))
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
@@ -43,7 +43,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 10)
-		consumer, err := connection.NewConsumer(context.Background(), qName, nil)
+		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{Feature: DefaultSettle})
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -247,7 +247,7 @@ var _ = Describe("Consumer direct reply to", func() {
 		Expect(err).To(BeNil())
 
 		consumer, err := connection.NewConsumer(context.Background(), "", &ConsumerOptions{
-			DirectReplyTo: true,
+			Feature: DirectReplyTo,
 		})
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
@@ -331,7 +331,7 @@ var _ = Describe("Consumer pre-settled", func() {
 		// Create consumer with pre-settled enabled
 		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
 			InitialCredits: initialCredits,
-			PreSettled:     true,
+			Feature:        PreSettled,
 		})
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
