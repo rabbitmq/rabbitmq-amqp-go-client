@@ -46,7 +46,7 @@ type URI struct {
 // ParseURI attempts to parse the given AMQP URI according to the spec.
 // See http://www.rabbitmq.com/uri-spec.html.
 //
-// DefaultSettle values for the fields are:
+// Default values for the fields are:
 //
 //	Scheme: amqp
 //	Host: localhost

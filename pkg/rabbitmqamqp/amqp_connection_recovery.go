@@ -20,7 +20,7 @@ type RecoveryConfiguration struct {
 	/*
 		BackOffReconnectInterval The time to wait before trying to createSender after a connection is closed.
 		time will be increased exponentially with each attempt.
-		DefaultSettle is 5 seconds, each attempt will double the time.
+		Default is 5 seconds, each attempt will double the time.
 		The minimum value is 1 second. Avoid setting a value low values since it can cause a high
 		number of reconnection attempts.
 	*/
@@ -28,7 +28,7 @@ type RecoveryConfiguration struct {
 
 	/*
 		MaxReconnectAttempts The maximum number of reconnection attempts.
-		DefaultSettle is 5.
+		Default is 5.
 		The minimum value is 1.
 	*/
 	MaxReconnectAttempts int
