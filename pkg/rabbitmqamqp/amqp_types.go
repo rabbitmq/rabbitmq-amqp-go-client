@@ -121,12 +121,12 @@ const (
 	// DirectReplyTo means that the consumer will be created with the direct reply to feature enabled.
 	// see https://www.rabbitmq.com/docs/direct-reply-to#overview message settle mode will be auto-settled
 	//for direct reply to consumers.
-	DirectReplyTo ConsumerFeature = iota
+	DirectReplyTo ConsumerFeature
 
 	// PreSettled means that the consumer will be created with the pre-settled delivery mode.
 	// The server settles the deliveries as soon as they are sent to the consumer,
 	// so no acknowledgment is needed from the consumer side.
-	PreSettled ConsumerFeature = iota
+	PreSettled ConsumerFeature
 )
 
 // ConsumerOptions represents the options for quorum and classic queues
