@@ -7,6 +7,10 @@ All notable changes to this project will be documented in this file.
 ## 0.5.0 - 2026-01-22
 - [Release 0.5.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.5.0)
 
+### Breaking changes
+- **RequesterOptions**: Replaced `DirectReplyTo bool` with `SettleStrategy ConsumerSettleStrategy`. Use `SettleStrategy: rabbitmqamqp.DirectReplyTo` for direct-reply-to, or leave zero value for default (dedicated reply queue). Aligns consumer/requester configuration with other AMQP 1.0 clients.
+- **ConsumerOptions / amqp_types**: Renamed `ConsumerFeature` to `ConsumerSettleStrategy`, `DefaultSettle` to `ExplicitSettle`, and `Feature` field to `SettleStrategy`. Aligns with the unified settle strategy API used in other AMQP 1.0 clients.
+
 ### Added
 - Add WebSocket transport support for AMQP 1.0 connections by @vedanthnyk25 in [#78](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/78)
 - Add Sec-WebSocket-Protocol to the HTTP header by @Gsantomaggio in [#79](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/79)

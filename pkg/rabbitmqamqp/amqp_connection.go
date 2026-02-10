@@ -276,7 +276,7 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 
 	replyQueueName := options.ReplyToQueueName
 	queueName := ""
-	if !options.DirectReplyTo {
+	if options.SettleStrategy != DirectReplyTo {
 
 		if len(replyQueueName) == 0 {
 			replyQueueName = generateNameWithDefaultPrefix()
@@ -333,13 +333,13 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 		done:                   make(chan struct{}),
 	}
 
-	feature := DefaultSettle
-	if options.DirectReplyTo {
-		feature = DirectReplyTo
+	settleStrategy := ExplicitSettle
+	if options.SettleStrategy == DirectReplyTo {
+		settleStrategy = DirectReplyTo
 	}
 	// Create consumer for receiving replies
 	consumer, err := a.NewConsumer(ctx, queueName, &ConsumerOptions{
-		Feature: feature,
+		SettleStrategy: settleStrategy,
 	})
 	if err != nil {
 		_ = publisher.Close(ctx) // cleanup publisher on failure
