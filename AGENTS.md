@@ -66,6 +66,9 @@ docs/examples/             # Example code demonstrating usage
   - `initialCredits()` - Initial credits (defaults to 256)
   - `linkFilters()` - Link filters for stream consumers
   - `id()` - Consumer ID
+  - `validate()` - Validates the configured consumer options
+  - `isDirectReplyToEnable()` - Indicates whether Direct Reply-To is enabled for this consumer
+  - `preSettled()` - Indicates whether the consumer operates in pre-settled mode
   - Settle strategy is configured via `ConsumerOptions.SettleStrategy` or `RequesterOptions.SettleStrategy` using the `ConsumerSettleStrategy` enum: `ExplicitSettle`, `DirectReplyTo`, `PreSettled`
 
 ### Queue Specifications
