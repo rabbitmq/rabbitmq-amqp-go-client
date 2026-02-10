@@ -43,7 +43,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(err).To(BeNil())
 		Expect(queue).NotTo(BeNil())
 		publishMessages(qName, 10)
-		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{Feature: DefaultSettle})
+		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{SettleStrategy: ExplicitSettle})
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer).To(BeAssignableToTypeOf(&Consumer{}))
@@ -247,7 +247,7 @@ var _ = Describe("Consumer direct reply to", func() {
 		Expect(err).To(BeNil())
 
 		consumer, err := connection.NewConsumer(context.Background(), "", &ConsumerOptions{
-			Feature: DirectReplyTo,
+			SettleStrategy: DirectReplyTo,
 		})
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())
@@ -331,7 +331,7 @@ var _ = Describe("Consumer pre-settled", func() {
 		// Create consumer with pre-settled enabled
 		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
 			InitialCredits: initialCredits,
-			Feature:        PreSettled,
+			SettleStrategy: PreSettled,
 		})
 		Expect(err).To(BeNil())
 		Expect(consumer).NotTo(BeNil())

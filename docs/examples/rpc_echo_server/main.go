@@ -1,3 +1,13 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// The example is demonstrating how to implement a simple RPC echo server and client using RabbitMQ AMQP 1.0 Go Client.
+// It uses DirectReplyTo for the client to receive responses without needing to declare a reply queue.
+// DirectReplyTo is the recommended way to receive replies for RPC clients.
+// The server listens for messages on a request queue and responds with the same message (echo).
+// The client sends messages to the request queue and waits for the echoed response.
+// The example also includes graceful shutdown handling when the user presses Ctrl+C.
+// Example path:https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/rpc_echo_server/main.go
+
 package main
 
 import (
@@ -66,9 +76,11 @@ func main() {
 
 	requester, err := clientConn.NewRequester(context.TODO(), &rabbitmqamqp.RequesterOptions{
 		RequestQueueName: requestQueue,
-		// Enable Direct Reply To feature
-		// see: https://www.rabbitmq.com/direct-reply-to.html
-		DirectReplyTo: true,
+		// Use DirectReplyTo so replies are received via RabbitMQ direct-reply-to (no reply queue declared).
+		// See: https://www.rabbitmq.com/docs/direct-reply-to#overview
+		// That's the recommended way to receive replies for RPC clients,
+		// as it avoids the overhead of declaring and consuming from a reply queue.
+		SettleStrategy: rabbitmqamqp.DirectReplyTo,
 	})
 	if err != nil {
 		panic(err)

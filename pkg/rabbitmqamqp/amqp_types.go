@@ -111,15 +111,17 @@ func (mo *managementOptions) preSettled() bool {
 	return false
 }
 
-type ConsumerFeature byte
+// ConsumerSettleStrategy configures how the consumer receives and settles messages.
+// Aligns with the settle strategy concept used across AMQP 1.0 clients.
+type ConsumerSettleStrategy byte
 
 const (
-	// DefaultSettle means that the consumer will be created with the default settings.
-	// message settle mode will be the default one (explicit settle) via IDeliveryContext
-	DefaultSettle ConsumerFeature = iota
+	// ExplicitSettle means that the consumer will be created with the default settings.
+	// Message settle mode will be explicit via IDeliveryContext (accept, discard, requeue).
+	ExplicitSettle ConsumerSettleStrategy = iota
 	// DirectReplyTo means that the consumer will be created with the direct reply to feature enabled.
-	// see https://www.rabbitmq.com/docs/direct-reply-to#overview message settle mode will be auto-settled
-	//for direct reply to consumers.
+	// See https://www.rabbitmq.com/docs/direct-reply-to#overview. Message settle mode will be auto-settled
+	// for direct reply to consumers.
 	DirectReplyTo
 	// PreSettled means that the consumer will be created with the pre-settled delivery mode.
 	// The server settles the deliveries as soon as they are sent to the consumer,
@@ -136,9 +138,9 @@ type ConsumerOptions struct {
 	// The id of the consumer
 	Id string
 
-	// Feature represents the feature that should be enabled for the consumer.
-	// see ConsumerFeature for more details.
-	Feature ConsumerFeature
+	// SettleStrategy configures how messages are received and settled.
+	// See ConsumerSettleStrategy for more details.
+	SettleStrategy ConsumerSettleStrategy
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -159,7 +161,7 @@ func (aco *ConsumerOptions) id() string {
 
 func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 	// direct reply to is supported since RabbitMQ 4.2.0
-	if aco.Feature == DirectReplyTo && !available.is42rMore {
+	if aco.SettleStrategy == DirectReplyTo && !available.is42rMore {
 		return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
 	}
 
@@ -167,11 +169,11 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 }
 
 func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
-	return aco.Feature == DirectReplyTo
+	return aco.SettleStrategy == DirectReplyTo
 }
 
 func (aco *ConsumerOptions) preSettled() bool {
-	return aco.Feature == PreSettled
+	return aco.SettleStrategy == PreSettled
 }
 
 type IOffsetSpecification interface {
