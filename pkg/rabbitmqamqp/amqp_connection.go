@@ -333,13 +333,9 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 		done:                   make(chan struct{}),
 	}
 
-	settleStrategy := ExplicitSettle
-	if options.SettleStrategy == DirectReplyTo {
-		settleStrategy = DirectReplyTo
-	}
 	// Create consumer for receiving replies
 	consumer, err := a.NewConsumer(ctx, queueName, &ConsumerOptions{
-		SettleStrategy: settleStrategy,
+		SettleStrategy: options.SettleStrategy,
 	})
 	if err != nil {
 		_ = publisher.Close(ctx) // cleanup publisher on failure
