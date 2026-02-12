@@ -30,6 +30,7 @@ go.work.sum
 # Left over files from tests
 coverage.txt
 .ci/ubuntu/log/rabbitmq.log
+docs/examples/otel_metrics/otel_metrics
 
 # Visual Studio Code
 .vscode/*

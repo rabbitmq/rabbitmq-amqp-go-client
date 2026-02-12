@@ -84,7 +84,10 @@ var _ = Describe("AMQP Environment Test", func() {
 
 	Describe("Environment strategy", func() {
 		DescribeTable("Environment with strategy should success", func(strategy TEndPointStrategy) {
-			env := NewClusterEnvironmentWithStrategy([]Endpoint{{Address: "amqp://", Options: &AmqpConnOptions{Id: "my"}}, {Address: "amqp://nohost:555"}, {Address: "amqp://nono"}}, StrategyRandom)
+			env := NewClusterEnvironment(
+				[]Endpoint{{Address: "amqp://", Options: &AmqpConnOptions{Id: "my"}}, {Address: "amqp://nohost:555"}, {Address: "amqp://nono"}},
+				WithStrategy(strategy),
+			)
 			Expect(env).NotTo(BeNil())
 			Expect(env.Connections()).NotTo(BeNil())
 			Expect(len(env.Connections())).To(Equal(0))
@@ -114,6 +117,35 @@ var _ = Describe("AMQP Environment Test", func() {
 			Entry("Partial options", &AmqpConnOptions{SASLType: amqp.SASLTypeAnonymous()}),
 			Entry("Partial options", &AmqpConnOptions{ContainerID: "cid_my"}),
 		)
+	})
+
+	Describe("Environment options", func() {
+		It("should use default options when no options are passed", func() {
+			env := NewEnvironment("amqp://", nil)
+			Expect(env).NotTo(BeNil())
+			Expect(env.EndPointStrategy).To(Equal(StrategyRandom))
+		})
+
+		It("should use custom strategy from options", func() {
+			env := NewEnvironment("amqp://", nil, WithStrategy(StrategySequential))
+			Expect(env).NotTo(BeNil())
+			Expect(env.EndPointStrategy).To(Equal(StrategySequential))
+		})
+
+		It("should use custom metrics collector from options", func() {
+			collector := &NoOpMetricsCollector{}
+			env := NewEnvironment("amqp://", nil, WithMetricsCollector(collector))
+			Expect(env).NotTo(BeNil())
+		})
+
+		It("should accept multiple options", func() {
+			env := NewEnvironment("amqp://", nil,
+				WithStrategy(StrategySequential),
+				WithMetricsCollector(&NoOpMetricsCollector{}),
+			)
+			Expect(env).NotTo(BeNil())
+			Expect(env.EndPointStrategy).To(Equal(StrategySequential))
+		})
 	})
 
 })

@@ -21,8 +21,10 @@ type IDeliveryContext interface {
 }
 
 type DeliveryContext struct {
-	receiver *amqp.Receiver
-	message  *amqp.Message
+	receiver         *amqp.Receiver
+	message          *amqp.Message
+	metricsCollector MetricsCollector
+	consumeCtx       ConsumeContext // For OTEL semantic convention attributes
 }
 
 func (dc *DeliveryContext) Message() *amqp.Message {
@@ -30,11 +32,19 @@ func (dc *DeliveryContext) Message() *amqp.Message {
 }
 
 func (dc *DeliveryContext) Accept(ctx context.Context) error {
-	return dc.receiver.AcceptMessage(ctx, dc.message)
+	err := dc.receiver.AcceptMessage(ctx, dc.message)
+	if err == nil {
+		dc.metricsCollector.ConsumeDisposition(ConsumeAccepted, dc.consumeCtx)
+	}
+	return err
 }
 
 func (dc *DeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
-	return dc.receiver.RejectMessage(ctx, dc.message, e)
+	err := dc.receiver.RejectMessage(ctx, dc.message, e)
+	if err == nil {
+		dc.metricsCollector.ConsumeDisposition(ConsumeDiscarded, dc.consumeCtx)
+	}
+	return err
 }
 
 // copyAnnotations helper function to copy annotations
@@ -54,15 +64,23 @@ func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotatio
 	if err != nil {
 		return err
 	}
-	return dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
+	err = dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
 		DeliveryFailed:    true,
 		UndeliverableHere: true,
 		Annotations:       destination,
 	})
+	if err == nil {
+		dc.metricsCollector.ConsumeDisposition(ConsumeDiscarded, dc.consumeCtx)
+	}
+	return err
 }
 
 func (dc *DeliveryContext) Requeue(ctx context.Context) error {
-	return dc.receiver.ReleaseMessage(ctx, dc.message)
+	err := dc.receiver.ReleaseMessage(ctx, dc.message)
+	if err == nil {
+		dc.metricsCollector.ConsumeDisposition(ConsumeRequeued, dc.consumeCtx)
+	}
+	return err
 }
 
 func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
@@ -70,11 +88,15 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 	if err != nil {
 		return err
 	}
-	return dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
+	err = dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
 		DeliveryFailed:    false,
 		UndeliverableHere: false,
 		Annotations:       destination,
 	})
+	if err == nil {
+		dc.metricsCollector.ConsumeDisposition(ConsumeRequeued, dc.consumeCtx)
+	}
+	return err
 }
 
 // PreSettledDeliveryContext represents a delivery context for pre-settled messages.
@@ -155,6 +177,10 @@ func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd
 	if err != nil {
 		return nil, err
 	}
+
+	// Record the consumer opening metric
+	connection.metricsCollector.OpenConsumer()
+
 	return r, nil
 }
 
@@ -209,6 +235,12 @@ func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 		return nil, err
 	}
 
+	// Build consume context for OTEL semantic convention attributes
+	consumeCtx := c.buildConsumeContext(msg)
+
+	// Record the consume metric
+	c.connection.metricsCollector.Consume(consumeCtx)
+
 	if msg != nil && msg.Annotations != nil && msg.Annotations["x-stream-offset"] != nil {
 		// keep track of the current offset of the consumer
 		c.currentOffset = msg.Annotations["x-stream-offset"].(int64)
@@ -216,15 +248,28 @@ func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 
 	// Check if pre-settled mode is enabled
 	if c.options != nil && c.options.preSettled() {
+		// For pre-settled mode, immediately record the disposition as accepted
+		// since the message is already settled by the broker
+		c.connection.metricsCollector.ConsumeDisposition(ConsumeAccepted, consumeCtx)
 		return &PreSettledDeliveryContext{message: msg}, nil
 	}
 
-	return &DeliveryContext{receiver: c.receiver.Load(), message: msg}, nil
+	return &DeliveryContext{
+		receiver:         c.receiver.Load(),
+		message:          msg,
+		metricsCollector: c.connection.metricsCollector,
+		consumeCtx:       consumeCtx,
+	}, nil
 }
 
 func (c *Consumer) Close(ctx context.Context) error {
 	c.connection.entitiesTracker.removeConsumer(c)
-	return c.receiver.Load().Close(ctx)
+	err := c.receiver.Load().Close(ctx)
+
+	// Record the consumer closing metric
+	c.connection.metricsCollector.CloseConsumer()
+
+	return err
 }
 
 // GetQueue returns the queue the consumer is connected to.
@@ -269,4 +314,23 @@ func (c *Consumer) isPausedOrPausing() bool {
 // issueCredits issues more credits on the receiver.
 func (c *Consumer) issueCredits(credits uint32) error {
 	return c.receiver.Load().IssueCredit(credits)
+}
+
+// buildConsumeContext builds a ConsumeContext from the consumer and message.
+func (c *Consumer) buildConsumeContext(message *amqp.Message) ConsumeContext {
+	// Parse the queue name from the destination address
+	queueName, _ := c.GetQueue()
+
+	var messageID string
+	if message != nil && message.Properties != nil && message.Properties.MessageID != nil {
+		// MessageID can be various types, convert to string
+		messageID = fmt.Sprintf("%v", message.Properties.MessageID)
+	}
+
+	return ConsumeContext{
+		ServerAddress:   c.connection.serverAddress,
+		ServerPort:      c.connection.serverPort,
+		DestinationName: queueName,
+		MessageID:       messageID,
+	}
 }

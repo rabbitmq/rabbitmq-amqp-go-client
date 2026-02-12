@@ -15,7 +15,7 @@ func main() {
 	// rmq.NewClusterEnvironment setups the environment.
 	// define multiple endpoints with different connection settings
 	// the connection will be created based on the strategy Sequential
-	env := rmq.NewClusterEnvironmentWithStrategy([]rmq.Endpoint{
+	env := rmq.NewClusterEnvironment([]rmq.Endpoint{
 
 		//this is correct
 		{Address: "amqp://localhost:5672", Options: &rmq.AmqpConnOptions{
@@ -53,7 +53,7 @@ func main() {
 			OAuth2Options: nil,
 			Id:            "my wrong id",
 		}},
-	}, rmq.StrategyRandom)
+	}, rmq.WithStrategy(rmq.StrategyRandom))
 
 	for i := 0; i < 5; i++ {
 		connection, err := env.NewConnection(context.Background())

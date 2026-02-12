@@ -37,22 +37,65 @@ type Environment struct {
 	endPoints        []Endpoint
 	EndPointStrategy TEndPointStrategy
 	nextConnectionId int32
+	metricsCollector MetricsCollector
 }
 
-func NewEnvironment(address string, options *AmqpConnOptions) *Environment {
-	return NewClusterEnvironmentWithStrategy([]Endpoint{{Address: address, Options: options}}, StrategyRandom)
+// environmentOptions holds internal configuration for the Environment.
+type environmentOptions struct {
+	strategy         TEndPointStrategy
+	metricsCollector MetricsCollector
 }
 
-func NewClusterEnvironment(endPoints []Endpoint) *Environment {
-	return NewClusterEnvironmentWithStrategy(endPoints, StrategyRandom)
+// EnvironmentOption configures an Environment.
+// Use the With* functions to create options.
+type EnvironmentOption func(*environmentOptions)
+
+// WithStrategy sets the endpoint selection strategy.
+// Default is StrategyRandom.
+func WithStrategy(strategy TEndPointStrategy) EnvironmentOption {
+	return func(o *environmentOptions) {
+		o.strategy = strategy
+	}
 }
 
-func NewClusterEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointStrategy) *Environment {
+// WithMetricsCollector sets the metrics collector.
+// Default is NoOpMetricsCollector.
+func WithMetricsCollector(collector MetricsCollector) EnvironmentOption {
+	return func(o *environmentOptions) {
+		o.metricsCollector = collector
+	}
+}
+
+// NewEnvironment creates a new single-endpoint Environment with optional configuration.
+// Options can be provided using the With* functions (e.g., WithStrategy, WithMetricsCollector).
+func NewEnvironment(address string, connOptions *AmqpConnOptions, opts ...EnvironmentOption) *Environment {
+	return NewClusterEnvironment([]Endpoint{{Address: address, Options: connOptions}}, opts...)
+}
+
+// NewClusterEnvironment creates a new multi-endpoint Environment with optional configuration.
+// Options can be provided using the With* functions (e.g., WithStrategy, WithMetricsCollector).
+func NewClusterEnvironment(endPoints []Endpoint, opts ...EnvironmentOption) *Environment {
+	// Start with defaults
+	options := &environmentOptions{
+		strategy:         StrategyRandom,
+		metricsCollector: nil,
+	}
+
+	// Apply all options
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if options.metricsCollector == nil {
+		options.metricsCollector = DefaultMetricsCollector()
+	}
+
 	return &Environment{
 		connections:      sync.Map{},
 		endPoints:        endPoints,
-		EndPointStrategy: strategy,
+		EndPointStrategy: options.strategy,
 		nextConnectionId: 0,
+		metricsCollector: options.metricsCollector,
 	}
 }
 
@@ -82,7 +125,7 @@ func (e *Environment) NewConnection(ctx context.Context) (*AmqpConnection, error
 		if addr.Options != nil {
 			cloned = addr.Options.Clone()
 		}
-		connection, err := Dial(ctx, addr.Address, cloned)
+		connection, err := dialWithMetrics(ctx, addr.Address, cloned, e.metricsCollector)
 		if err != nil {
 			Error("Failed to open connection", "url", ExtractWithoutPassword(addr.Address), "error", err)
 			lastError = err
