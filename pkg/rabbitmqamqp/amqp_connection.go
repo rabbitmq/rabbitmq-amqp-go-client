@@ -165,12 +165,13 @@ type AmqpConnection struct {
 
 	// topologyRecoveryRecords is used to keep track of the topology recovery records, it is used to recover the topology in case of unexpected connection closure and reconnection.
 	topologyRecoveryRecords *topologyRecoveryRecords
+	metricsCollector        MetricsCollector
+	mutex                   sync.RWMutex
+	closed                  bool
 
-	// mutex is used to synchronize the access to the connection, it is used to prevent multiple goroutines from trying to open or close the connection at the same time.
-	mutex sync.RWMutex
-
-	// closed is used to indicate if the connection is closed, it is used to prevent trying to use the connection after it is closed.
-	closed bool
+	// Server connection info for OTEL semantic conventions
+	serverAddress string // Parsed from URI (server.address)
+	serverPort    int    // Parsed from URI (server.port)
 }
 
 func (a *AmqpConnection) Properties() map[string]any {
@@ -383,11 +384,30 @@ func (a *AmqpConnection) NewRequester(ctx context.Context, options *RequesterOpt
 
 // Dial connect to the AMQP 1.0 server using the provided connectionSettings
 // Returns a pointer to the new AmqpConnection if successful else an error.
+//
+// TODO: perhaps deprecate this function and use Environment.NewConnection function instead?
 func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*AmqpConnection, error) {
+	return dialWithMetrics(ctx, address, connOptions, nil)
+}
+
+// dialWithMetrics is the internal function that creates a connection with a metrics collector.
+// If metricsCollector is nil, a no-op implementation is used.
+func dialWithMetrics(ctx context.Context, address string, connOptions *AmqpConnOptions, metricsCollector MetricsCollector) (*AmqpConnection, error) {
 	connOptions, err := validateOptions(connOptions)
 	if err != nil {
 		return nil, err
 	}
+
+	if metricsCollector == nil {
+		metricsCollector = DefaultMetricsCollector()
+	}
+
+	// Parse URI to extract server address and port for OTEL semantic conventions
+	uri, err := ParseURI(address)
+	if err != nil {
+		return nil, err
+	}
+
 	// create the connection
 	conn := &AmqpConnection{
 		management:              newAmqpManagement(connOptions.TopologyRecoveryOptions),
@@ -396,6 +416,9 @@ func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*A
 		entitiesTracker:         newEntitiesTracker(),
 		topologyRecoveryRecords: newTopologyRecoveryRecords(),
 		featuresAvailable:       newFeaturesAvailable(),
+		metricsCollector:        metricsCollector,
+		serverAddress:           uri.Host,
+		serverPort:              uri.Port,
 	}
 
 	// management needs to access the connection to manage the recovery records
@@ -408,8 +431,11 @@ func Dial(ctx context.Context, address string, connOptions *AmqpConnOptions) (*A
 	conn.amqpConnOptions = connOptions
 	conn.address = address
 	conn.lifeCycle.SetState(&StateOpen{})
-	return conn, nil
 
+	// Record the connection opening metric
+	conn.metricsCollector.OpenConnection()
+
+	return conn, nil
 }
 
 func validateOptions(connOptions *AmqpConnOptions) (*AmqpConnOptions, error) {
@@ -720,6 +746,10 @@ func (a *AmqpConnection) Close(ctx context.Context) error {
 	}
 	err = a.azureConnection.Close()
 	a.close()
+
+	// Record the connection closing metric
+	a.metricsCollector.CloseConnection()
+
 	return err
 }
 
