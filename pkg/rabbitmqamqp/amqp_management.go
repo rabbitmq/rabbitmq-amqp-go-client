@@ -206,7 +206,8 @@ func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueS
 			queueName: specification.name(),
 			queueType: specification.queueType(),
 		}
-		if specification.queueType() == Classic {
+		// valid only for classic queues or default when queue type is not specified, for quorum queues these fields are ignored and not set in the recovery record
+		if len(specification.queueType()) == 0 || specification.queueType() == Classic {
 			recoveryRecord.autoDelete = ptr(specification.isAutoDelete())
 			recoveryRecord.exclusive = ptr(specification.isExclusive())
 		}

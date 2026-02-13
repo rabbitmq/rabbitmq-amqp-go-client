@@ -2,9 +2,10 @@ package rabbitmqamqp
 
 import (
 	"context"
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"strconv"
 )
 
 var _ = Describe("AMQP Queue test ", func() {
@@ -244,6 +245,29 @@ var _ = Describe("AMQP Queue test ", func() {
 		result, err := management.QueueInfo(context.TODO(), queueName)
 		Expect(err).To(Equal(ErrDoesNotExist))
 		Expect(result).To(BeNil())
+	})
+
+	// default
+	It("AMQP Declare Queue with DefaultQueueSpecification should succeed", func() {
+		queueName := generateName("AMQP Declare Queue with DefaultQueueSpecification should succeed")
+		queueInfo, err := management.DeclareQueue(context.TODO(), &DefaultQueueSpecification{
+			Name:                 queueName,
+			DeadLetterExchange:   "dead-letter-exchange",
+			DeadLetterRoutingKey: "dead-letter-routing-key",
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.Name()).To(Equal(queueName))
+		Expect(queueInfo.IsDurable()).To(BeTrue())
+		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
+		Expect(queueInfo.IsExclusive()).To(BeFalse())
+		Expect(queueInfo.arguments["x-dead-letter-exchange"]).To(Equal("dead-letter-exchange"))
+		Expect(queueInfo.arguments["x-dead-letter-routing-key"]).To(Equal("dead-letter-routing-key"))
+		// the default value for queue type is classic
+		Expect(queueInfo.Type()).To(Equal(Classic))
+
+		err = management.DeleteQueue(context.TODO(), queueName)
+		Expect(err).To(BeNil())
 	})
 })
 
