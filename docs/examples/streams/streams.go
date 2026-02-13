@@ -1,9 +1,18 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// RabbitMQ Streams documentation: https://www.rabbitmq.com/docs/streams
+// The example is demonstrating how to use RabbitMQ AMQP 1.0 Go Client to work with RabbitMQ Streams.
+// In this example, we declare a stream queue, publish messages to it, and then consume those messages from the stream.
+// The example includes error handling and logging for each step of the process, and it demonstrates how to work with RabbitMQ Streams using the AMQP 1.0 protocol.
+// example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/streams/streams.go
+
 package main
 
 import (
 	"context"
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 	"time"
+
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func checkError(err error) {

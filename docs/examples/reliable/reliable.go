@@ -1,14 +1,23 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// The example is demonstrating how to implement a reliable message publishing and consuming scenario using RabbitMQ AMQP 1.0 Go Client.
+// The example includes handling network disconnections, message acknowledgments, and tracking message states (accepted, released, rejected).
+// It simulates a publisher sending messages to a queue and a consumer receiving those messages while dealing with potential network issues.
+// The example also includes logging and statistics to monitor the message flow and connection status.
+// example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/reliable/reliable.go
+
 package main
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Azure/go-amqp"
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Azure/go-amqp"
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func main() {
