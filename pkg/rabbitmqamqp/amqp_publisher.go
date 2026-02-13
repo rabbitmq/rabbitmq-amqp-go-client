@@ -3,9 +3,12 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
+	"sync/atomic"
+
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
-	"sync/atomic"
 )
 
 type PublishResult struct {
@@ -38,6 +41,10 @@ func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAd
 	if err != nil {
 		return nil, err
 	}
+
+	// Record the publisher opening metric
+	connection.metricsCollector.OpenPublisher()
+
 	return r, nil
 }
 
@@ -119,18 +126,97 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 	if err != nil {
 		return nil, err
 	}
+
+	// Build publish context for OTEL semantic convention attributes
+	publishCtx := m.buildPublishContext(message)
+
+	// Record the publish metric immediately after sending
+	m.connection.metricsCollector.Publish(publishCtx)
+
 	state, err := r.Wait(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// Record the publish disposition metric based on the outcome
+	m.recordPublishDisposition(state, publishCtx)
+
 	return &PublishResult{
 		Message: message,
 		Outcome: state,
 	}, err
 }
 
+// recordPublishDisposition records the publish disposition metric based on the delivery state.
+func (m *Publisher) recordPublishDisposition(state DeliveryState, ctx PublishContext) {
+	switch state.(type) {
+	case *StateAccepted:
+		m.connection.metricsCollector.PublishDisposition(PublishAccepted, ctx)
+	case *StateRejected:
+		m.connection.metricsCollector.PublishDisposition(PublishRejected, ctx)
+	case *StateReleased:
+		m.connection.metricsCollector.PublishDisposition(PublishReleased, ctx)
+	}
+}
+
+// buildPublishContext builds a PublishContext from the publisher and message.
+func (m *Publisher) buildPublishContext(message *amqp.Message) PublishContext {
+	destinationName, routingKey := m.parseDestination()
+
+	var messageID string
+	if message.Properties != nil && message.Properties.MessageID != nil {
+		// MessageID can be various types, convert to string
+		messageID = fmt.Sprintf("%v", message.Properties.MessageID)
+	}
+
+	return PublishContext{
+		ServerAddress:   m.connection.serverAddress,
+		ServerPort:      m.connection.serverPort,
+		DestinationName: destinationName,
+		RoutingKey:      routingKey,
+		MessageID:       messageID,
+	}
+}
+
+// parseDestination parses the destination address and returns the destination name and routing key.
+// The destination name follows OTEL semantic conventions:
+// - For exchanges: "{exchange}:{routing_key}" or just "{exchange}"
+// - For queues: "{queue}"
+func (m *Publisher) parseDestination() (destinationName, routingKey string) {
+	address := m.destinationAdd
+	if address == "" {
+		return "", ""
+	}
+
+	// Address format: /exchanges/{exchange}/{key} or /queues/{queue}
+	if strings.HasPrefix(address, "/"+exchanges+"/") {
+		// Exchange address
+		path := strings.TrimPrefix(address, "/"+exchanges+"/")
+		parts := strings.SplitN(path, "/", 2)
+		exchange, _ := url.QueryUnescape(parts[0])
+		if len(parts) > 1 {
+			routingKey, _ = url.QueryUnescape(parts[1])
+			destinationName = buildDestinationName(exchange, routingKey, "")
+		} else {
+			destinationName = exchange
+		}
+	} else if strings.HasPrefix(address, "/"+queues+"/") {
+		// Queue address
+		queue := strings.TrimPrefix(address, "/"+queues+"/")
+		queue, _ = url.QueryUnescape(queue)
+		destinationName = queue
+	}
+
+	return destinationName, routingKey
+}
+
 // Close closes the publisher.
 func (m *Publisher) Close(ctx context.Context) error {
 	m.connection.entitiesTracker.removeProducer(m)
-	return m.sender.Load().Close(ctx)
+	err := m.sender.Load().Close(ctx)
+
+	// Record the publisher closing metric
+	m.connection.metricsCollector.ClosePublisher()
+
+	return err
 }
