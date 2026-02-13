@@ -119,6 +119,13 @@ func (q *queueRecoveryRecord) toIQueueSpecification() IQueueSpecification {
 			Name:      q.queueName,
 			Arguments: q.arguments,
 		}
+	default:
+		return &DefaultQueueSpecification{
+			Name:         q.queueName,
+			IsAutoDelete: *q.autoDelete,
+			IsExclusive:  *q.exclusive,
+			Arguments:    q.arguments,
+		}
 	}
 	return nil
 }
