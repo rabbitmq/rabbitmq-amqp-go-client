@@ -127,7 +127,7 @@ func (q *queueRecoveryRecord) toIQueueSpecification() IQueueSpecification {
 			Arguments:    q.arguments,
 		}
 	}
-	return nil
+
 }
 
 type exchangeRecoveryRecord struct {
