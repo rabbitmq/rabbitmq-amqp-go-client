@@ -1,9 +1,19 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// RabbitMQ Streams documentation: https://www.rabbitmq.com/docs/streams
+// RabbitMQ AMQP 1.0 SQL Stream Filter documentation: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions
+// The example is demonstrating how to use RabbitMQ AMQP 1.0 Go Client to work with RabbitMQ Streams and SQL stream filters.
+// In this example, we declare a stream queue, publish messages to it, and then consume those messages from the stream using a SQL filter.
+// The example includes error handling and logging for each step of the process, and it demonstrates how to work with RabbitMQ Streams and apply SQL filters using the AMQP 1.0 protocol.
+// example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/streams_filtering/streams_filtering.go
+
 package main
 
 import (
 	"context"
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 	"time"
+
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func checkError(err error) {

@@ -1,3 +1,10 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// The example is demonstrating how to use the RabbitMQ AMQP 1.0 Go Client to connect to a RabbitMQ server,
+// declare an exchange and a queue, bind them together, publish messages, consume messages, and then clean up resources before closing the connection.
+// It includes error handling and logging for each step of the process.
+// example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/getting_started/main.go
+
 package main
 
 import (

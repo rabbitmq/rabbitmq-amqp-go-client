@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"os"
+
 	"github.com/Azure/go-amqp"
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
-	"os"
 )
 
 func check(err error) {
