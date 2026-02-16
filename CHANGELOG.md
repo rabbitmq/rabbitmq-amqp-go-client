@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [[0.6.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.6.0)]
+
+## 0.6.0 - 2026-02-16
+- [Release 0.6.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.6.0)
+
+### Added
+- Add pre-settled option to consumer by @Gsantomaggio in [#80](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/80)
+- Add default queue implementation by @Gsantomaggio in [#85](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/85)
+
+### Changed
+- Change consumer options by @Gsantomaggio in [#81](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/81)
+- Rename Consumer Feature to Consumer SettleStrategy by @Gsantomaggio in [#82](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/82)
+
+### Breaking changes
+- Minor breaking change in [#82](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/82): Rename Consumer Feature to Consumer SettleStrategy. Unify all the AMQP 1.0 clients' interfaces.
+
+
 ## [[0.5.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.5.0)]
 
 ## 0.5.0 - 2026-01-22
