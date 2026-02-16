@@ -1,10 +1,18 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// The example is demonstrating how to implement a simple broadcast scenario using RabbitMQ AMQP 1.0 Go Client.
+// In this example, a publisher sends messages to a fanout exchange, and multiple consumers receive the same messages from that exchange.
+// The example includes error handling and logging for each step of the process,
+// and it uses temporary queues for the consumers to receive messages from the fanout exchange.
+// Example path: / example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/broadcast/broadcast.go
 package main
 
 import (
 	"context"
 	"fmt"
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 	"time"
+
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func main() {

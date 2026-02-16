@@ -23,6 +23,7 @@ func (v Version) Compare(other Version) int {
 	return v.Patch - other.Patch
 }
 
+// featuresAvailable is a struct that holds the information about the features available in the RabbitMQ server based on its version and product type.
 type featuresAvailable struct {
 	is4OrMore  bool
 	is41OrMore bool

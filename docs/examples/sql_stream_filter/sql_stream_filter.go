@@ -1,8 +1,18 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// RabbitMQ AMQP 1.0 SQL Stream Filter documentation: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions
+// The example is demonstrating how to use SQL stream filters with RabbitMQ AMQP 1.0 Go Client.
+// In this example, we declare a stream queue and publish two messages to it: one that matches the SQL filter and one that does not.
+// We then create a consumer with a SQL stream filter that only accepts messages matching specific criteria.
+// The consumer should only receive the message that matches the filter, demonstrating how to use SQL stream filters effectively.
+
+// example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/sql_stream_filter/sql_stream_filter.go
 package main
 
 import (
 	"context"
 	"fmt"
+
 	"github.com/Azure/go-amqp"
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )

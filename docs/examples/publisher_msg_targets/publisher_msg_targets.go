@@ -1,7 +1,16 @@
+// RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
+// RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
+// The example is demonstrating how to publish messages with specific targets (queues) using RabbitMQ AMQP 1.0 Go Client.
+// In this example, we define multiple queues and publish messages to them using the 'To' property of the message.
+// The publisher does not have a predefined target, allowing it to specify the destination for each message individually.
+// The example includes error handling and logging for each step of the process.
+// example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/publisher_msg_targets/publisher_msg_targets.go
+
 package main
 
 import (
 	"context"
+
 	"github.com/Azure/go-amqp"
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )

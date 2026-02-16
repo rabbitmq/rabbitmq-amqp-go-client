@@ -32,6 +32,10 @@ func DefaultEndpoints() []Endpoint {
 	return []Endpoint{ep}
 }
 
+/*
+Environment is the main entry point for the library. It is responsible for managing the connections to the RabbitMQ server.
+It keeps track of the connections and the endpoints,and provides methods to create new connections and close all connections.
+*/
 type Environment struct {
 	connections      sync.Map
 	endPoints        []Endpoint
@@ -39,14 +43,32 @@ type Environment struct {
 	nextConnectionId int32
 }
 
+/*
+NewEnvironment creates a new environment with the given address and options.
+The address is the AMQP connection string, and the options are the connection options.
+The default strategy is StrategyRandom, which picks a random endpoint from the list of endpoints when creating a new connection.
+If you want to use a different strategy, you can use NewClusterEnvironmentWithStrategy.
+*/
 func NewEnvironment(address string, options *AmqpConnOptions) *Environment {
 	return NewClusterEnvironmentWithStrategy([]Endpoint{{Address: address, Options: options}}, StrategyRandom)
 }
+
+/*
+NewClusterEnvironment creates a new environment with the given endpoints.
+The default strategy is StrategyRandom, which picks a random endpoint from the list of endpoints when creating a new connection.
+If you want to use a different strategy, you can use NewClusterEnvironmentWithStrategy.
+*/
 
 func NewClusterEnvironment(endPoints []Endpoint) *Environment {
 	return NewClusterEnvironmentWithStrategy(endPoints, StrategyRandom)
 }
 
+/*
+NewClusterEnvironmentWithStrategy creates a new environment with the given endpoints and strategy.
+The strategy is used to determine how the environment picks an endpoint from the list of endpoints when creating a new connection.
+The default strategy is StrategyRandom, which picks a random endpoint from the list of endpoints.
+The other strategy is StrategySequential, which picks the endpoints in order.
+*/
 func NewClusterEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointStrategy) *Environment {
 	return &Environment{
 		connections:      sync.Map{},

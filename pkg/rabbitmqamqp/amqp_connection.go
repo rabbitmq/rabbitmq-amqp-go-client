@@ -133,21 +133,44 @@ func (a *AmqpConnOptions) Clone() *AmqpConnOptions {
 	return cloned
 }
 
+/*
+AmqpConnection represents a connection to the AMQP 1.0 server.
+It is used to create publishers and consumers, and to manage the connection.
+It is wrapper around the amqp.Conn from the go-amqp library, and it also includes a management interface to
+manage the topology of the RabbitMQ server.
+*/
 type AmqpConnection struct {
-	properties        map[string]any
+	// peer properties from the AMQP connection, it is used to determine the features available on the server
+	properties map[string]any
+	// featuresAvailable is used to determine the features available on the server based on the properties
 	featuresAvailable *featuresAvailable
+	// azureConnection is the underlying connection from the go-amqp library
+	azureConnection *amqp.Conn
+	// amqpConnOptions is the connection options used to create the connection and to configure the recovery in case of unexpected connection closure.
+	amqpConnOptions *AmqpConnOptions
+	// management is the management interface to manage the topology of the RabbitMQ server, it is used to declare exchanges, queues, and bindings.
+	management *AmqpManagement
+	// lifeCycle is used to manage the lifecycle of the connection,
+	//  it is used to track the state of the connection and to notify the status change to the user.
+	lifeCycle *LifeCycle
+	// address the actual address used to connect to the server, it is used for logging and for reconnection in case of unexpected connection closure.
+	address string
+	// session is the AMQP session used to create senders and receivers, it is created when the connection is opened and it is closed when the connection is closed.
+	session *amqp.Session
+	// the reference map is used to keep track of the connections
+	refMap *sync.Map
 
-	azureConnection         *amqp.Conn
-	management              *AmqpManagement
-	lifeCycle               *LifeCycle
-	amqpConnOptions         *AmqpConnOptions
-	address                 string
-	session                 *amqp.Session
-	refMap                  *sync.Map
-	entitiesTracker         *entitiesTracker
+	// entitiesTracker is used to keep track of the publishers and consumers created from this connection, it is used to restart the entities in case of unexpected connection closure and reconnection.
+	entitiesTracker *entitiesTracker
+
+	// topologyRecoveryRecords is used to keep track of the topology recovery records, it is used to recover the topology in case of unexpected connection closure and reconnection.
 	topologyRecoveryRecords *topologyRecoveryRecords
-	mutex                   sync.RWMutex
-	closed                  bool
+
+	// mutex is used to synchronize the access to the connection, it is used to prevent multiple goroutines from trying to open or close the connection at the same time.
+	mutex sync.RWMutex
+
+	// closed is used to indicate if the connection is closed, it is used to prevent trying to use the connection after it is closed.
+	closed bool
 }
 
 func (a *AmqpConnection) Properties() map[string]any {
