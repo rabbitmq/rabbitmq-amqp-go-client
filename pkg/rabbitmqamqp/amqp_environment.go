@@ -41,33 +41,78 @@ type Environment struct {
 	endPoints        []Endpoint
 	EndPointStrategy TEndPointStrategy
 	nextConnectionId int32
+	metricsCollector MetricsCollector
+}
+
+// environmentOptions holds optional configuration for Environment.
+type environmentOptions struct {
+	strategy         TEndPointStrategy
+	metricsCollector MetricsCollector
+}
+
+// EnvironmentOption is a function to configure the Environment. See WithStrategy and WithMetricsCollector for more details.
+type EnvironmentOption func(*environmentOptions)
+
+// WithStrategy sets the endpoint selection strategy for the Environment.
+func WithStrategy(strategy TEndPointStrategy) EnvironmentOption {
+	return func(opts *environmentOptions) {
+		opts.strategy = strategy
+	}
+}
+
+// WithMetricsCollector sets the metrics collector for the Environment.
+func WithMetricsCollector(collector MetricsCollector) EnvironmentOption {
+	return func(opts *environmentOptions) {
+		opts.metricsCollector = collector
+	}
+}
+
+// applyEnvironmentOptions applies the given options to environmentOptions with defaults.
+func applyEnvironmentOptions(opts ...EnvironmentOption) *environmentOptions {
+	envOpts := &environmentOptions{
+		strategy:         StrategyRandom,
+		metricsCollector: DefaultMetricsCollector(),
+	}
+	for _, opt := range opts {
+		opt(envOpts)
+	}
+	return envOpts
 }
 
 /*
 NewEnvironment creates a new environment with the given address and options.
 The address is the AMQP connection string, and the options are the connection options.
-The default strategy is StrategyRandom, which picks a random endpoint from the list of endpoints when creating a new connection.
-If you want to use a different strategy, you can use NewClusterEnvironmentWithStrategy.
+Optional environment configuration can be passed using functional options.
 */
-func NewEnvironment(address string, options *AmqpConnOptions) *Environment {
-	return NewClusterEnvironmentWithStrategy([]Endpoint{{Address: address, Options: options}}, StrategyRandom)
+func NewEnvironment(address string, connOptions *AmqpConnOptions, opts ...EnvironmentOption) *Environment {
+	envOpts := applyEnvironmentOptions(opts...)
+	return &Environment{
+		connections:      sync.Map{},
+		endPoints:        []Endpoint{{Address: address, Options: connOptions}},
+		EndPointStrategy: envOpts.strategy,
+		nextConnectionId: 0,
+		metricsCollector: envOpts.metricsCollector,
+	}
 }
 
 /*
 NewClusterEnvironment creates a new environment with the given endpoints.
-The default strategy is StrategyRandom, which picks a random endpoint from the list of endpoints when creating a new connection.
-If you want to use a different strategy, you can use NewClusterEnvironmentWithStrategy.
+Optional environment configuration can be passed using functional options.
 */
-
-func NewClusterEnvironment(endPoints []Endpoint) *Environment {
-	return NewClusterEnvironmentWithStrategy(endPoints, StrategyRandom)
+func NewClusterEnvironment(endPoints []Endpoint, opts ...EnvironmentOption) *Environment {
+	envOpts := applyEnvironmentOptions(opts...)
+	return &Environment{
+		connections:      sync.Map{},
+		endPoints:        endPoints,
+		EndPointStrategy: envOpts.strategy,
+		nextConnectionId: 0,
+		metricsCollector: envOpts.metricsCollector,
+	}
 }
 
 /*
 NewClusterEnvironmentWithStrategy creates a new environment with the given endpoints and strategy.
-The strategy is used to determine how the environment picks an endpoint from the list of endpoints when creating a new connection.
-The default strategy is StrategyRandom, which picks a random endpoint from the list of endpoints.
-The other strategy is StrategySequential, which picks the endpoints in order.
+This function is provided for backward compatibility. Consider using NewClusterEnvironment with WithStrategy option instead.
 */
 func NewClusterEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointStrategy) *Environment {
 	return &Environment{
@@ -75,6 +120,7 @@ func NewClusterEnvironmentWithStrategy(endPoints []Endpoint, strategy TEndPointS
 		endPoints:        endPoints,
 		EndPointStrategy: strategy,
 		nextConnectionId: 0,
+		metricsCollector: DefaultMetricsCollector(),
 	}
 }
 
@@ -104,7 +150,7 @@ func (e *Environment) NewConnection(ctx context.Context) (*AmqpConnection, error
 		if addr.Options != nil {
 			cloned = addr.Options.Clone()
 		}
-		connection, err := Dial(ctx, addr.Address, cloned)
+		connection, err := dialWithMetrics(ctx, addr.Address, cloned, e.metricsCollector)
 		if err != nil {
 			Error("Failed to open connection", "url", ExtractWithoutPassword(addr.Address), "error", err)
 			lastError = err
