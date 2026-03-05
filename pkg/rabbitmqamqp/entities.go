@@ -406,7 +406,7 @@ type StreamQueueSpecification struct {
 	MaxLengthBytes       int64
 	InitialClusterSize   int
 	MaxAge               time.Duration
-	StreamMaxSegmentSize int
+	StreamMaxSegmentSize int64
 	Arguments            map[string]any
 }
 
