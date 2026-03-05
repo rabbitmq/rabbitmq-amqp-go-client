@@ -1,5 +1,10 @@
 package rabbitmqamqp
 
+import (
+	"fmt"
+	"time"
+)
+
 type iEntityIdentifier interface {
 	Id() string
 }
@@ -400,6 +405,9 @@ type StreamQueueSpecification struct {
 	Name               string
 	MaxLengthBytes     int64
 	InitialClusterSize int
+	MaxAge             time.Duration
+	SegmentSize        int64
+	FilterSizeBytes    int64
 	Arguments          map[string]any
 }
 
@@ -433,9 +441,59 @@ func (s *StreamQueueSpecification) buildArguments() map[string]any {
 		result["x-stream-initial-cluster-size"] = s.InitialClusterSize
 	}
 
+	if s.MaxAge != 0 {
+		result["x-max-age"] = durationToMaxAge(s.MaxAge)
+	}
+
+	if s.SegmentSize != 0 {
+		result["x-stream-max-segment-size-bytes"] = s.SegmentSize
+	}
+
+	if s.FilterSizeBytes != 0 {
+		result["x-stream-filter-size-bytes"] = s.FilterSizeBytes
+	}
+
 	result["x-queue-type"] = string(s.queueType())
 
 	return result
+}
+
+// durationToMaxAge converts a time.Duration to the RabbitMQ stream x-max-age string format.
+// RabbitMQ accepts durations expressed as a number followed by a unit: Y, M, D, h, m, s.
+// The largest fitting unit is used (e.g. 48h → "2D", 3600s → "1h").
+func durationToMaxAge(d time.Duration) string {
+	if d == 0 {
+		return "0s"
+	}
+	type unit struct {
+		suffix string
+		size   time.Duration
+	}
+	units := []unit{
+		{"Y", 365 * 24 * time.Hour},
+		{"M", 30 * 24 * time.Hour},
+		{"D", 24 * time.Hour},
+		{"h", time.Hour},
+		{"m", time.Minute},
+		{"s", time.Second},
+	}
+	for _, u := range units {
+		if d%u.size == 0 {
+			return fmt.Sprintf("%d%s", d/u.size, u.suffix)
+		}
+	}
+	// Fallback: round up to whole seconds for positive durations, enforcing a minimum of 1s.
+	if d > 0 {
+		secs := int64(d / time.Second)
+		if d%time.Second != 0 {
+			secs++
+		}
+		if secs < 1 {
+			secs = 1
+		}
+		return fmt.Sprintf("%ds", secs)
+	}
+	return fmt.Sprintf("%ds", int64(d.Seconds()))
 }
 
 // / **** Exchange ****

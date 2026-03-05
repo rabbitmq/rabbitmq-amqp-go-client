@@ -1,6 +1,8 @@
 package rabbitmqamqp
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -18,5 +20,84 @@ var _ = Describe("Entities", func() {
 
 			Expect(generatedName).ToNot(Equal(anotherGeneratedName), "different instances should generate different names")
 		})
+	})
+
+	Describe("StreamQueueSpecification", func() {
+		It("should set x-stream-max-segment-size-bytes when SegmentSize is set", func() {
+			spec := &StreamQueueSpecification{
+				Name:        "my-stream",
+				SegmentSize: 500_000_000,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(int64(500_000_000)))
+		})
+
+		It("should not set x-stream-max-segment-size-bytes when SegmentSize is zero", func() {
+			spec := &StreamQueueSpecification{Name: "my-stream"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-stream-max-segment-size-bytes"))
+		})
+
+		It("should set x-max-age when MaxAge is set", func() {
+			spec := &StreamQueueSpecification{
+				Name:   "my-stream",
+				MaxAge: 7 * 24 * time.Hour,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-max-age"]).To(Equal("7D"))
+		})
+
+		It("should not set x-max-age when MaxAge is zero", func() {
+			spec := &StreamQueueSpecification{Name: "my-stream"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-max-age"))
+		})
+
+		It("should set both x-max-age and x-stream-max-segment-size-bytes together", func() {
+			spec := &StreamQueueSpecification{
+				Name:        "my-stream",
+				MaxAge:      30 * 24 * time.Hour,
+				SegmentSize: 100_000_000,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-max-age"]).To(Equal("1M"))
+			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(int64(100_000_000)))
+		})
+
+		It("should set x-stream-filter-size-bytes when FilterSizeBytes is set", func() {
+			spec := &StreamQueueSpecification{
+				Name:            "my-stream",
+				FilterSizeBytes: 16,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-stream-filter-size-bytes"]).To(Equal(int64(16)))
+		})
+
+		It("should not set x-stream-filter-size-bytes when FilterSizeBytes is zero", func() {
+			spec := &StreamQueueSpecification{Name: "my-stream"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-stream-filter-size-bytes"))
+		})
+
+		It("should always set x-queue-type to stream", func() {
+			spec := &StreamQueueSpecification{Name: "my-stream"}
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("stream"))
+		})
+	})
+
+	Describe("durationToMaxAge", func() {
+		DescribeTable("converts duration to RabbitMQ max-age string",
+			func(d time.Duration, expected string) {
+				Expect(durationToMaxAge(d)).To(Equal(expected))
+			},
+			Entry("seconds", 30*time.Second, "30s"),
+			Entry("minutes", 5*time.Minute, "5m"),
+			Entry("hours", 2*time.Hour, "2h"),
+			Entry("days", 3*24*time.Hour, "3D"),
+			Entry("months (30 days)", 30*24*time.Hour, "1M"),
+			Entry("years (365 days)", 365*24*time.Hour, "1Y"),
+			Entry("zero", time.Duration(0), "0s"),
+		)
 	})
 })
