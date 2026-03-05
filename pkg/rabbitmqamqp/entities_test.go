@@ -23,16 +23,16 @@ var _ = Describe("Entities", func() {
 	})
 
 	Describe("StreamQueueSpecification", func() {
-		It("should set x-stream-max-segment-size-bytes when StreamMaxSegmentSize is set", func() {
+		It("should set x-stream-max-segment-size-bytes when SegmentSize is set", func() {
 			spec := &StreamQueueSpecification{
-				Name:                 "my-stream",
-				StreamMaxSegmentSize: 500_000_000,
+				Name:        "my-stream",
+				SegmentSize: 500_000_000,
 			}
 			args := spec.buildArguments()
 			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(500_000_000))
 		})
 
-		It("should not set x-stream-max-segment-size-bytes when StreamMaxSegmentSize is zero", func() {
+		It("should not set x-stream-max-segment-size-bytes when SegmentSize is zero", func() {
 			spec := &StreamQueueSpecification{Name: "my-stream"}
 			args := spec.buildArguments()
 			Expect(args).ToNot(HaveKey("x-stream-max-segment-size-bytes"))
@@ -55,9 +55,9 @@ var _ = Describe("Entities", func() {
 
 		It("should set both x-max-age and x-stream-max-segment-size-bytes together", func() {
 			spec := &StreamQueueSpecification{
-				Name:                 "my-stream",
-				MaxAge:               30 * 24 * time.Hour,
-				StreamMaxSegmentSize: 100_000_000,
+				Name:        "my-stream",
+				MaxAge:      30 * 24 * time.Hour,
+				SegmentSize: 100_000_000,
 			}
 			args := spec.buildArguments()
 			Expect(args["x-max-age"]).To(Equal("1M"))
