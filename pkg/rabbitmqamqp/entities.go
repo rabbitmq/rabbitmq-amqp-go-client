@@ -477,6 +477,17 @@ func durationToMaxAge(d time.Duration) string {
 			return fmt.Sprintf("%d%s", d/u.size, u.suffix)
 		}
 	}
+	// Fallback: round up to whole seconds for positive durations, enforcing a minimum of 1s.
+	if d > 0 {
+		secs := int64(d / time.Second)
+		if d%time.Second != 0 {
+			secs++
+		}
+		if secs < 1 {
+			secs = 1
+		}
+		return fmt.Sprintf("%ds", secs)
+	}
 	return fmt.Sprintf("%ds", int64(d.Seconds()))
 }
 
