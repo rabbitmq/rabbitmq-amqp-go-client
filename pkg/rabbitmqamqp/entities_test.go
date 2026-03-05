@@ -29,7 +29,7 @@ var _ = Describe("Entities", func() {
 				SegmentSize: 500_000_000,
 			}
 			args := spec.buildArguments()
-			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(500_000_000))
+			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(int64(500_000_000)))
 		})
 
 		It("should not set x-stream-max-segment-size-bytes when SegmentSize is zero", func() {
@@ -61,7 +61,7 @@ var _ = Describe("Entities", func() {
 			}
 			args := spec.buildArguments()
 			Expect(args["x-max-age"]).To(Equal("1M"))
-			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(100_000_000))
+			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(int64(100_000_000)))
 		})
 
 		It("should always set x-queue-type to stream", func() {
