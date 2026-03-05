@@ -407,6 +407,7 @@ type StreamQueueSpecification struct {
 	InitialClusterSize int
 	MaxAge             time.Duration
 	SegmentSize        int64
+	FilterSizeBytes    int64
 	Arguments          map[string]any
 }
 
@@ -446,6 +447,10 @@ func (s *StreamQueueSpecification) buildArguments() map[string]any {
 
 	if s.SegmentSize != 0 {
 		result["x-stream-max-segment-size-bytes"] = s.SegmentSize
+	}
+
+	if s.FilterSizeBytes != 0 {
+		result["x-stream-filter-size-bytes"] = s.FilterSizeBytes
 	}
 
 	result["x-queue-type"] = string(s.queueType())

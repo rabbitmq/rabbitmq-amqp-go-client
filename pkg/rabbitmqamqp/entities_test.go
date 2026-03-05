@@ -64,6 +64,21 @@ var _ = Describe("Entities", func() {
 			Expect(args["x-stream-max-segment-size-bytes"]).To(Equal(int64(100_000_000)))
 		})
 
+		It("should set x-stream-filter-size-bytes when FilterSizeBytes is set", func() {
+			spec := &StreamQueueSpecification{
+				Name:            "my-stream",
+				FilterSizeBytes: 16,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-stream-filter-size-bytes"]).To(Equal(int64(16)))
+		})
+
+		It("should not set x-stream-filter-size-bytes when FilterSizeBytes is zero", func() {
+			spec := &StreamQueueSpecification{Name: "my-stream"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-stream-filter-size-bytes"))
+		})
+
 		It("should always set x-queue-type to stream", func() {
 			spec := &StreamQueueSpecification{Name: "my-stream"}
 			args := spec.buildArguments()
