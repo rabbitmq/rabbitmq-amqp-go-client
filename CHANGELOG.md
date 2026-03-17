@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [[0.7.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.7.0)]
+
+## 0.7.0 - 2026-03-17
+- [Release 0.7.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.7.0)
+
+### Added
+- Add code documentation by @Gsantomaggio in [#86](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/86)
+- Add OpenTelemetry metrics support with semantic conventions by @Zerpet in [#84](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/84)
+- Add settings to the stream queues by @Gsantomaggio in [#87](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/87)
+
 ## [[0.6.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.6.0)]
 
 ## 0.6.0 - 2026-02-16
