@@ -28,7 +28,9 @@ type featuresAvailable struct {
 	is4OrMore  bool
 	is41OrMore bool
 	is42rMore  bool
+	is43rMore  bool
 	isRabbitMQ bool
+	isTanzu    bool
 }
 
 func newFeaturesAvailable() *featuresAvailable {
@@ -48,7 +50,9 @@ func (f *featuresAvailable) ParseProperties(properties map[string]any) error {
 	f.is4OrMore = isVersionGreaterOrEqual(version, "4.0.0")
 	f.is41OrMore = isVersionGreaterOrEqual(version, "4.1.0")
 	f.is42rMore = isVersionGreaterOrEqual(version, "4.2.0")
+	f.is43rMore = isVersionGreaterOrEqual(version, "4.3.0")
 	f.isRabbitMQ = strings.EqualFold(properties["product"].(string), "RabbitMQ")
+	f.isTanzu = isTanzu(properties["version"].(string))
 	return nil
 }
 
@@ -98,4 +102,8 @@ func isVersionGreaterOrEqual(version, target string) bool {
 		return false
 	}
 	return v1.Compare(v2) >= 0
+}
+
+func isTanzu(version string) bool {
+	return strings.Contains(version, "tanzu+rabbitmq")
 }

@@ -34,12 +34,15 @@ type AmqpManagement struct {
 	// since recovery happens in a separate goroutine while public API methods
 	// can be called from user goroutines.
 	isRecovering atomic.Bool
+
+	featuresAvailable *featuresAvailable
 }
 
-func newAmqpManagement(topologyRecovery TopologyRecoveryOptions) *AmqpManagement {
+func newAmqpManagement(topologyRecovery TopologyRecoveryOptions, featuresAvailable *featuresAvailable) *AmqpManagement {
 	return &AmqpManagement{
 		lifeCycle:               NewLifeCycle(),
 		topologyRecoveryOptions: topologyRecovery,
+		featuresAvailable:       featuresAvailable,
 	}
 }
 
@@ -188,6 +191,12 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueSpecification) (*AmqpQueueInfo, error) {
 	if specification == nil {
 		return nil, fmt.Errorf("queue specification cannot be nil. You need to provide a valid IQueueSpecification")
+	}
+
+	err := specification.validate(a.featuresAvailable)
+
+	if err != nil {
+		return nil, err
 	}
 
 	amqpQueue := newAmqpQueue(a, specification.name())
