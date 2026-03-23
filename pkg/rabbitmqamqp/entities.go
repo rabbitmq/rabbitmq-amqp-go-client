@@ -713,7 +713,7 @@ func (d *DelayedQueueSpecification) validate(f *featuresAvailable) error {
 	if f.isTanzu {
 		return nil
 	}
-	return fmt.Errorf("DelayedQueueSpecification is only supported on Tanzu RabbitMQ 4.3 or later")
+	return fmt.Errorf("DelayedQueueSpecification is only supported on Tanzu RabbitMQ 4.x or later")
 }
 
 // durationToMaxAge converts a time.Duration to the RabbitMQ stream x-max-age string format.
