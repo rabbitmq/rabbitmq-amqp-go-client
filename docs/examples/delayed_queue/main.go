@@ -1,7 +1,7 @@
 // RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
 // RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
 // This example mirrors getting_started but declares a delayed queue via DelayedQueueSpecification
-// (RabbitMQ queue type "delayed"). Delayed queues are available on Tanzu RabbitMQ 4.3+; see:
+// (RabbitMQ queue type "delayed"). Delayed queues are available on Tanzu RabbitMQ 4.x+; see:
 // https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-rabbitmq-on-kubernetes/4-2/tanzu-rabbitmq-kubernetes/delayed-queues.html
 // example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/delayed_queue/main.go
 
