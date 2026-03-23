@@ -120,7 +120,7 @@ func (q *queueRecoveryRecord) toIQueueSpecification() IQueueSpecification {
 			Arguments: q.arguments,
 		}
 	case Jms:
-		return &JmsQueueSpecification{
+		return &JMSQueueSpecification{
 			Name:      q.queueName,
 			Arguments: q.arguments,
 		}

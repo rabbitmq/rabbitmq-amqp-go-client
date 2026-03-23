@@ -1,6 +1,6 @@
 // RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
 // RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
-// This example mirrors getting_started but declares a JMS queue via JmsQueueSpecification
+// This example mirrors getting_started but declares a JMS queue via JMSQueueSpecification
 // (RabbitMQ queue type "jms"). JMS queues are available on Tanzu RabbitMQ 4.x; see:
 // https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-rabbitmq-oci/4-2/tanzu-rabbitmq-oci-image/site-overview.html
 // example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/jms_queue/main.go
@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Declare a JMS queue (x-queue-type=jms). Optional queue arguments go in Arguments.
-	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.JmsQueueSpecification{
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.JMSQueueSpecification{
 		Name: queueName,
 	})
 

@@ -86,9 +86,9 @@ var _ = Describe("Entities", func() {
 		})
 	})
 
-	Describe("JmsQueueSpecification", func() {
+	Describe("JMSQueueSpecification", func() {
 		It("should always set x-queue-type to jms and fixed durability flags", func() {
-			spec := &JmsQueueSpecification{Name: "my-jms-queue"}
+			spec := &JMSQueueSpecification{Name: "my-jms-queue"}
 			Expect(spec.isAutoDelete()).To(BeFalse())
 			Expect(spec.isExclusive()).To(BeFalse())
 			Expect(spec.queueType()).To(Equal(Jms))
@@ -97,7 +97,7 @@ var _ = Describe("Entities", func() {
 		})
 
 		It("should merge optional arguments", func() {
-			spec := &JmsQueueSpecification{
+			spec := &JMSQueueSpecification{
 				Name:      "my-jms-queue",
 				Arguments: map[string]any{"x-max-length-bytes": int64(1000)},
 			}
