@@ -2,7 +2,7 @@
 
 
 - [Getting Started](getting_started) - A simple example to get you started.
-- [JMS queue](jms_queue) - Same flow as getting started, using `JmsQueueSpecification` (Tanzu RabbitMQ 4.3+).
+- [JMS queue](jms_queue) - Same flow as getting started, using `JMSQueueSpecification` (Tanzu RabbitMQ 4.3+).
 - [Delayed queue](delayed_queue) - Same flow as getting started, using `DelayedQueueSpecification` (Tanzu RabbitMQ 4.x).
 - [Reliable](reliable) - An example of how to deal with reconnections and error handling.
 - [Streams](streams) - An example of how to use [RabbitMQ Streams](https://www.rabbitmq.com/docs/streams) with AMQP 1.0
