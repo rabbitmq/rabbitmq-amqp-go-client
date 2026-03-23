@@ -545,12 +545,6 @@ func (j *JmsQueueSpecification) buildArguments() map[string]any {
 		result["x-overflow"] = j.OverflowStrategy.overflowStrategy()
 	}
 
-	//DeliveryLimit        int64
-
-	//LeaderLocator        ILeaderLocator
-	//InitialClusterSize   int
-	//SelectorFields       []string
-
 	result["x-queue-type"] = string(j.queueType())
 
 	return result
