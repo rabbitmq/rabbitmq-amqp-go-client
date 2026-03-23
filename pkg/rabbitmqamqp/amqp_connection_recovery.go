@@ -126,8 +126,10 @@ func (q *queueRecoveryRecord) toIQueueSpecification() IQueueSpecification {
 		}
 	case Delayed:
 		return &DelayedQueueSpecification{
-			Name:      q.queueName,
-			Arguments: q.arguments,
+			Name:         q.queueName,
+			IsAutoDelete: *q.autoDelete,
+			IsExclusive:  *q.exclusive,
+			Arguments:    q.arguments,
 		}
 	default:
 		return &DefaultQueueSpecification{
