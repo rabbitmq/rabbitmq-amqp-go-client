@@ -225,10 +225,12 @@ var _ = Describe("Recovery connection test", func() {
 			Entry("Classic queue", Classic, true, true, map[string]any{}),
 			Entry("Stream queue", Stream, false, false, map[string]any{}),
 			//Entry("JMS queue", Jms, false, false, map[string]any{}),
+			//Entry("Delayed queue", Delayed, false, false, map[string]any{}),
 			Entry("Quorum queue with arguments", Quorum, false, false, map[string]any{"x-max-length-bytes": 1000}),
 			Entry("Classic queue with arguments", Classic, true, true, map[string]any{"x-max-length-bytes": 1000}),
 			Entry("Stream queue with arguments", Stream, false, false, map[string]any{"x-max-length-bytes": 1000}),
 			//Entry("JMS queue with arguments", Jms, false, false, map[string]any{"x-max-length-bytes": 1000}),
+			Entry("Delayed queue with arguments", Delayed, false, false, map[string]any{"x-max-length-bytes": 1000}),
 		)
 
 		DescribeTable("Exchange record returns the expected exchange specification",
