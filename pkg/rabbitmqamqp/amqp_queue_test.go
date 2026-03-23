@@ -254,7 +254,15 @@ var _ = Describe("AMQP Queue test ", func() {
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("JMSQueueSpecification is only supported on Tanzu RabbitMQ 4.3 or later"))
+	})
 
+	It("should fail if declare a Delayed queue in the open source RabbitMQ", func() {
+		queueName := generateName("should fail if declare a Delayed queue in the open source RabbitMQ")
+		_, err := management.DeclareQueue(context.TODO(), &DelayedQueueSpecification{
+			Name: queueName,
+		})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("DelayedQueueSpecification is only supported on Tanzu RabbitMQ 4.3 or later"))
 	})
 
 	// default

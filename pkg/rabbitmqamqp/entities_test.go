@@ -107,6 +107,89 @@ var _ = Describe("Entities", func() {
 		})
 	})
 
+	Describe("DelayedQueueSpecification", func() {
+		It("should set x-queue-type to delayed and default durability-related flags", func() {
+			spec := &DelayedQueueSpecification{Name: "my-delayed-queue"}
+			Expect(spec.isAutoDelete()).To(BeFalse())
+			Expect(spec.isExclusive()).To(BeFalse())
+			Expect(spec.queueType()).To(Equal(Delayed))
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("delayed"))
+		})
+
+		It("should map standard and quorum-style arguments", func() {
+			spec := &DelayedQueueSpecification{
+				Name:                 "dq",
+				AutoExpire:           60000,
+				MessageTTL:           30000,
+				SingleActiveConsumer: true,
+				DeadLetterExchange:   "dlx",
+				DeadLetterRoutingKey: "rk",
+				MaxLength:            100,
+				MaxLengthBytes:       2000,
+				DeliveryLimit:        5,
+				InitialClusterSize:   3,
+				TargetClusterSize:    5,
+				DeadLetterStrategy:   "at-least-once",
+				LeaderLocator:        &ClientLocalLeaderLocator{},
+				OverflowStrategy:     &RejectPublishOverflowStrategy{},
+			}
+			args := spec.buildArguments()
+			Expect(args["x-expires"]).To(Equal(int64(60000)))
+			Expect(args["x-message-ttl"]).To(Equal(int64(30000)))
+			Expect(args["x-single-active-consumer"]).To(BeTrue())
+			Expect(args["x-dead-letter-exchange"]).To(Equal("dlx"))
+			Expect(args["x-dead-letter-routing-key"]).To(Equal("rk"))
+			Expect(args["x-max-length"]).To(Equal(int64(100)))
+			Expect(args["x-max-length-bytes"]).To(Equal(int64(2000)))
+			Expect(args["x-delivery-limit"]).To(Equal(int64(5)))
+			Expect(args["x-quorum-initial-group-size"]).To(Equal(3))
+			Expect(args["x-quorum-target-group-size"]).To(Equal(int64(5)))
+			Expect(args["x-dead-letter-strategy"]).To(Equal("at-least-once"))
+			Expect(args["x-queue-leader-locator"]).To(Equal("client-local"))
+			Expect(args["x-overflow"]).To(Equal("reject-publish"))
+			Expect(args["x-queue-type"]).To(Equal("delayed"))
+		})
+
+		It("should set automatic shovel arguments with defaults when ShovelDestination is set", func() {
+			spec := &DelayedQueueSpecification{
+				Name:                  "dq",
+				ShovelDestination:     "dest-exch",
+				ShovelPrefetch:        100,
+				ShovelProtocol:        "amqp10",
+				ShovelAcknowledgement: "no-ack",
+			}
+			args := spec.buildArguments()
+			Expect(args["x-shovel-destination"]).To(Equal("dest-exch"))
+			Expect(args["x-shovel-destination-uri"]).To(Equal(DefaultDelayedShovelDestinationURI))
+			Expect(args["x-shovel-protocol"]).To(Equal("amqp10"))
+			Expect(args["x-shovel-prefetch-count"]).To(Equal(100))
+			Expect(args["x-shovel-ack-mode"]).To(Equal("no-ack"))
+		})
+
+		It("should apply default shovel prefetch, protocol, ack, and URI when only destination is set", func() {
+			spec := &DelayedQueueSpecification{
+				Name:              "dq",
+				ShovelDestination: "ex",
+			}
+			args := spec.buildArguments()
+			Expect(args["x-shovel-prefetch-count"]).To(Equal(DefaultDelayedShovelPrefetch))
+			Expect(args["x-shovel-protocol"]).To(Equal(DefaultDelayedShovelProtocol))
+			Expect(args["x-shovel-ack-mode"]).To(Equal(DefaultDelayedShovelAcknowledgement))
+			Expect(args["x-shovel-destination-uri"]).To(Equal(DefaultDelayedShovelDestinationURI))
+		})
+
+		It("should set x-shovel-destination-key when set", func() {
+			spec := &DelayedQueueSpecification{
+				Name:                        "dq",
+				ShovelDestination:           "ex",
+				ShovelDestinationRoutingKey: "orders.key",
+			}
+			args := spec.buildArguments()
+			Expect(args["x-shovel-destination-key"]).To(Equal("orders.key"))
+		})
+	})
+
 	Describe("durationToMaxAge", func() {
 		DescribeTable("converts duration to RabbitMQ max-age string",
 			func(d time.Duration, expected string) {
