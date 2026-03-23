@@ -58,6 +58,7 @@ docs/examples/             # Example code demonstrating usage
 - `Quorum` - Quorum queue type
 - `Classic` - Classic queue type
 - `Stream` - Stream queue type
+- `Jms` - JMS queue type // for rabbitmq tanzu 
 
 ### Consumer Options
 

@@ -82,7 +82,7 @@ var _ = Describe("Management tests", func() {
 		var management *AmqpManagement
 
 		BeforeEach(func() {
-			management = newAmqpManagement(TopologyRecoveryAllEnabled)
+			management = newAmqpManagement(TopologyRecoveryAllEnabled, newFeaturesAvailable())
 			management.topologyRecoveryRecords = newTopologyRecoveryRecords()
 		})
 

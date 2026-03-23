@@ -408,14 +408,15 @@ func dialWithMetrics(ctx context.Context, address string, connOptions *AmqpConnO
 		return nil, err
 	}
 
+	fa := newFeaturesAvailable()
 	// create the connection
 	conn := &AmqpConnection{
-		management:              newAmqpManagement(connOptions.TopologyRecoveryOptions),
+		management:              newAmqpManagement(connOptions.TopologyRecoveryOptions, fa),
 		lifeCycle:               NewLifeCycle(),
 		amqpConnOptions:         connOptions,
 		entitiesTracker:         newEntitiesTracker(),
 		topologyRecoveryRecords: newTopologyRecoveryRecords(),
-		featuresAvailable:       newFeaturesAvailable(),
+		featuresAvailable:       fa,
 		metricsCollector:        metricsCollector,
 		serverAddress:           uri.Host,
 		serverPort:              uri.Port,

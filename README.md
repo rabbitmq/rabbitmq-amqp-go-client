@@ -35,3 +35,7 @@ You need the following packages to use the rabbitmq amqp client:
 - Stop RabbitMQ with `./.ci/ubuntu/gha-setup.sh stop`
 
 
+### RabbitMQ Tanzu
+
+Features like AMQP 1.0 over WebSocket, JMS support, and more are only available in Tanzu RabbitMQ 4.0 or later. You can get it from [here](https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-rabbitmq-oci/4-2/tanzu-rabbitmq-oci-image/site-overview.html).
+

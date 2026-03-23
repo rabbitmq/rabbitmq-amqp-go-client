@@ -119,6 +119,11 @@ func (q *queueRecoveryRecord) toIQueueSpecification() IQueueSpecification {
 			Name:      q.queueName,
 			Arguments: q.arguments,
 		}
+	case Jms:
+		return &JMSQueueSpecification{
+			Name:      q.queueName,
+			Arguments: q.arguments,
+		}
 	default:
 		return &DefaultQueueSpecification{
 			Name:         q.queueName,

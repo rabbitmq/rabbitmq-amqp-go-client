@@ -86,6 +86,27 @@ var _ = Describe("Entities", func() {
 		})
 	})
 
+	Describe("JMSQueueSpecification", func() {
+		It("should always set x-queue-type to jms and fixed durability flags", func() {
+			spec := &JMSQueueSpecification{Name: "my-jms-queue"}
+			Expect(spec.isAutoDelete()).To(BeFalse())
+			Expect(spec.isExclusive()).To(BeFalse())
+			Expect(spec.queueType()).To(Equal(Jms))
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("jms"))
+		})
+
+		It("should merge optional arguments", func() {
+			spec := &JMSQueueSpecification{
+				Name:      "my-jms-queue",
+				Arguments: map[string]any{"x-max-length-bytes": int64(1000)},
+			}
+			args := spec.buildArguments()
+			Expect(args["x-max-length-bytes"]).To(Equal(int64(1000)))
+			Expect(args["x-queue-type"]).To(Equal("jms"))
+		})
+	})
+
 	Describe("durationToMaxAge", func() {
 		DescribeTable("converts duration to RabbitMQ max-age string",
 			func(d time.Duration, expected string) {

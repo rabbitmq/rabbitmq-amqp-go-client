@@ -3,7 +3,7 @@ AMQP 1.0 over WebSocket Example
 
 This example demonstrates how to use AMQP 1.0 over WebSocket. </br>
 ## RabbitMQ Tanzu 
-You need [Tanzu RabbitMQ 4.0](https://www.vmware.com/products/app-platform/tanzu-rabbitmq) or later with the AMQP 1.0 and `rabbitmq_web_amqp` plugins enabled.
+You need [Tanzu RabbitMQ 4.0](https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-rabbitmq-oci/4-2/tanzu-rabbitmq-oci-image/site-overview.html) or later with the AMQP 1.0 and `rabbitmq_web_amqp` plugins enabled.
 
 For more info read the blog post: [AMQP 1.0 over WebSocket](https://www.rabbitmq.com/blog/2025/04/16/amqp-websocket)
 
