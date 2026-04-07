@@ -442,11 +442,12 @@ type PublisherOptions struct {
 	// MaxInFlight limits the number of concurrent pending PublishAsync operations.
 	// When the limit is reached, PublishAsync blocks until a slot becomes available.
 	// Defaults to DefaultMaxInFlight (256) if zero.
+	// MaxInFlight could be the number of go-routines executed.
 	MaxInFlight int
 
 	// PublishTimeout is the maximum time to wait for broker confirmation
 	// in PublishAsync before the callback receives a timeout error.
-	// Defaults to DefaultPublishTimeout (30s) if zero.
+	// Defaults to DefaultPublishTimeout (10s) if zero.
 	PublishTimeout time.Duration
 }
 

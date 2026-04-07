@@ -5,6 +5,15 @@ import (
 	"sync"
 )
 
+const (
+	open         = iota
+	reconnecting = iota
+	closing      = iota
+	closed       = iota
+)
+
+// ILifeCycleState defines the connection state
+// see the iota constants for possible states: open, reconnecting, closing, closed
 type ILifeCycleState interface {
 	getState() int
 }
@@ -42,13 +51,6 @@ func (c *StateClosed) getState() int {
 	return closed
 }
 
-const (
-	open         = iota
-	reconnecting = iota
-	closing      = iota
-	closed       = iota
-)
-
 func statusToString(status ILifeCycleState) string {
 	switch status.getState() {
 	case open:
@@ -64,6 +66,38 @@ func statusToString(status ILifeCycleState) string {
 
 }
 
+// StateChanged define the connection life cycle
+// See ILifeCycleState for more details about the possible states
+// Every time the connection state changes,
+// a StateChanged struct is sent to the channel defined in LifeCycle.notifyStatusChange method.
+// You can use it to manage your connection and react to the state changes, for example,
+// by blocking the publishing messages during the reconnection, ex:
+// <code>
+//
+//	 signalBlock := sync.Cond{L: &sync.Mutex{}}
+//		stateChanged := make(chan *rmq.StateChanged, 1)
+//		go func(ch chan *rmq.StateChanged) {
+//			for statusChanged := range ch {
+//				rmq.Info("[connection]", "Status changed", statusChanged)
+//				switch statusChanged.To.(type) {
+//				case *rmq.StateOpen:
+//					signalBlock.Broadcast()
+//				case *rmq.StateReconnecting:
+//					rmq.Info("[connection]", "Reconnecting to the AMQP 1.0 server")
+//				case *rmq.StateClosed:
+//					StateClosed := statusChanged.To.(*rmq.StateClosed)
+//					if errors.Is(StateClosed.GetError(), rmq.ErrMaxReconnectAttemptsReached) {
+//						rmq.Error("[connection]", "Max reconnect attempts reached. Closing connection", StateClosed.GetError())
+//						signalBlock.Broadcast()
+//						isRunning = false
+//					}
+//
+//				}
+//			}
+//		}(stateChanged)
+//
+// </code>
+// see examples/reliable/reliable.go example for more details.
 type StateChanged struct {
 	From ILifeCycleState
 	To   ILifeCycleState

@@ -114,10 +114,6 @@ You can set the message to be non-persistent by setting the Header.Durable to fa
 Note:
 When you use the `Header` is up to you to set the message properties,
 You need set the `Header.Durable` to true or false.
-
-<code>
-
-</code>
 */
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
 	if m.destinationAdd == "" {
@@ -175,8 +171,17 @@ MaxInFlight (configurable via PublisherOptions, default 256). When the limit is
 reached, PublishAsync blocks on the caller's goroutine until a slot becomes
 available or the context is cancelled.
 
+MaxInFlight could be potentially the unacked messages in the FIFO queues.
+
 The timeout for each confirmation wait is controlled by PublisherOptions.PublishTimeout
 (default 10s).
+
+PublishAsync can increase the throughput but can increase the memory usage.
+Every publish runs a go-routine that waits for the broker confirmation, so a large number of in-flight messages
+can lead to a large number of goroutines and increased memory usage.
+Use the MaxInFlight option to set an upper bound on the number of concurrent confirmations and control the memory usage.
+
+callback is optional, you can set it to nil if you don't want to receive the Publish result.
 */
 func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, callback PublishAsyncCallback) error {
 	if m.destinationAdd == "" {
@@ -223,11 +228,12 @@ func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, cal
 		}
 
 		m.recordPublishDisposition(state, publishCtx)
-
-		callback(&PublishResult{
-			Message: message,
-			Outcome: state,
-		}, nil)
+		if callback != nil {
+			callback(&PublishResult{
+				Message: message,
+				Outcome: state,
+			}, nil)
+		}
 	}()
 
 	return nil

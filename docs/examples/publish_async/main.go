@@ -28,7 +28,7 @@ import (
 func main() {
 	const (
 		queueName      = "publish-async-go-queue"
-		totalMessages  = 2_000_000
+		totalMessages  = 10_000_000
 		maxInFlight    = 100
 		publishTimeout = 10 * time.Second
 	)

@@ -13,6 +13,8 @@ format:
 vet:
 	go vet ./pkg/rabbitmqamqp
 	go vet ./docs/examples/...
+	go vet ./docs/perf_test/...
+
 
 STATICCHECK ?= $(GOBIN)/staticcheck
 STATICCHECK_VERSION ?= latest
@@ -21,6 +23,7 @@ $(STATICCHECK):
 check: $(STATICCHECK)
 	$(STATICCHECK) ./pkg/rabbitmqamqp
 	$(STATICCHECK) ./docs/examples/...
+	$(STATICCHECK) ./docs/perf_test/...
 
 
 
