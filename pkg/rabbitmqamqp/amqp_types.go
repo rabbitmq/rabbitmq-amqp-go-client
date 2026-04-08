@@ -430,9 +430,11 @@ const DefaultMaxInFlight = 256
 // DefaultPublishTimeout is the default timeout for waiting on broker confirmation in PublishAsync.
 const DefaultPublishTimeout = 10 * time.Second
 
-// PublishAsyncCallback is the callback invoked when an async publish completes or fails.
+// PublishAsyncCallback is the callback invoked when an async publish completes or
+// when waiting for broker confirmation fails.
 // On success, result is non-nil and err is nil.
-// On failure (timeout or send error), result is nil and err describes the failure.
+// On failure (for example, timeout or confirmation-wait error), result is nil and
+// err describes the failure.
 type PublishAsyncCallback func(result *PublishResult, err error)
 
 type PublisherOptions struct {
