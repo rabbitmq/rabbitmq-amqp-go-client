@@ -66,13 +66,13 @@ func statusToString(status ILifeCycleState) string {
 
 }
 
-// StateChanged define the connection life cycle
-// See ILifeCycleState for more details about the possible states
+// StateChanged defines the connection life cycle.
+// See ILifeCycleState for more details about the possible states.
 // Every time the connection state changes,
-// a StateChanged struct is sent to the channel defined in LifeCycle.notifyStatusChange method.
-// You can use it to manage your connection and react to the state changes, for example,
-// by blocking the publishing messages during the reconnection, ex:
-// <code>
+// a StateChanged struct is sent to the channel defined in the
+// LifeCycle.notifyStatusChange method.
+// You can use it to manage your connection and react to state changes, e.g.
+// by blocking message publishing during reconnection:
 //
 //	 signalBlock := sync.Cond{L: &sync.Mutex{}}
 //		stateChanged := make(chan *rmq.StateChanged, 1)
