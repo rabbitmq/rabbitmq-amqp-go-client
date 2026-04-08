@@ -223,7 +223,9 @@ func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, cal
 
 		state, waitErr := receipt.Wait(waitCtx)
 		if waitErr != nil {
-			callback(nil, fmt.Errorf("publish confirmation failed: %w", waitErr))
+			if callback != nil {
+				callback(nil, fmt.Errorf("publish confirmation failed: %w", waitErr))
+			}
 			return
 		}
 
