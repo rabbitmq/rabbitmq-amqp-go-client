@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
@@ -23,6 +24,8 @@ type Publisher struct {
 	linkName       string
 	destinationAdd string
 	id             string
+	inFlight       chan struct{}
+	publishTimeout time.Duration
 }
 
 func (m *Publisher) Id() string {
@@ -35,14 +38,27 @@ func newPublisher(ctx context.Context, connection *AmqpConnection, destinationAd
 		id = options.id()
 	}
 
-	r := &Publisher{connection: connection, linkName: getLinkName(options), destinationAdd: destinationAdd, id: id}
+	maxInFlight := DefaultMaxInFlight
+	publishTimeout := DefaultPublishTimeout
+	if options != nil {
+		maxInFlight = options.maxInFlight()
+		publishTimeout = options.publishTimeout()
+	}
+
+	r := &Publisher{
+		connection:     connection,
+		linkName:       getLinkName(options),
+		destinationAdd: destinationAdd,
+		id:             id,
+		inFlight:       make(chan struct{}, maxInFlight),
+		publishTimeout: publishTimeout,
+	}
 	connection.entitiesTracker.storeOrReplaceProducer(r)
 	err := r.createSender(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Record the publisher opening metric
 	connection.metricsCollector.OpenPublisher()
 
 	return r, nil
@@ -98,10 +114,6 @@ You can set the message to be non-persistent by setting the Header.Durable to fa
 Note:
 When you use the `Header` is up to you to set the message properties,
 You need set the `Header.Durable` to true or false.
-
-<code>
-
-</code>
 */
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
 	if m.destinationAdd == "" {
@@ -145,6 +157,88 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 		Message: message,
 		Outcome: state,
 	}, err
+}
+
+/*
+PublishAsync sends a message asynchronously and delivers the result via a callback.
+
+The message is sent to the broker immediately (same as Publish), but the confirmation
+wait (SendReceipt.Wait) happens in a background goroutine. When the broker confirms
+the message or the timeout expires, the callback is invoked with the result or an error.
+
+Back-pressure: the number of concurrent in-flight confirmations is bounded by
+MaxInFlight (configurable via PublisherOptions, default 256). When the limit is
+reached, PublishAsync blocks on the caller's goroutine until a slot becomes
+available or the context is cancelled.
+
+MaxInFlight could be potentially the unacked messages in the FIFO queues.
+
+The timeout for each confirmation wait is controlled by PublisherOptions.PublishTimeout
+(default 10s).
+
+PublishAsync can increase the throughput but can increase the memory usage.
+Every publish runs a goroutine that waits for the broker confirmation, so a large number of in-flight messages
+can lead to a large number of goroutines and increased memory usage.
+Use the MaxInFlight option to set an upper bound on the number of concurrent confirmations and control the memory usage.
+
+callback is optional, you can set it to nil if you don't want to receive the Publish result.
+*/
+func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, callback PublishAsyncCallback) error {
+	if m.destinationAdd == "" {
+		if message.Properties == nil || message.Properties.To == nil {
+			return fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
+		}
+		if err := validateAddress(*message.Properties.To); err != nil {
+			return err
+		}
+	}
+
+	if message.Header == nil {
+		message.Header = &amqp.MessageHeader{
+			Durable: true,
+		}
+	}
+
+	// Acquire an in-flight slot; blocks if MaxInFlight goroutines are already waiting.
+	select {
+	case m.inFlight <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	receipt, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
+	if err != nil {
+		<-m.inFlight
+		return err
+	}
+
+	publishCtx := m.buildPublishContext(message)
+	m.connection.metricsCollector.Publish(publishCtx)
+
+	go func() {
+		defer func() { <-m.inFlight }()
+
+		waitCtx, cancel := context.WithTimeout(ctx, m.publishTimeout)
+		defer cancel()
+
+		state, waitErr := receipt.Wait(waitCtx)
+		if waitErr != nil {
+			if callback != nil {
+				callback(nil, fmt.Errorf("publish confirmation failed: %w", waitErr))
+			}
+			return
+		}
+
+		m.recordPublishDisposition(state, publishCtx)
+		if callback != nil {
+			callback(&PublishResult{
+				Message: message,
+				Outcome: state,
+			}, nil)
+		}
+	}()
+
+	return nil
 }
 
 // recordPublishDisposition records the publish disposition metric based on the delivery state.

@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
@@ -419,11 +420,37 @@ func (sco *StreamConsumerOptions) preSettled() bool {
 type IPublisherOptions interface {
 	linkName() string
 	id() string
+	maxInFlight() int
+	publishTimeout() time.Duration
 }
+
+// DefaultMaxInFlight is the default maximum number of pending PublishAsync goroutines.
+const DefaultMaxInFlight = 256
+
+// DefaultPublishTimeout is the default timeout for waiting on broker confirmation in PublishAsync.
+const DefaultPublishTimeout = 10 * time.Second
+
+// PublishAsyncCallback is the callback invoked when an async publish completes or
+// when waiting for broker confirmation fails.
+// On success, result is non-nil and err is nil.
+// On failure (for example, timeout or confirmation-wait error), result is nil and
+// err describes the failure.
+type PublishAsyncCallback func(result *PublishResult, err error)
 
 type PublisherOptions struct {
 	Id             string
 	SenderLinkName string
+
+	// MaxInFlight limits the number of concurrent pending PublishAsync operations.
+	// When the limit is reached, PublishAsync blocks until a slot becomes available.
+	// Defaults to DefaultMaxInFlight (256) if zero.
+	// MaxInFlight could be the number of go-routines executed.
+	MaxInFlight int
+
+	// PublishTimeout is the maximum time to wait for broker confirmation
+	// in PublishAsync before the callback receives a timeout error.
+	// Defaults to DefaultPublishTimeout (10s) if zero.
+	PublishTimeout time.Duration
 }
 
 func (apo *PublisherOptions) linkName() string {
@@ -432,4 +459,18 @@ func (apo *PublisherOptions) linkName() string {
 
 func (apo *PublisherOptions) id() string {
 	return apo.Id
+}
+
+func (apo *PublisherOptions) maxInFlight() int {
+	if apo == nil || apo.MaxInFlight <= 0 {
+		return DefaultMaxInFlight
+	}
+	return apo.MaxInFlight
+}
+
+func (apo *PublisherOptions) publishTimeout() time.Duration {
+	if apo == nil || apo.PublishTimeout <= 0 {
+		return DefaultPublishTimeout
+	}
+	return apo.PublishTimeout
 }
