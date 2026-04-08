@@ -177,7 +177,7 @@ The timeout for each confirmation wait is controlled by PublisherOptions.Publish
 (default 10s).
 
 PublishAsync can increase the throughput but can increase the memory usage.
-Every publish runs a go-routine that waits for the broker confirmation, so a large number of in-flight messages
+Every publish runs a goroutine that waits for the broker confirmation, so a large number of in-flight messages
 can lead to a large number of goroutines and increased memory usage.
 Use the MaxInFlight option to set an upper bound on the number of concurrent confirmations and control the memory usage.
 
