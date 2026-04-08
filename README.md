@@ -11,7 +11,15 @@ This library is meant to be used with RabbitMQ `4.x`.
 - Getting started Video tutorial: </br>
 [![Getting Started](https://img.youtube.com/vi/iR1JUFh3udI/0.jpg)](https://youtu.be/iR1JUFh3udI)
 
+## Performance test
 
+You can find a performance test in `docs/perf_test/`. 
+This client supports two ways to publish messages:
+- With the `Publish` method, which is a simple way to publish messages.
+- With the `PublishAsync` method, which allows you to publish messages asynchronously 
+  and get a confirmation when the message is published. This is useful for high throughput scenarios.
+  `PublishAsync` can be tuned with the `PublisherOptions` to achieve better performance.
+  Note: With a large MaxInFlight the library can use memory since it tracks all the messages in flight.
 
 ## Documentation
 
