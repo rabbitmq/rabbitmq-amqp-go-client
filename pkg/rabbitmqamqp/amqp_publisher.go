@@ -218,7 +218,7 @@ func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, cal
 	go func() {
 		defer func() { <-m.inFlight }()
 
-		waitCtx, cancel := context.WithTimeout(context.Background(), m.publishTimeout)
+		waitCtx, cancel := context.WithTimeout(ctx, m.publishTimeout)
 		defer cancel()
 
 		state, waitErr := receipt.Wait(waitCtx)
