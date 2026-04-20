@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [[1.0.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.0.0)]
+
+## 1.0.0 - 2026-04-20
+- [Release 1.0.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.0.0)
+- First stable release.
+
+### Added
+- Add `release.yml` for changelog generation by @Gsantomaggio in [#89](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/89)
+- Add support for JMS queue by @Gsantomaggio in [#91](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/91)
+- Add `DelayedQueueSpecification` for Tanzu delayed queues by @Gsantomaggio in [#92](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/92)
+- Add `PublishAsync` to Publisher for non-blocking message publishing by @Gsantomaggio in [#93](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/93)
+
+### Changed
+- Bump `go.opentelemetry.io/otel/sdk` from 1.40.0 to 1.43.0 in `/tests/otelmetrics` by @dependabot in [#94](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/94)
+
 ## [[0.7.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v0.7.0)]
 
 ## 0.7.0 - 2026-03-17
