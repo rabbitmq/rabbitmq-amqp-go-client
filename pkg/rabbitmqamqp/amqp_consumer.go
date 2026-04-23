@@ -2,7 +2,9 @@ package rabbitmqamqp
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Azure/go-amqp"
@@ -59,6 +61,38 @@ func copyAnnotations(annotations amqp.Annotations) (amqp.Annotations, error) {
 	return destination, nil
 }
 
+// streamOffsetFromAnnotation decodes RabbitMQ stream offset annotation values without panicking
+// on unexpected AMQP decoded numeric types.
+func streamOffsetFromAnnotation(v any) (int64, bool) {
+	switch t := v.(type) {
+	case int64:
+		return t, true
+	case int32:
+		return int64(t), true
+	case int16:
+		return int64(t), true
+	case int8:
+		return int64(t), true
+	case int:
+		return int64(t), true
+	case uint64:
+		if t > uint64(1<<63-1) {
+			return 0, false
+		}
+		return int64(t), true
+	case uint32:
+		return int64(t), true
+	case uint16:
+		return int64(t), true
+	case uint8:
+		return int64(t), true
+	case uint:
+		return int64(t), true
+	default:
+		return 0, false
+	}
+}
+
 func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
@@ -99,6 +133,10 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 	return err
 }
 
+// ErrPreSettledMessageDisposed is returned by PreSettledDeliveryContext settlement methods:
+// the broker has already settled the delivery, so the application cannot accept/reject/release it.
+var ErrPreSettledMessageDisposed = errors.New("auto-settle on, message is already disposed")
+
 // PreSettledDeliveryContext represents a delivery context for pre-settled messages.
 // All settlement methods throw errors since the message is already settled.
 type PreSettledDeliveryContext struct {
@@ -110,23 +148,23 @@ func (dc *PreSettledDeliveryContext) Message() *amqp.Message {
 }
 
 func (dc *PreSettledDeliveryContext) Accept(ctx context.Context) error {
-	return fmt.Errorf("auto-settle on, message is already disposed")
+	return ErrPreSettledMessageDisposed
 }
 
 func (dc *PreSettledDeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
-	return fmt.Errorf("auto-settle on, message is already disposed")
+	return ErrPreSettledMessageDisposed
 }
 
 func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
-	return fmt.Errorf("auto-settle on, message is already disposed")
+	return ErrPreSettledMessageDisposed
 }
 
 func (dc *PreSettledDeliveryContext) Requeue(ctx context.Context) error {
-	return fmt.Errorf("auto-settle on, message is already disposed")
+	return ErrPreSettledMessageDisposed
 }
 
 func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
-	return fmt.Errorf("auto-settle on, message is already disposed")
+	return ErrPreSettledMessageDisposed
 }
 
 type consumerState byte
@@ -141,6 +179,7 @@ type Consumer struct {
 	receiver       atomic.Pointer[amqp.Receiver]
 	connection     *AmqpConnection
 	options        IConsumerOptions
+	optionsMu      sync.RWMutex // serializes options updates with Receive reading pre-settled / link-related options
 	destinationAdd string
 	id             string
 
@@ -150,9 +189,10 @@ type Consumer struct {
 		so in case of restart the consumer can start from the last message that was consumed.
 		For the AMQP queues it is just ignored.
 	*/
-	currentOffset int64
+	currentOffset atomic.Int64
 
-	state consumerState
+	// state holds consumerState values; accessed only via atomic loads/stores.
+	state atomic.Uint32
 
 	// see GetQueue method for more details.
 	queue string
@@ -164,14 +204,14 @@ func (c *Consumer) Id() string {
 
 func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IConsumerOptions) (*Consumer, error) {
 	id := fmt.Sprintf("consumer-%s", uuid.New().String())
-	if options != nil && len(options.id()) > 0 {
+	if options != nil && options.id() != "" {
 		id = options.id()
 	}
 
 	r := &Consumer{connection: connection, options: options,
 		destinationAdd: destinationAdd,
-		currentOffset:  -1,
 		id:             id}
+	r.currentOffset.Store(-1)
 	connection.entitiesTracker.storeOrReplaceConsumer(r)
 	err := r.createReceiver(ctx)
 	if err != nil {
@@ -185,10 +225,14 @@ func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd
 }
 
 func (c *Consumer) createReceiver(ctx context.Context) error {
-	if c.currentOffset >= 0 {
+	c.optionsMu.Lock()
+	defer c.optionsMu.Unlock()
+
+	offset := c.currentOffset.Load()
+	if offset >= 0 {
 		// here it means that the consumer is a stream consumer and there is a restart.
 		// so we need to set the offset to the last consumed message in order to restart from there.
-		// In there is not a restart this code won't be executed.
+		// If there is not a restart this code won't be executed.
 		if c.options != nil {
 			// here we assume it is a stream. So we recreate the options with the offset.
 			streamOpts := &StreamConsumerOptions{
@@ -196,7 +240,7 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 				InitialCredits:   c.options.initialCredits(),
 				// we increment the offset by one to start from the next message.
 				// because the current was already consumed.
-				Offset: &OffsetValue{Offset: uint64(c.currentOffset + 1)},
+				Offset: &OffsetValue{Offset: uint64(offset + 1)},
 			}
 			// Preserve StreamFilterOptions if it's a StreamConsumerOptions
 			if sco, ok := c.options.(*StreamConsumerOptions); ok {
@@ -242,12 +286,18 @@ func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 	c.connection.metricsCollector.Consume(consumeCtx)
 
 	if msg != nil && msg.Annotations != nil && msg.Annotations["x-stream-offset"] != nil {
-		// keep track of the current offset of the consumer
-		c.currentOffset = msg.Annotations["x-stream-offset"].(int64)
+		if off, ok := streamOffsetFromAnnotation(msg.Annotations["x-stream-offset"]); ok {
+			c.currentOffset.Store(off)
+		} else {
+			Debug("Ignoring x-stream-offset with unsupported type", "value", msg.Annotations["x-stream-offset"])
+		}
 	}
 
 	// Check if pre-settled mode is enabled
-	if c.options != nil && c.options.preSettled() {
+	c.optionsMu.RLock()
+	preSettled := c.options != nil && c.options.preSettled()
+	c.optionsMu.RUnlock()
+	if preSettled {
 		// For pre-settled mode, immediately record the disposition as accepted
 		// since the message is already settled by the broker
 		c.connection.metricsCollector.ConsumeDisposition(ConsumeAccepted, consumeCtx)
@@ -281,34 +331,39 @@ func (c *Consumer) GetQueue() (string, error) {
 
 // pause drains the credits of the receiver and stops issuing new credits.
 func (c *Consumer) pause(ctx context.Context) error {
-	if c.state == consumerStatePaused || c.state == consumerStatePausing {
-		return nil
+	for {
+		s := c.state.Load()
+		if s == uint32(consumerStatePaused) || s == uint32(consumerStatePausing) {
+			return nil
+		}
+		if c.state.CompareAndSwap(uint32(consumerStateRunning), uint32(consumerStatePausing)) {
+			break
+		}
 	}
-	c.state = consumerStatePausing
 	err := c.receiver.Load().DrainCredit(ctx, nil)
 	if err != nil {
-		c.state = consumerStateRunning
+		c.state.Store(uint32(consumerStateRunning))
 		return fmt.Errorf("error draining credits: %w", err)
 	}
-	c.state = consumerStatePaused
+	c.state.Store(uint32(consumerStatePaused))
 	return nil
 }
 
 // unpause requests new credits using the initial credits value of the options.
 func (c *Consumer) unpause(credits uint32) error {
-	if c.state == consumerStateRunning {
+	if c.state.Load() == uint32(consumerStateRunning) {
 		return nil
 	}
 	err := c.receiver.Load().IssueCredit(credits)
 	if err != nil {
 		return fmt.Errorf("error issuing credits: %w", err)
 	}
-	c.state = consumerStateRunning
+	c.state.Store(uint32(consumerStateRunning))
 	return nil
 }
 
 func (c *Consumer) isPausedOrPausing() bool {
-	return c.state != consumerStateRunning
+	return c.state.Load() != uint32(consumerStateRunning)
 }
 
 // issueCredits issues more credits on the receiver.
@@ -319,7 +374,10 @@ func (c *Consumer) issueCredits(credits uint32) error {
 // buildConsumeContext builds a ConsumeContext from the consumer and message.
 func (c *Consumer) buildConsumeContext(message *amqp.Message) ConsumeContext {
 	// Parse the queue name from the destination address
-	queueName, _ := c.GetQueue()
+	queueName, err := c.GetQueue()
+	if err != nil {
+		Debug("Could not parse queue address for consume metrics", "error", err, "queue", c.queue)
+	}
 
 	var messageID string
 	if message != nil && message.Properties != nil && message.Properties.MessageID != nil {

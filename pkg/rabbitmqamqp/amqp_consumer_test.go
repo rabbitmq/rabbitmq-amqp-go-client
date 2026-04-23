@@ -359,3 +359,19 @@ var _ = Describe("Consumer pre-settled", func() {
 		Expect(queueInfo.messageCount).To(Equal(uint64(0)))
 	})
 })
+
+var _ = Describe("streamOffsetFromAnnotation", func() {
+	DescribeTable("decodes stream offset annotations",
+		func(v any, want int64, wantOK bool) {
+			got, ok := streamOffsetFromAnnotation(v)
+			Expect(ok).To(Equal(wantOK))
+			Expect(got).To(Equal(want))
+		},
+		Entry("int64", int64(42), int64(42), true),
+		Entry("int32", int32(7), int64(7), true),
+		Entry("uint64", uint64(99), int64(99), true),
+		Entry("uint64 overflow", uint64(1<<63), int64(0), false),
+		Entry("string", "nope", int64(0), false),
+		Entry("nil", nil, int64(0), false),
+	)
+})
