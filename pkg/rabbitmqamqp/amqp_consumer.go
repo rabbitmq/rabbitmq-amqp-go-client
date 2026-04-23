@@ -202,6 +202,73 @@ func (c *Consumer) Id() string {
 	return c.id
 }
 
+// rabbitmqActiveFromLinkState decodes broker FLOW link-state values for rabbitmq:active.
+func rabbitmqActiveFromLinkState(v any) (active bool, ok bool) {
+	switch t := v.(type) {
+	case bool:
+		return t, true
+	case int64:
+		return t != 0, true
+	case int32:
+		return t != 0, true
+	case int16:
+		return t != 0, true
+	case int8:
+		return t != 0, true
+	case int:
+		return t != 0, true
+	case uint64:
+		return t != 0, true
+	case uint32:
+		return t != 0, true
+	case uint16:
+		return t != 0, true
+	case uint8:
+		return t != 0, true
+	case uint:
+		return t != 0, true
+	case float64:
+		return t != 0, true
+	case float32:
+		return t != 0, true
+	default:
+		return false, false
+	}
+}
+
+func setSingleActiveConsumerLinkStateHandler(opts *amqp.ReceiverOptions, options IConsumerOptions, c *Consumer) {
+	if opts == nil || c == nil || options == nil {
+		return
+	}
+	co, ok := options.(*ConsumerOptions)
+	if !ok || co.SingleActiveConsumerStateChanged == nil {
+		return
+	}
+	handler := co.SingleActiveConsumerStateChanged
+	opts.OnLinkStateProperties = func(props map[string]any) {
+		if len(props) == 0 {
+			return
+		}
+		v, has := props[rabbitmqActiveLinkStateProperty]
+		if !has {
+			return
+		}
+		active, parsed := rabbitmqActiveFromLinkState(v)
+		if !parsed {
+			Warn("Ignoring rabbitmq:active with unsupported type", "value", v)
+			return
+		}
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					Error("SingleActiveConsumerStateChanged handler panicked", "recover", r)
+				}
+			}()
+			handler(c, active)
+		}()
+	}
+}
+
 func newConsumer(ctx context.Context, connection *AmqpConnection, destinationAdd string, options IConsumerOptions) (*Consumer, error) {
 	id := fmt.Sprintf("consumer-%s", uuid.New().String())
 	if options != nil && options.id() != "" {
@@ -260,6 +327,7 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 		// normal receiver link, inside createReceiverLinkOptions we check if pre-settled mode is enabled
 		// so, by default we use AtLeastOnce settlement mode even is not specified
 		receiverOptions = createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce)
+		setSingleActiveConsumerLinkStateHandler(receiverOptions, c.options, c)
 	}
 
 	receiver, err := c.connection.session.NewReceiver(ctx, c.destinationAdd, receiverOptions)

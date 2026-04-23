@@ -2,6 +2,7 @@
 
 
 - [Getting Started](getting_started) - A simple example to get you started.
+- [Quorum single-active-consumer notification](qq_single_active_notification) - Quorum queue SAC: FLOW link-state `rabbitmq:active` via `ConsumerOptions.SingleActiveConsumerStateChanged` (RabbitMQ 4.3+). Mirrors the [.NET QQSingleActiveNotification example](https://github.com/rabbitmq/rabbitmq-amqp-dotnet-client/blob/main/docs/Examples/QQSingleActiveNotification/Program.cs).
 - [JMS queue](jms_queue) - Same flow as getting started, using `JMSQueueSpecification` (Tanzu RabbitMQ 4.3+).
 - [Delayed queue](delayed_queue) - Same flow as getting started, using `DelayedQueueSpecification` (Tanzu RabbitMQ 4.x).
 - [Reliable](reliable) - An example of how to deal with reconnections and error handling.

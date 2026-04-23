@@ -142,6 +142,11 @@ type ConsumerOptions struct {
 	// SettleStrategy configures how messages are received and settled.
 	// See ConsumerSettleStrategy for more details.
 	SettleStrategy ConsumerSettleStrategy
+
+	// SingleActiveConsumerStateChanged, when non-nil, registers for FLOW link-state
+	// updates for rabbitmq:active on this consumer link. Use with a quorum queue
+	// declared using SingleActiveConsumer. See SingleActiveConsumerStateChangedFunc.
+	SingleActiveConsumerStateChanged SingleActiveConsumerStateChangedFunc
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -164,6 +169,15 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 	// direct reply to is supported since RabbitMQ 4.2.0
 	if aco.SettleStrategy == DirectReplyTo && !available.is42rMore {
 		return fmt.Errorf("direct reply to feature is not supported. You need RabbitMQ 4.2 or later")
+	}
+
+	if aco.SingleActiveConsumerStateChanged != nil {
+		if aco.SettleStrategy == DirectReplyTo {
+			return fmt.Errorf("single active consumer state notification is not supported with DirectReplyTo settle strategy")
+		}
+		if !available.is43rMore {
+			return fmt.Errorf("single active consumer state notification requires RabbitMQ 4.3 or later")
+		}
 	}
 
 	return nil
@@ -193,6 +207,16 @@ const rmqStreamOffsetSpec = "rabbitmq:stream-offset-spec"
 const rmqStreamMatchUnfiltered = "rabbitmq:stream-match-unfiltered"
 const amqpApplicationPropertiesFilter = "amqp:application-properties-filter"
 const amqpPropertiesFilter = "amqp:properties-filter"
+
+// rabbitmqActiveLinkStateProperty is the FLOW link-state key RabbitMQ 4.3+ uses
+// for quorum queue single-active-consumer active (true) vs standby (false).
+const rabbitmqActiveLinkStateProperty = "rabbitmq:active"
+
+// SingleActiveConsumerStateChangedFunc is called when the broker reports quorum
+// single-active-consumer state via AMQP 1.0 FLOW link-state (rabbitmq:active).
+// Requires RabbitMQ 4.3+, a quorum queue declared with x-single-active-consumer,
+// and cannot be used together with DirectReplyTo.
+type SingleActiveConsumerStateChangedFunc func(consumer *Consumer, isActive bool)
 
 const offsetFirst = "first"
 const offsetNext = "next"
