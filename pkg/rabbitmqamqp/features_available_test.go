@@ -2,6 +2,7 @@ package rabbitmqamqp
 
 import (
 	"fmt"
+
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -127,6 +128,23 @@ var _ = Describe("Available Features", func() {
 				},
 			},
 		}).validate(&featuresAvailable{is41OrMore: true})).To(BeNil())
+	})
+
+	It("ConsumerOptions validate for single active consumer state notification", func() {
+		nop := func(*Consumer, bool) {}
+
+		Expect((&ConsumerOptions{
+			SingleActiveConsumerStateChanged: nop,
+		}).validate(&featuresAvailable{is43rMore: false})).To(MatchError(ContainSubstring("4.3")))
+
+		Expect((&ConsumerOptions{
+			SettleStrategy:                   DirectReplyTo,
+			SingleActiveConsumerStateChanged: nop,
+		}).validate(&featuresAvailable{is43rMore: true, is42rMore: true})).To(MatchError(ContainSubstring("DirectReplyTo")))
+
+		Expect((&ConsumerOptions{
+			SingleActiveConsumerStateChanged: nop,
+		}).validate(&featuresAvailable{is43rMore: true})).To(BeNil())
 	})
 
 })

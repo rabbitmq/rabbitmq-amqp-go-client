@@ -3,6 +3,7 @@ package rabbitmqamqp
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Azure/go-amqp"
 	. "github.com/onsi/ginkgo/v2"
@@ -360,6 +361,85 @@ var _ = Describe("Consumer pre-settled", func() {
 	})
 })
 
+var _ = Describe("Quorum single-active-consumer link state", func() {
+	It("notifies standby then promotion when the active consumer closes", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		ver, _ := connection.Properties()["version"].(string)
+		if !isVersionGreaterOrEqual(extractVersion(ver), "4.3.0") {
+			Skip("requires RabbitMQ 4.3+ for quorum SAC FLOW link-state")
+		}
+		qName := generateNameWithDateTime("qq_sac_flow")
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name:                 qName,
+			SingleActiveConsumer: true,
+		})
+		Expect(err).To(BeNil())
+
+		c1, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{SettleStrategy: ExplicitSettle})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = c1.Close(context.Background()) })
+
+		var mu sync.Mutex
+		var c2States []bool
+		c2, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			SettleStrategy: ExplicitSettle,
+			SingleActiveConsumerStateChanged: func(_ *Consumer, active bool) {
+				mu.Lock()
+				c2States = append(c2States, active)
+				mu.Unlock()
+			},
+		})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = c2.Close(context.Background()) })
+
+		Eventually(func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			for _, s := range c2States {
+				if !s {
+					return true
+				}
+			}
+			return false
+		}).WithTimeout(5 * time.Second).WithPolling(50 * time.Millisecond).Should(BeTrue())
+
+		Expect(c1.Close(context.Background())).To(BeNil())
+
+		Eventually(func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			seenStandby := false
+			for _, s := range c2States {
+				if !s {
+					seenStandby = true
+				}
+				if seenStandby && s {
+					return true
+				}
+			}
+			return false
+		}).WithTimeout(5 * time.Second).WithPolling(50 * time.Millisecond).Should(BeTrue())
+	})
+
+	It("rejects DirectReplyTo when a SAC handler is configured", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = connection.Close(context.Background()) })
+		_, err = connection.NewConsumer(context.Background(), "ignored", &ConsumerOptions{
+			SettleStrategy:                   DirectReplyTo,
+			SingleActiveConsumerStateChanged: func(*Consumer, bool) {},
+		})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("DirectReplyTo"))
+	})
+})
+
 var _ = Describe("streamOffsetFromAnnotation", func() {
 	DescribeTable("decodes stream offset annotations",
 		func(v any, want int64, wantOK bool) {
@@ -373,5 +453,22 @@ var _ = Describe("streamOffsetFromAnnotation", func() {
 		Entry("uint64 overflow", uint64(1<<63), int64(0), false),
 		Entry("string", "nope", int64(0), false),
 		Entry("nil", nil, int64(0), false),
+	)
+})
+
+var _ = Describe("rabbitmqActiveFromLinkState", func() {
+	DescribeTable("decodes rabbitmq:active values",
+		func(v any, want bool, wantOK bool) {
+			got, ok := rabbitmqActiveFromLinkState(v)
+			Expect(ok).To(Equal(wantOK))
+			Expect(got).To(Equal(want))
+		},
+		Entry("bool true", true, true, true),
+		Entry("bool false", false, false, true),
+		Entry("int64 non-zero", int64(1), true, true),
+		Entry("int64 zero", int64(0), false, true),
+		Entry("uint8", uint8(2), true, true),
+		Entry("float64", float64(1), true, true),
+		Entry("string", "x", false, false),
 	)
 })
