@@ -147,4 +147,43 @@ var _ = Describe("Available Features", func() {
 		}).validate(&featuresAvailable{is43rMore: true})).To(BeNil())
 	})
 
+	It("extractMessageRejectedError returns nil for non-rejected states", func() {
+		Expect(extractMessageRejectedError(&StateAccepted{})).To(BeNil())
+		Expect(extractMessageRejectedError(&StateReleased{})).To(BeNil())
+		Expect(extractMessageRejectedError(&StateModified{})).To(BeNil())
+	})
+
+	It("extractMessageRejectedError returns nil for StateRejected without Error", func() {
+		Expect(extractMessageRejectedError(&StateRejected{})).To(BeNil())
+	})
+
+	It("extractMessageRejectedError extracts RejectedBy and Reason from StateRejected.Error", func() {
+		state := &StateRejected{
+			Error: &amqp.Error{
+				Condition:   "amqp:resource-limit-exceeded",
+				Description: "maximum length reached",
+				Info:        map[string]any{"queue": "my-queue"},
+			},
+		}
+		result := extractMessageRejectedError(state)
+		Expect(result).NotTo(BeNil())
+		Expect(result.RejectedBy).To(Equal("my-queue"))
+		Expect(result.Reason).To(Equal("maximum length reached"))
+		Expect(result.Error()).To(ContainSubstring("my-queue"))
+		Expect(result.Error()).To(ContainSubstring("maximum length reached"))
+	})
+
+	It("extractMessageRejectedError handles missing rejected-by key gracefully", func() {
+		state := &StateRejected{
+			Error: &amqp.Error{
+				Description: "queue unavailable",
+			},
+		}
+		result := extractMessageRejectedError(state)
+		Expect(result).NotTo(BeNil())
+		Expect(result.RejectedBy).To(BeEmpty())
+		Expect(result.Reason).To(Equal("queue unavailable"))
+		Expect(result.Error()).To(ContainSubstring("queue unavailable"))
+	})
+
 })

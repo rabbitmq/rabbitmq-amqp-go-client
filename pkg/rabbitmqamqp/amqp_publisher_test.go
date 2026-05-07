@@ -538,3 +538,106 @@ var _ = Describe("AMQP publisher async", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 })
+
+var _ = Describe("AMQP publisher rejected-by and rejection reason (RabbitMQ 4.3+)", func() {
+	It("Publish should populate MessageRejectedError when a queue rejects a message", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		ver, _ := connection.Properties()["version"].(string)
+		if !isVersionGreaterOrEqual(extractVersion(ver), "4.3.0") {
+			Skip("requires RabbitMQ 4.3+ for rejected-by and rejection-reason in the Rejected outcome")
+		}
+
+		qName := generateNameWithDateTime("rejected_by_reason")
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name:             qName,
+			MaxLength:        1,
+			OverflowStrategy: &RejectPublishOverflowStrategy{},
+		})
+		Expect(err).To(BeNil())
+
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = publisher.Close(context.Background()) })
+
+		// First message fills the queue - should be accepted.
+		result, err := publisher.Publish(context.Background(), NewMessage([]byte("first")))
+		Expect(err).To(BeNil())
+		Expect(result.Outcome).To(BeAssignableToTypeOf(&StateAccepted{}))
+		Expect(result.MessageRejectedError).To(BeNil())
+		_, _ = publisher.Publish(context.Background(), NewMessage([]byte("second")))
+		time.Sleep(time.Duration(100) * time.Millisecond)
+		// message exceeds the limit - should be rejected with details.
+		result, err = publisher.Publish(context.Background(), NewMessage([]byte("too much")))
+		Expect(err).To(BeNil())
+		Expect(result.Outcome).To(BeAssignableToTypeOf(&StateRejected{}))
+		Expect(result.MessageRejectedError).NotTo(BeNil())
+		Expect(result.MessageRejectedError.RejectedBy).To(Equal(qName))
+		Expect(result.MessageRejectedError.Reason).NotTo(BeEmpty())
+		Expect(result.MessageRejectedError.Error()).To(ContainSubstring(qName))
+	})
+
+	It("PublishAsync should populate MessageRejectedError when a queue rejects a message", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		ver, _ := connection.Properties()["version"].(string)
+		if !isVersionGreaterOrEqual(extractVersion(ver), "4.3.0") {
+			Skip("requires RabbitMQ 4.3+ for rejected-by and rejection-reason in the Rejected outcome")
+		}
+
+		qName := generateNameWithDateTime("rejected_by_reason_async")
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name:             qName,
+			MaxLength:        1,
+			OverflowStrategy: &RejectPublishOverflowStrategy{},
+		})
+		Expect(err).To(BeNil())
+
+		publisher, err := connection.NewPublisher(context.Background(), &QueueAddress{Queue: qName}, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = publisher.Close(context.Background()) })
+
+		// Fill the queue with the first message.
+		var wg sync.WaitGroup
+		wg.Add(1)
+		err = publisher.PublishAsync(context.Background(), NewMessage([]byte("first")),
+			func(result *PublishResult, cbErr error) {
+				defer wg.Done()
+				Expect(cbErr).To(BeNil())
+				Expect(result.Outcome).To(BeAssignableToTypeOf(&StateAccepted{}))
+				Expect(result.MessageRejectedError).To(BeNil())
+			})
+		Expect(err).To(BeNil())
+		wg.Wait()
+
+		/// publish another message to fill the queue. we can ignore it
+		_ = publisher.PublishAsync(context.Background(), NewMessage([]byte("second")), nil)
+		time.Sleep(time.Duration(200) * time.Millisecond)
+		// Second message should be rejected with details.
+		wg.Add(1)
+		var rejectedResult *PublishResult
+		err = publisher.PublishAsync(context.Background(), NewMessage([]byte("second")),
+			func(result *PublishResult, cbErr error) {
+				defer wg.Done()
+				rejectedResult = result
+			})
+		Expect(err).To(BeNil())
+		wg.Wait()
+
+		Expect(rejectedResult).NotTo(BeNil())
+		Expect(rejectedResult.Outcome).To(BeAssignableToTypeOf(&StateRejected{}))
+		Expect(rejectedResult.MessageRejectedError).NotTo(BeNil())
+		Expect(rejectedResult.MessageRejectedError.RejectedBy).To(Equal(qName))
+		Expect(rejectedResult.MessageRejectedError.Reason).NotTo(BeEmpty())
+	})
+})

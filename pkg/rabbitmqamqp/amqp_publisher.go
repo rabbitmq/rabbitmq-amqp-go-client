@@ -12,9 +12,61 @@ import (
 	"github.com/google/uuid"
 )
 
+// MessageRejectedError contains details about why a message was rejected by the broker.
+// When RabbitMQ 4.3+ rejects a message (e.g. because a queue's max-length has been
+// reached), the broker includes the name of the queue that rejected it and a
+// human-readable reason inside the AMQP 1.0 Rejected outcome.
+//
+// See: https://www.rabbitmq.com/blog/2026/04/23/rabbitmq-4.3-release#amqp-rejection-reason
+type MessageRejectedError struct {
+	// RejectedBy is the name of the queue that rejected the message.
+	// Empty when the broker did not include this information.
+	RejectedBy string
+
+	// Reason is the human-readable description of why the message was rejected
+	// (e.g. "maximum length reached", "queue unavailable").
+	Reason string
+}
+
+func (e *MessageRejectedError) Error() string {
+	if e.RejectedBy != "" {
+		return fmt.Sprintf("message rejected by queue '%s': %s", e.RejectedBy, e.Reason)
+	}
+	return fmt.Sprintf("message rejected: %s", e.Reason)
+}
+
+// PublishResult is returned by Publish and the PublishAsync callback.
+// When Outcome is *StateRejected and the broker provided rejection details
+// (requires RabbitMQ 4.3+), MessageRejectedError is non-nil and carries the
+// name of the rejecting queue and the rejection reason.
 type PublishResult struct {
 	Outcome DeliveryState
 	Message *amqp.Message
+	// MessageRejectedError is non-nil when Outcome is *StateRejected and the
+	// broker supplied rejection details (RabbitMQ 4.3+).
+	MessageRejectedError *MessageRejectedError
+}
+
+// extractMessageRejectedError extracts a MessageRejectedError from a DeliveryState.
+// Returns nil when state is not *StateRejected or the Rejected outcome carries no Error.
+// The "rejected-by" queue name is read from StateRejected.Error.Info["rejected-by"];
+// the rejection reason comes from StateRejected.Error.Description.
+func extractMessageRejectedError(state DeliveryState) *MessageRejectedError {
+	rejected, ok := state.(*StateRejected)
+	if !ok || rejected.Error == nil {
+		return nil
+	}
+	result := &MessageRejectedError{
+		Reason: rejected.Error.Description,
+	}
+	if rejected.Error.Info != nil {
+		if v, exists := rejected.Error.Info["queue"]; exists {
+			if s, ok := v.(string); ok {
+				result.RejectedBy = s
+			}
+		}
+	}
+	return result
 }
 
 // Publisher is a publisher that sends messages to a specific destination address.
@@ -154,8 +206,9 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 	m.recordPublishDisposition(state, publishCtx)
 
 	return &PublishResult{
-		Message: message,
-		Outcome: state,
+		Message:              message,
+		Outcome:              state,
+		MessageRejectedError: extractMessageRejectedError(state),
 	}, err
 }
 
@@ -232,8 +285,9 @@ func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, cal
 		m.recordPublishDisposition(state, publishCtx)
 		if callback != nil {
 			callback(&PublishResult{
-				Message: message,
-				Outcome: state,
+				Message:              message,
+				Outcome:              state,
+				MessageRejectedError: extractMessageRejectedError(state),
 			}, nil)
 		}
 	}()
