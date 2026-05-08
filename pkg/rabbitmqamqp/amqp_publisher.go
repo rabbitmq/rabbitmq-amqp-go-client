@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,7 +50,7 @@ type PublishResult struct {
 
 // extractMessageRejectedError extracts a MessageRejectedError from a DeliveryState.
 // Returns nil when state is not *StateRejected or the Rejected outcome carries no Error.
-// The "rejected-by" queue name is read from StateRejected.Error.Info["rejected-by"];
+// The queue name is read from StateRejected.Error.Info["queue"];
 // the rejection reason comes from StateRejected.Error.Description.
 func extractMessageRejectedError(state DeliveryState) *MessageRejectedError {
 	rejected, ok := state.(*StateRejected)
@@ -77,6 +78,7 @@ type Publisher struct {
 	destinationAdd string
 	id             string
 	inFlight       chan struct{}
+	inFlightWg     sync.WaitGroup
 	publishTimeout time.Duration
 }
 
@@ -125,6 +127,25 @@ func (m *Publisher) createSender(ctx context.Context) error {
 	return nil
 }
 
+// validateMessageTarget returns an error when the publisher has no fixed
+// destination and the message does not carry a valid TO property.
+func (m *Publisher) validateMessageTarget(message *amqp.Message) error {
+	if m.destinationAdd == "" {
+		if message.Properties == nil || message.Properties.To == nil {
+			return fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
+		}
+		return validateAddress(*message.Properties.To)
+	}
+	return nil
+}
+
+// ensureDurable marks the message as durable when no explicit Header has been provided.
+func ensureDurable(message *amqp.Message) {
+	if message.Header == nil {
+		message.Header = &amqp.MessageHeader{Durable: true}
+	}
+}
+
 /*
 Publish sends a message to the destination address that can be decided during the creation of the publisher or at the time of sending the message.
 
@@ -168,23 +189,10 @@ When you use the `Header` is up to you to set the message properties,
 You need set the `Header.Durable` to true or false.
 */
 func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*PublishResult, error) {
-	if m.destinationAdd == "" {
-		if message.Properties == nil || message.Properties.To == nil {
-			return nil, fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
-		}
-
-		err := validateAddress(*message.Properties.To)
-		if err != nil {
-			return nil, err
-		}
+	if err := m.validateMessageTarget(message); err != nil {
+		return nil, err
 	}
-
-	// set the default persistence to the message
-	if message.Header == nil {
-		message.Header = &amqp.MessageHeader{
-			Durable: true,
-		}
-	}
+	ensureDurable(message)
 
 	r, err := m.sender.Load().SendWithReceipt(ctx, message, nil)
 	if err != nil {
@@ -209,7 +217,7 @@ func (m *Publisher) Publish(ctx context.Context, message *amqp.Message) (*Publis
 		Message:              message,
 		Outcome:              state,
 		MessageRejectedError: extractMessageRejectedError(state),
-	}, err
+	}, nil
 }
 
 /*
@@ -237,20 +245,10 @@ Use the MaxInFlight option to set an upper bound on the number of concurrent con
 callback is optional, you can set it to nil if you don't want to receive the Publish result.
 */
 func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, callback PublishAsyncCallback) error {
-	if m.destinationAdd == "" {
-		if message.Properties == nil || message.Properties.To == nil {
-			return fmt.Errorf("message properties TO is required to send a message to a dynamic target address")
-		}
-		if err := validateAddress(*message.Properties.To); err != nil {
-			return err
-		}
+	if err := m.validateMessageTarget(message); err != nil {
+		return err
 	}
-
-	if message.Header == nil {
-		message.Header = &amqp.MessageHeader{
-			Durable: true,
-		}
-	}
+	ensureDurable(message)
 
 	// Acquire an in-flight slot; blocks if MaxInFlight goroutines are already waiting.
 	select {
@@ -268,8 +266,12 @@ func (m *Publisher) PublishAsync(ctx context.Context, message *amqp.Message, cal
 	publishCtx := m.buildPublishContext(message)
 	m.connection.metricsCollector.Publish(publishCtx)
 
+	m.inFlightWg.Add(1)
 	go func() {
-		defer func() { <-m.inFlight }()
+		defer func() {
+			<-m.inFlight
+			m.inFlightWg.Done()
+		}()
 
 		waitCtx, cancel := context.WithTimeout(ctx, m.publishTimeout)
 		defer cancel()
@@ -308,12 +310,17 @@ func (m *Publisher) recordPublishDisposition(state DeliveryState, ctx PublishCon
 }
 
 // buildPublishContext builds a PublishContext from the publisher and message.
+// For dynamic-target publishers (no fixed destination address), the message TO
+// property is used so that OTEL semantic convention attributes are populated.
 func (m *Publisher) buildPublishContext(message *amqp.Message) PublishContext {
-	destinationName, routingKey := m.parseDestination()
+	address := m.destinationAdd
+	if address == "" && message.Properties != nil && message.Properties.To != nil {
+		address = *message.Properties.To
+	}
+	destinationName, routingKey := parseDestinationAddress(address)
 
 	var messageID string
 	if message.Properties != nil && message.Properties.MessageID != nil {
-		// MessageID can be various types, convert to string
 		messageID = fmt.Sprintf("%v", message.Properties.MessageID)
 	}
 
@@ -326,19 +333,17 @@ func (m *Publisher) buildPublishContext(message *amqp.Message) PublishContext {
 	}
 }
 
-// parseDestination parses the destination address and returns the destination name and routing key.
-// The destination name follows OTEL semantic conventions:
+// parseDestinationAddress parses an AMQP address and returns the destination name
+// and routing key following OTEL semantic conventions:
 // - For exchanges: "{exchange}:{routing_key}" or just "{exchange}"
 // - For queues: "{queue}"
-func (m *Publisher) parseDestination() (destinationName, routingKey string) {
-	address := m.destinationAdd
+func parseDestinationAddress(address string) (destinationName, routingKey string) {
 	if address == "" {
 		return "", ""
 	}
 
 	// Address format: /exchanges/{exchange}/{key} or /queues/{queue}
 	if strings.HasPrefix(address, "/"+exchanges+"/") {
-		// Exchange address
 		path := strings.TrimPrefix(address, "/"+exchanges+"/")
 		parts := strings.SplitN(path, "/", 2)
 		exchange, _ := url.QueryUnescape(parts[0])
@@ -349,7 +354,6 @@ func (m *Publisher) parseDestination() (destinationName, routingKey string) {
 			destinationName = exchange
 		}
 	} else if strings.HasPrefix(address, "/"+queues+"/") {
-		// Queue address
 		queue := strings.TrimPrefix(address, "/"+queues+"/")
 		queue, _ = url.QueryUnescape(queue)
 		destinationName = queue
@@ -358,13 +362,13 @@ func (m *Publisher) parseDestination() (destinationName, routingKey string) {
 	return destinationName, routingKey
 }
 
-// Close closes the publisher.
+// Close waits for all in-flight PublishAsync confirmations to complete, then
+// closes the underlying AMQP sender. No new messages should be published after
+// Close is called.
 func (m *Publisher) Close(ctx context.Context) error {
+	m.inFlightWg.Wait()
 	m.connection.entitiesTracker.removeProducer(m)
 	err := m.sender.Load().Close(ctx)
-
-	// Record the publisher closing metric
 	m.connection.metricsCollector.ClosePublisher()
-
 	return err
 }
