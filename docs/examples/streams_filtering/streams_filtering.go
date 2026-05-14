@@ -31,7 +31,7 @@ func main() {
 	rmq.Info("Golang AMQP 1.0 Streams example with filtering")
 	queueStream := "stream-go-queue-filtering-" + time.Now().String()
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	checkError(err)
 	management := amqpConnection.Management()
 	// define a stream queue
@@ -54,7 +54,7 @@ func main() {
 	// publish messages to the stream
 	for i := 0; i < 40; i++ {
 		msg := rmq.NewMessageWithFilter([]byte("Hello World"), filters[i%4])
-		publishResult, err := publisher.Publish(context.Background(), msg)
+		publishResult, err := publisher.Publish(context.TODO(), msg)
 		checkError(err)
 
 		// check the outcome of the publishResult
@@ -77,7 +77,7 @@ func main() {
 
 	}
 	// create a stream consumer
-	consumer, err := amqpConnection.NewConsumer(context.Background(), queueStream, &rmq.StreamConsumerOptions{
+	consumer, err := amqpConnection.NewConsumer(context.TODO(), queueStream, &rmq.StreamConsumerOptions{
 		// the offset is set to the first chunk of the stream
 		// so here it starts from the beginning
 		Offset: &rmq.OffsetFirst{},
@@ -91,7 +91,7 @@ func main() {
 			// 	msg.ApplicationProperties = map[string]interface{}{"key3": "value3"}
 			// during the publish you can do something like:
 			// 	msg.ApplicationProperties = map[string]interface{}{"key1": "value1"}
-			// publisher.Publish(context.Background(), msg)
+			// publisher.Publish(context.TODO(), msg)
 			//ApplicationProperties: nil,
 
 			// or here you can filter by message properties
@@ -99,7 +99,7 @@ func main() {
 			// 	msg.Properties = &amqp.MessageProperties{Subject: "MySubject"}
 			// during the publish you can do something like:
 			// 	msg.Properties = &amqp.MessageProperties{Subject: "MySubject"}
-			// publisher.Publish(context.Background(), msg)
+			// publisher.Publish(context.TODO(), msg)
 			//Properties:            nil,
 			// see amqp_consumer_stream_test.go for more examples
 		},
@@ -110,22 +110,22 @@ func main() {
 	// In this case we should receive only 20 messages with the filter values
 	// MyFilter1 and MyFilter2
 	for i := 0; i < 20; i++ {
-		deliveryContext, err := consumer.Receive(context.Background())
+		deliveryContext, err := consumer.Receive(context.TODO())
 		checkError(err)
 		rmq.Info("[Consumer]", "Message received", deliveryContext.Message().Data[0])
 		// accept the message
-		err = deliveryContext.Accept(context.Background())
+		err = deliveryContext.Accept(context.TODO())
 		checkError(err)
 	}
 
 	// close the consumer
-	err = consumer.Close(context.Background())
+	err = consumer.Close(context.TODO())
 	checkError(err)
 
-	err = amqpConnection.Management().DeleteQueue(context.Background(), queueStream)
+	err = amqpConnection.Management().DeleteQueue(context.TODO(), queueStream)
 	checkError(err)
 
-	err = env.CloseConnections(context.Background())
+	err = env.CloseConnections(context.TODO())
 	checkError(err)
 
 	rmq.Info("Example completed")

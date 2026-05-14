@@ -30,7 +30,7 @@ func main() {
 	queueStream := "stream-go-queue-" + time.Now().String()
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	checkError(err)
 	management := amqpConnection.Management()
 	// define a stream queue
@@ -50,7 +50,7 @@ func main() {
 
 	// publish messages to the stream
 	for i := 0; i < 10; i++ {
-		publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage([]byte("Hello World")))
+		publishResult, err := publisher.Publish(context.TODO(), rmq.NewMessage([]byte("Hello World")))
 		checkError(err)
 
 		// check the outcome of the publishResult
@@ -73,7 +73,7 @@ func main() {
 
 	}
 	// create a stream consumer
-	consumer, err := amqpConnection.NewConsumer(context.Background(), queueStream, &rmq.StreamConsumerOptions{
+	consumer, err := amqpConnection.NewConsumer(context.TODO(), queueStream, &rmq.StreamConsumerOptions{
 		// the offset is set to the first chunk of the stream
 		// so here it starts from the beginning
 		Offset: &rmq.OffsetFirst{},
@@ -82,22 +82,22 @@ func main() {
 
 	// receive messages from the stream
 	for i := 0; i < 10; i++ {
-		deliveryContext, err := consumer.Receive(context.Background())
+		deliveryContext, err := consumer.Receive(context.TODO())
 		checkError(err)
 		rmq.Info("[Consumer]", "Message received", deliveryContext.Message().Data[0])
 		// accept the message
-		err = deliveryContext.Accept(context.Background())
+		err = deliveryContext.Accept(context.TODO())
 		checkError(err)
 	}
 
 	// close the consumer
-	err = consumer.Close(context.Background())
+	err = consumer.Close(context.TODO())
 	checkError(err)
 
-	err = amqpConnection.Management().DeleteQueue(context.Background(), queueStream)
+	err = amqpConnection.Management().DeleteQueue(context.TODO(), queueStream)
 	checkError(err)
 
-	err = env.CloseConnections(context.Background())
+	err = env.CloseConnections(context.TODO())
 	checkError(err)
 
 	rmq.Info("Example completed")

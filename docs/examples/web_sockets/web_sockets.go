@@ -24,7 +24,7 @@ func main() {
 	env := rmq.NewEnvironment(amqpConnectionString, &rmq.AmqpConnOptions{
 		SASLType: amqp.SASLTypePlain("rabbit", "rabbit"),
 	})
-	conn, err := env.NewConnection(context.Background())
+	conn, err := env.NewConnection(context.TODO())
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func main() {
 	}
 	msg := rmq.NewMessage([]byte("Hello over WebSockets"))
 
-	publishResult, err := producer.Publish(context.Background(), msg)
+	publishResult, err := producer.Publish(context.TODO(), msg)
 	if err != nil {
 		panic(err)
 	}
@@ -59,12 +59,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	deliveryContext, err := consumer.Receive(context.Background())
+	deliveryContext, err := consumer.Receive(context.TODO())
 	if err != nil {
 		panic(err)
 	}
 	rmq.Info("[Consumer]", "Message received", string(deliveryContext.Message().GetData()))
-	err = deliveryContext.Accept(context.Background())
+	err = deliveryContext.Accept(context.TODO())
 	if err != nil {
 		panic(err)
 	}
@@ -78,7 +78,7 @@ func main() {
 		panic(err)
 	}
 
-	err = conn.Management().DeleteQueue(context.Background(), "test-ws-queue")
+	err = conn.Management().DeleteQueue(context.TODO(), "test-ws-queue")
 	if err != nil {
 		panic(err)
 	}

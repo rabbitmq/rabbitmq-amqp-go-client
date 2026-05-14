@@ -50,7 +50,7 @@ func main() {
 	}(stateChanged)
 
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	if err != nil {
 		rmq.Error("Error opening connection", "error", err)
 		return
@@ -59,7 +59,7 @@ func main() {
 	rmq.Info("AMQP connection opened")
 
 	management := amqpConnection.Management()
-	queueInfo, err := management.DeclareQueue(context.Background(), &rmq.QuorumQueueSpecification{
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 		Name: queueName,
 	})
 	if err != nil {
@@ -73,7 +73,7 @@ func main() {
 	//                  until a slot becomes free.
 	//   PublishTimeout – each confirmation goroutine waits at most 30 s for a
 	//                    broker acknowledgement before the callback receives an error.
-	publisher, err := amqpConnection.NewPublisher(context.Background(),
+	publisher, err := amqpConnection.NewPublisher(context.TODO(),
 		&rmq.QueueAddress{Queue: queueName},
 		&rmq.PublisherOptions{
 			MaxInFlight:    maxInFlight,
@@ -92,7 +92,7 @@ func main() {
 		msgBody := fmt.Sprintf("hello async %d", i)
 		msg := rmq.NewMessage([]byte(msgBody))
 
-		err = publisher.PublishAsync(context.Background(), msg,
+		err = publisher.PublishAsync(context.TODO(), msg,
 			func(result *rmq.PublishResult, cbErr error) {
 				defer wg.Done()
 
@@ -138,7 +138,7 @@ func main() {
 		"msg/s", fmt.Sprintf("%.0f", float64(totalMessages)/elapsed.Seconds()),
 	)
 
-	if err = publisher.Close(context.Background()); err != nil {
+	if err = publisher.Close(context.TODO()); err != nil {
 		rmq.Error("Error closing publisher", "error", err)
 	}
 
@@ -148,18 +148,18 @@ func main() {
 	var input string
 	_, _ = fmt.Scanln(&input)
 
-	purged, err := management.PurgeQueue(context.Background(), queueInfo.Name())
+	purged, err := management.PurgeQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
 		rmq.Error("Error purging queue", "error", err)
 	} else {
 		rmq.Info("Queue purged", "messages", purged)
 	}
 
-	if err = management.DeleteQueue(context.Background(), queueInfo.Name()); err != nil {
+	if err = management.DeleteQueue(context.TODO(), queueInfo.Name()); err != nil {
 		rmq.Error("Error deleting queue", "error", err)
 	}
 
-	if err = env.CloseConnections(context.Background()); err != nil {
+	if err = env.CloseConnections(context.TODO()); err != nil {
 		rmq.Error("Error closing connection", "error", err)
 	}
 
