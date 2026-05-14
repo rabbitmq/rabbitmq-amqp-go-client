@@ -59,7 +59,7 @@ func main() {
 		),
 	)
 	defer func() {
-		if err := meterProvider.Shutdown(context.Background()); err != nil {
+		if err := meterProvider.Shutdown(context.TODO()); err != nil {
 			fmt.Printf("Failed to shutdown meter provider: %v\n", err)
 		}
 	}()
@@ -81,7 +81,7 @@ func main() {
 
 	// 5. Open connection
 	fmt.Println("Connecting to RabbitMQ...")
-	connection, err := env.NewConnection(context.Background())
+	connection, err := env.NewConnection(context.TODO())
 	if err != nil {
 		fmt.Printf("Failed to connect: %v\n", err)
 		return
@@ -91,7 +91,7 @@ func main() {
 	// 6. Declare a queue
 	queueName := "otel-metrics-example-queue"
 	management := connection.Management()
-	_, err = management.DeclareQueue(context.Background(), &rmq.QuorumQueueSpecification{
+	_, err = management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 		Name: queueName,
 	})
 	if err != nil {
@@ -101,7 +101,7 @@ func main() {
 	fmt.Printf("Queue '%s' declared\n", queueName)
 
 	// 7. Create a publisher
-	publisher, err := connection.NewPublisher(context.Background(), &rmq.QueueAddress{
+	publisher, err := connection.NewPublisher(context.TODO(), &rmq.QueueAddress{
 		Queue: queueName,
 	}, nil)
 	if err != nil {
@@ -111,7 +111,7 @@ func main() {
 	fmt.Println("Publisher created")
 
 	// 8. Create a consumer
-	consumer, err := connection.NewConsumer(context.Background(), queueName, nil)
+	consumer, err := connection.NewConsumer(context.TODO(), queueName, nil)
 	if err != nil {
 		fmt.Printf("Failed to create consumer: %v\n", err)
 		return
@@ -124,7 +124,7 @@ func main() {
 	fmt.Printf("Publishing %d messages...\n", messageCount)
 	for i := 0; i < messageCount; i++ {
 		msg := rmq.NewMessage([]byte(fmt.Sprintf("Message %d", i+1)))
-		result, err := publisher.Publish(context.Background(), msg)
+		result, err := publisher.Publish(context.TODO(), msg)
 		if err != nil {
 			fmt.Printf("Failed to publish message %d: %v\n", i+1, err)
 			continue
@@ -142,7 +142,7 @@ func main() {
 	// 10. Consume messages
 	fmt.Printf("Consuming messages...\n")
 	consumedCount := 0
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
 	for consumedCount < messageCount {
@@ -151,7 +151,7 @@ func main() {
 			fmt.Printf("Error receiving message: %v\n", err)
 			break
 		}
-		err = delivery.Accept(context.Background())
+		err = delivery.Accept(context.TODO())
 		if err != nil {
 			fmt.Printf("Error accepting message: %v\n", err)
 			break
@@ -178,19 +178,19 @@ func main() {
 	fmt.Println()
 	fmt.Println("Cleaning up...")
 
-	if err := consumer.Close(context.Background()); err != nil {
+	if err := consumer.Close(context.TODO()); err != nil {
 		fmt.Printf("Failed to close consumer: %v\n", err)
 	}
 
-	if err := publisher.Close(context.Background()); err != nil {
+	if err := publisher.Close(context.TODO()); err != nil {
 		fmt.Printf("Failed to close publisher: %v\n", err)
 	}
 
-	if err := management.DeleteQueue(context.Background(), queueName); err != nil {
+	if err := management.DeleteQueue(context.TODO(), queueName); err != nil {
 		fmt.Printf("Failed to delete queue: %v\n", err)
 	}
 
-	if err := connection.Close(context.Background()); err != nil {
+	if err := connection.Close(context.TODO()); err != nil {
 		fmt.Printf("Failed to close connection: %v\n", err)
 	}
 

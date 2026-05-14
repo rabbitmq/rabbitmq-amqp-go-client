@@ -27,7 +27,7 @@ func main() {
 
 	rmq.Info("Define the publisher message targets")
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	checkError(err)
 	queues := []string{"queue1", "queue2", "queue3"}
 	management := amqpConnection.Management()
@@ -58,7 +58,7 @@ func main() {
 		msg, err := rmq.NewMessageWithAddress([]byte("Hello World"),
 			&rmq.QueueAddress{Queue: queues[i%3]})
 		checkError(err)
-		publishResult, err := publisher.Publish(context.Background(), msg)
+		publishResult, err := publisher.Publish(context.TODO(), msg)
 		checkError(err)
 		switch publishResult.Outcome.(type) {
 		case *amqp.StateAccepted:
@@ -71,8 +71,8 @@ func main() {
 	// check the UI, you should see 4 messages in each queue
 
 	// Close the publisher
-	err = publisher.Close(context.Background())
+	err = publisher.Close(context.TODO())
 	checkError(err)
-	err = env.CloseConnections(context.Background())
+	err = env.CloseConnections(context.TODO())
 	checkError(err)
 }

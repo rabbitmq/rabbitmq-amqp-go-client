@@ -46,11 +46,11 @@ func main() {
 		}},
 	})
 
-	connection, err := env.NewConnection(context.Background())
+	connection, err := env.NewConnection(context.TODO())
 	check(err)
 
 	// Close the connection
-	err = connection.Close(context.Background())
+	err = connection.Close(context.TODO())
 	check(err)
 
 }

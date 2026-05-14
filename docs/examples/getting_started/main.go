@@ -49,7 +49,7 @@ func main() {
 	// })
 
 	// Open a connection to the AMQP 1.0 server ( RabbitMQ >= 4.0)
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	if err != nil {
 		rmq.Error("Error opening connection", err)
 		return
@@ -94,13 +94,13 @@ func main() {
 
 	// Create a consumer to receive messages from the queue
 	// you need to build the address of the queue, but you can use the helper function
-	consumer, err := amqpConnection.NewConsumer(context.Background(), queueName, nil)
+	consumer, err := amqpConnection.NewConsumer(context.TODO(), queueName, nil)
 	if err != nil {
 		rmq.Error("Error creating consumer", err)
 		return
 	}
 
-	consumerContext, cancel := context.WithCancel(context.Background())
+	consumerContext, cancel := context.WithCancel(context.TODO())
 
 	// Consume messages from the queue
 	go func(ctx context.Context) {
@@ -120,7 +120,7 @@ func main() {
 			rmq.Info("[Consumer] Received message", "message",
 				fmt.Sprintf("%s", deliveryContext.Message().Data))
 
-			err = deliveryContext.Accept(context.Background())
+			err = deliveryContext.Accept(context.TODO())
 			if err != nil {
 				rmq.Error("[Consumer] Error accepting message", "error", err)
 				return
@@ -128,7 +128,7 @@ func main() {
 		}
 	}(consumerContext)
 
-	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.ExchangeAddress{
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.ExchangeAddress{
 		Exchange: exchangeName,
 		Key:      routingKey,
 	}, nil)
@@ -139,7 +139,7 @@ func main() {
 
 	for i := 0; i < 100; i++ {
 		// Publish a message to the exchange
-		publishResult, err := publisher.Publish(context.Background(), rmq.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
+		publishResult, err := publisher.Publish(context.TODO(), rmq.NewMessage([]byte("Hello, World!"+fmt.Sprintf("%d", i))))
 		if err != nil {
 			rmq.Error("Error publishing message", "error", err)
 			time.Sleep(1 * time.Second)
@@ -170,13 +170,13 @@ func main() {
 
 	cancel()
 	//Close the consumer
-	err = consumer.Close(context.Background())
+	err = consumer.Close(context.TODO())
 	if err != nil {
 		rmq.Error("[Consumer]", err)
 		return
 	}
 	// Close the publisher
-	err = publisher.Close(context.Background())
+	err = publisher.Close(context.TODO())
 	if err != nil {
 		rmq.Error("[Publisher]", err)
 		return
@@ -212,7 +212,7 @@ func main() {
 
 	// Close all the connections. but you can still use the environment
 	// to create new connections
-	err = env.CloseConnections(context.Background())
+	err = env.CloseConnections(context.TODO())
 	if err != nil {
 		rmq.Error("Error closing connection", "error", err)
 		return

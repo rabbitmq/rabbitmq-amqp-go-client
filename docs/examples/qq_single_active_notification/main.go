@@ -75,7 +75,7 @@ func declareSACQueue(ctx context.Context, management *rmq.AmqpManagement) error 
 }
 
 func runProducer() {
-	ctx := context.Background()
+	ctx := context.TODO()
 	conn, err := rmq.Dial(ctx, amqpURL(), nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dial:", err)
@@ -120,7 +120,7 @@ func runProducer() {
 }
 
 func runConsumer() {
-	ctx := context.Background()
+	ctx := context.TODO()
 	conn, err := rmq.Dial(ctx, amqpURL(), nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dial:", err)

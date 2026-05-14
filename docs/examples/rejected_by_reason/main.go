@@ -51,7 +51,7 @@ func main() {
 	}(stateChanged)
 
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	if err != nil {
 		rmq.Error("Error opening connection", "error", err)
 		return
@@ -65,7 +65,7 @@ func main() {
 	// messages.  The RejectPublishOverflowStrategy causes the broker to send back a
 	// Rejected outcome (with rejection details on RabbitMQ 4.3+) instead of silently
 	// dropping the overflowing message.
-	queueInfo, err := management.DeclareQueue(context.Background(), &rmq.QuorumQueueSpecification{
+	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 		Name:             queueName,
 		MaxLength:        maxLength,
 		OverflowStrategy: &rmq.RejectPublishOverflowStrategy{},
@@ -76,7 +76,7 @@ func main() {
 	}
 	rmq.Info("Queue declared", "name", queueInfo.Name(), "maxLength", maxLength)
 
-	publisher, err := amqpConnection.NewPublisher(context.Background(),
+	publisher, err := amqpConnection.NewPublisher(context.TODO(),
 		&rmq.QueueAddress{Queue: queueName}, nil)
 	if err != nil {
 		rmq.Error("Error creating publisher", "error", err)
@@ -90,7 +90,7 @@ func main() {
 	rmq.Info("--- Synchronous Publish ---")
 	for i := 1; i <= totalSent; i++ {
 		msg := rmq.NewMessage([]byte(fmt.Sprintf("message %d", i)))
-		result, pubErr := publisher.Publish(context.Background(), msg)
+		result, pubErr := publisher.Publish(context.TODO(), msg)
 		if pubErr != nil {
 			rmq.Error("[Publisher] send error", "error", pubErr)
 			continue
@@ -119,7 +119,7 @@ func main() {
 	}
 
 	// Purge the queue so the async demo starts from an empty queue.
-	purged, err := management.PurgeQueue(context.Background(), queueInfo.Name())
+	purged, err := management.PurgeQueue(context.TODO(), queueInfo.Name())
 	if err != nil {
 		rmq.Error("Error purging queue", "error", err)
 		return
@@ -144,7 +144,7 @@ func main() {
 		// and give the opportunity to max len feature to work as excepted
 		// for this specific example
 		time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
-		asyncErr := publisher.PublishAsync(context.Background(), msg,
+		asyncErr := publisher.PublishAsync(context.TODO(), msg,
 			func(result *rmq.PublishResult, cbErr error) {
 				defer wg.Done()
 				if cbErr != nil {
@@ -188,19 +188,19 @@ func main() {
 	var input string
 	_, _ = fmt.Scanln(&input)
 
-	if err = publisher.Close(context.Background()); err != nil {
+	if err = publisher.Close(context.TODO()); err != nil {
 		rmq.Error("Error closing publisher", "error", err)
 	}
 
-	if _, err = management.PurgeQueue(context.Background(), queueInfo.Name()); err != nil {
+	if _, err = management.PurgeQueue(context.TODO(), queueInfo.Name()); err != nil {
 		rmq.Error("Error purging queue", "error", err)
 	}
 
-	if err = management.DeleteQueue(context.Background(), queueInfo.Name()); err != nil {
+	if err = management.DeleteQueue(context.TODO(), queueInfo.Name()); err != nil {
 		rmq.Error("Error deleting queue", "error", err)
 	}
 
-	if err = env.CloseConnections(context.Background()); err != nil {
+	if err = env.CloseConnections(context.TODO()); err != nil {
 		rmq.Error("Error closing connection", "error", err)
 	}
 

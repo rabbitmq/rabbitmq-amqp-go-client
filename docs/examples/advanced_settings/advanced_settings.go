@@ -57,7 +57,7 @@ func main() {
 	}, rmq.WithStrategy(rmq.StrategyRandom))
 
 	for i := 0; i < 5; i++ {
-		connection, err := env.NewConnection(context.Background())
+		connection, err := env.NewConnection(context.TODO())
 		if err != nil {
 			rmq.Error("Error opening connection", err)
 			return

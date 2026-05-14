@@ -29,13 +29,13 @@ func main() {
 
 	env := rmq.NewEnvironment("amqp://guest:guest@localhost:5672/", nil)
 
-	amqpConnection, err := env.NewConnection(context.Background())
+	amqpConnection, err := env.NewConnection(context.TODO())
 	if err != nil {
 		rmq.Error("Error opening connection", err)
 		return
 	}
 
-	_, err = amqpConnection.Management().DeclareQueue(context.Background(), &rmq.StreamQueueSpecification{
+	_, err = amqpConnection.Management().DeclareQueue(context.TODO(), &rmq.StreamQueueSpecification{
 		Name: queueName,
 	})
 	if err != nil {
@@ -43,7 +43,7 @@ func main() {
 		return
 	}
 
-	publisher, err := amqpConnection.NewPublisher(context.Background(), &rmq.QueueAddress{
+	publisher, err := amqpConnection.NewPublisher(context.TODO(), &rmq.QueueAddress{
 		Queue: queueName,
 	}, nil)
 	if err != nil {
@@ -59,7 +59,7 @@ func main() {
 	}
 	msgNotIntTheFilter.ApplicationProperties = map[string]interface{}{"keyNo": "valueNO"}
 
-	pr, err := publisher.Publish(context.Background(), msgNotIntTheFilter)
+	pr, err := publisher.Publish(context.TODO(), msgNotIntTheFilter)
 	if err != nil {
 		rmq.Error("Error publishing message", err)
 		return
@@ -75,14 +75,14 @@ func main() {
 	}
 	msgInTheFilter.ApplicationProperties = map[string]interface{}{"keyYes": "valueYES"}
 
-	pr, err = publisher.Publish(context.Background(), msgInTheFilter)
+	pr, err = publisher.Publish(context.TODO(), msgInTheFilter)
 	if err != nil {
 		rmq.Error("Error publishing message", err)
 		return
 	}
 	rmq.Info("Published message that matches the filter", "publish result", pr.Outcome)
 
-	consumer, err := amqpConnection.NewConsumer(context.Background(), queueName, &rmq.StreamConsumerOptions{
+	consumer, err := amqpConnection.NewConsumer(context.TODO(), queueName, &rmq.StreamConsumerOptions{
 		InitialCredits: 10,
 		Offset:         &rmq.OffsetFirst{},
 		StreamFilterOptions: &rmq.StreamFilterOptions{
@@ -95,7 +95,7 @@ func main() {
 		return
 	}
 
-	consumerContext, cancel := context.WithCancel(context.Background())
+	consumerContext, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
 	// Consume messages from the queue. It should only receive the message that matches the filter
@@ -108,23 +108,23 @@ func main() {
 	rmq.Info("[Consumer]", "Body",
 		fmt.Sprintf("%s", deliveryContext.Message().Data),
 		"Subject", *deliveryContext.Message().Properties.Subject, "To", *deliveryContext.Message().Properties.To)
-	err = deliveryContext.Accept(context.Background())
+	err = deliveryContext.Accept(context.TODO())
 	if err != nil {
 		rmq.Error("Error accepting message", err)
 		return
 	}
 
-	err = amqpConnection.Management().DeleteQueue(context.Background(), queueName)
+	err = amqpConnection.Management().DeleteQueue(context.TODO(), queueName)
 	if err != nil {
 		rmq.Error("Error deleting stream queue", err)
 		return
 	}
-	err = amqpConnection.Close(context.Background())
+	err = amqpConnection.Close(context.TODO())
 	if err != nil {
 		rmq.Error("Error closing connection", err)
 		return
 	}
-	_ = env.CloseConnections(context.Background())
+	_ = env.CloseConnections(context.TODO())
 	rmq.Info("AMQP 1.0 Client SQL Stream Filter Example Completed")
 
 }
