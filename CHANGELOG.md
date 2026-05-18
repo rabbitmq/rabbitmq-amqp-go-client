@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [[1.1.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.1.0)]
+
+## 1.1.0 - 2026-05-18
+- [Release 1.1.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.1.0)
+
+### Breaking Changes
+- fix(consumer): safe stream offset, sync options, atomic pause state by @Gsantomaggio in [#95](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/95)
+- Drop support for Go 1.24 by @Gsantomaggio in [#97](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/97)
+
+### Added
+- feat(consumer): quorum SAC notifications via FLOW `rabbitmq:active` by @Gsantomaggio in [#99](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/99)
+- feat: expose rejection details in `PublishResult` for RabbitMQ 4.3+ by @Gsantomaggio in [#100](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/100)
+
+### Changed
+- Update Azure go-amqp to 1.6.0 by @Gsantomaggio in [#96](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/96)
+- refactor(publisher): reduce duplication and improve Close/OTEL safety by @Gsantomaggio in [#101](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/101)
+- Replace `context.Background()` with `context.TODO()` by @Gsantomaggio in [#103](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/103)
+- Bump `go.opentelemetry.io/otel/sdk` from 1.40.0 to 1.43.0 in `/docs/examples/otel_metrics` by @dependabot in [#98](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/98)
+
 ## [[1.0.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.0.0)]
 
 ## 1.0.0 - 2026-04-20
