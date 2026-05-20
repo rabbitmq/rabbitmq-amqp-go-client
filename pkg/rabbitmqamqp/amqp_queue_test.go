@@ -287,6 +287,59 @@ var _ = Describe("AMQP Queue test ", func() {
 		err = management.DeleteQueue(context.TODO(), queueName)
 		Expect(err).To(BeNil())
 	})
+	It("AMQP Declare Queue with CustomQueueSpecification and queue type quorum should succeed", func() {
+		queueName := generateName("AMQP Declare Queue with CustomQueueSpecification quorum")
+		queueInfo, err := management.DeclareQueue(context.TODO(), &CustomQueueSpecification{
+			Name:          queueName,
+			QueueTypeName: "quorum",
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.Name()).To(Equal(queueName))
+		Expect(queueInfo.IsDurable()).To(BeTrue())
+		Expect(queueInfo.IsAutoDelete()).To(BeFalse())
+		Expect(queueInfo.IsExclusive()).To(BeFalse())
+		Expect(queueInfo.Type()).To(Equal(Quorum))
+
+		queueInfoReceived, err := management.QueueInfo(context.TODO(), queueName)
+		Expect(err).To(BeNil())
+		Expect(queueInfoReceived).To(Equal(queueInfo))
+
+		err = management.DeleteQueue(context.TODO(), queueName)
+		Expect(err).To(BeNil())
+	})
+
+	It("AMQP Declare Queue with CustomQueueSpecification and queue type doesn't exist should fail", func() {
+		queueName := generateName("AMQP Declare Queue with CustomQueueSpecification doesn't exist")
+		_, err := management.DeclareQueue(context.TODO(), &CustomQueueSpecification{
+			Name:          queueName,
+			QueueTypeName: "Type doesn't exist",
+		})
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("AMQP Declare Queue with CustomQueueSpecification and quorum type should pass arguments", func() {
+		queueName := generateName("AMQP Declare Queue with CustomQueueSpecification quorum args")
+		queueInfo, err := management.DeclareQueue(context.TODO(), &CustomQueueSpecification{
+			Name:                 queueName,
+			QueueTypeName:        "quorum",
+			DeadLetterExchange:   "dead-letter-exchange",
+			DeadLetterRoutingKey: "dead-letter-routing-key",
+			MaxLength:            1000,
+			MaxLengthBytes:       CapacityGB(1),
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.Name()).To(Equal(queueName))
+		Expect(queueInfo.Type()).To(Equal(Quorum))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-dead-letter-exchange", "dead-letter-exchange"))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-dead-letter-routing-key", "dead-letter-routing-key"))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-length", int64(1000)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-max-length-bytes", int64(1_000_000_000)))
+
+		err = management.DeleteQueue(context.TODO(), queueName)
+		Expect(err).To(BeNil())
+	})
 })
 
 func publishMessages(queueName string, count int, args ...string) {

@@ -190,6 +190,98 @@ var _ = Describe("Entities", func() {
 		})
 	})
 
+	Describe("CustomQueueSpecification", func() {
+		It("should set x-queue-type to the custom string when QueueTypeName is non-empty", func() {
+			spec := &CustomQueueSpecification{
+				Name:          "my-custom-queue",
+				QueueTypeName: "quorum",
+			}
+			Expect(spec.queueType()).To(Equal(TQueueType("quorum")))
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("quorum"))
+		})
+
+		It("should omit x-queue-type when QueueTypeName is empty", func() {
+			spec := &CustomQueueSpecification{Name: "my-queue"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-queue-type"))
+		})
+
+		It("should reflect IsAutoDelete and IsExclusive fields", func() {
+			spec := &CustomQueueSpecification{
+				Name:         "my-queue",
+				IsAutoDelete: true,
+				IsExclusive:  true,
+			}
+			Expect(spec.isAutoDelete()).To(BeTrue())
+			Expect(spec.isExclusive()).To(BeTrue())
+
+			spec2 := &CustomQueueSpecification{Name: "my-queue"}
+			Expect(spec2.isAutoDelete()).To(BeFalse())
+			Expect(spec2.isExclusive()).To(BeFalse())
+		})
+
+		It("should map all DefaultQueueSpecification-style arguments", func() {
+			spec := &CustomQueueSpecification{
+				Name:                   "my-custom-queue",
+				QueueTypeName:          "quorum",
+				AutoExpire:             60000,
+				MessageTTL:             30000,
+				OverflowStrategy:       &RejectPublishOverflowStrategy{},
+				SingleActiveConsumer:   true,
+				DeadLetterExchange:     "dlx",
+				DeadLetterRoutingKey:   "dlx-rk",
+				MaxLength:              500,
+				MaxLengthBytes:         1_000_000,
+				MaxPriority:            5,
+				LeaderLocator:          &ClientLocalLeaderLocator{},
+				QuorumInitialGroupSize: 3,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("quorum"))
+			Expect(args["x-expires"]).To(Equal(int64(60000)))
+			Expect(args["x-message-ttl"]).To(Equal(int64(30000)))
+			Expect(args["x-overflow"]).To(Equal("reject-publish"))
+			Expect(args["x-single-active-consumer"]).To(BeTrue())
+			Expect(args["x-dead-letter-exchange"]).To(Equal("dlx"))
+			Expect(args["x-dead-letter-routing-key"]).To(Equal("dlx-rk"))
+			Expect(args["x-max-length"]).To(Equal(int64(500)))
+			Expect(args["x-max-length-bytes"]).To(Equal(int64(1_000_000)))
+			Expect(args["x-max-priority"]).To(Equal(int64(5)))
+			Expect(args["x-queue-leader-locator"]).To(Equal("client-local"))
+			Expect(args["x-quorum-initial-group-size"]).To(Equal(3))
+		})
+
+		It("should merge extra Arguments with built arguments", func() {
+			spec := &CustomQueueSpecification{
+				Name:          "my-custom-queue",
+				QueueTypeName: "quorum",
+				Arguments:     map[string]any{"custom-key": "custom-value"},
+			}
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("quorum"))
+			Expect(args["custom-key"]).To(Equal("custom-value"))
+		})
+
+		It("should accept any arbitrary queue type string", func() {
+			spec := &CustomQueueSpecification{
+				Name:          "my-plugin-queue",
+				QueueTypeName: "myQueueType",
+			}
+			Expect(spec.queueType()).To(Equal(TQueueType("myQueueType")))
+			args := spec.buildArguments()
+			Expect(args["x-queue-type"]).To(Equal("myQueueType"))
+		})
+
+		It("should always pass validation", func() {
+			spec := &CustomQueueSpecification{
+				Name:          "my-custom-queue",
+				QueueTypeName: "quorum",
+			}
+			Expect(spec.validate(nil)).To(BeNil())
+		})
+	})
+
 	Describe("durationToMaxAge", func() {
 		DescribeTable("converts duration to RabbitMQ max-age string",
 			func(d time.Duration, expected string) {
