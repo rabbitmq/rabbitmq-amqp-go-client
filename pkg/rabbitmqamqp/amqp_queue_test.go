@@ -3,6 +3,7 @@ package rabbitmqamqp
 import (
 	"context"
 	"strconv"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -263,6 +264,42 @@ var _ = Describe("AMQP Queue test ", func() {
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("DelayedQueueSpecification is only supported on Tanzu RabbitMQ"))
+	})
+
+	It("AMQP Declare Quorum Queue with delayed retry should succeed on RabbitMQ 4.3+", func() {
+		if !connection.featuresAvailable.is43rMore {
+			Skip("Requires RabbitMQ 4.3 or later")
+		}
+		queueName := generateName("AMQP Declare Quorum Queue with delayed retry")
+		queueInfo, err := management.DeclareQueue(context.TODO(), &QuorumQueueSpecification{
+			Name:             queueName,
+			DelayedRetryType: QuorumQueueDelayedRetryReturned,
+			DelayedRetryMin:  2 * time.Second,
+			DelayedRetryMax:  60 * time.Second,
+		})
+		Expect(err).To(BeNil())
+		Expect(queueInfo).NotTo(BeNil())
+		Expect(queueInfo.Name()).To(Equal(queueName))
+		Expect(queueInfo.Type()).To(Equal(Quorum))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-delayed-retry-type", "returned"))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-delayed-retry-min", int64(2000)))
+		Expect(queueInfo.Arguments()).To(HaveKeyWithValue("x-delayed-retry-max", int64(60000)))
+
+		err = management.DeleteQueue(context.TODO(), queueName)
+		Expect(err).To(BeNil())
+	})
+
+	It("AMQP Declare Quorum Queue with delayed retry should fail on RabbitMQ < 4.3", func() {
+		if connection.featuresAvailable.is43rMore {
+			Skip("Only fails on RabbitMQ < 4.3")
+		}
+		queueName := generateName("AMQP Declare Quorum Queue with delayed retry should fail")
+		_, err := management.DeclareQueue(context.TODO(), &QuorumQueueSpecification{
+			Name:             queueName,
+			DelayedRetryType: QuorumQueueDelayedRetryReturned,
+		})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("4.3"))
 	})
 
 	// default

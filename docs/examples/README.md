@@ -18,3 +18,4 @@
 - [Web Sockets](web_sockets) - An example of how to use Web Sockets with the AMQP 1.0 client.
 - [Pre-settled messages](pre_settled) - An example of how to receive pre-settled messages with the AMQP 1.0 client.
 - [Reject a message with a Reason](rejected_by_reason) - An example of reject with rejected-by and rejection reason (RabbitMQ 4.3+) 
+- [Quorum Queue Delayed Retry](qq_delayed_retry) - An example of how to use linear back-off redelivery on quorum queues (RabbitMQ 4.3+)

@@ -5,6 +5,17 @@ import (
 	"time"
 )
 
+// QuorumQueueDelayedRetryType controls the x-delayed-retry-type queue argument for quorum queues.
+// This feature requires RabbitMQ 4.3 or later.
+type QuorumQueueDelayedRetryType string
+
+const (
+	// QuorumQueueDelayedRetryDisabled disables delayed retry redelivery.
+	QuorumQueueDelayedRetryDisabled QuorumQueueDelayedRetryType = "disabled"
+	// QuorumQueueDelayedRetryReturned enables delayed retry only for messages returned by consumers.
+	QuorumQueueDelayedRetryReturned QuorumQueueDelayedRetryType = "returned"
+)
+
 type iEntityIdentifier interface {
 	Id() string
 }
@@ -193,7 +204,16 @@ type QuorumQueueSpecification struct {
 	TargetClusterSize      int64
 	LeaderLocator          ILeaderLocator
 	QuorumInitialGroupSize int
-	Arguments              map[string]any
+	// DelayedRetryType enables linear back-off redelivery on the quorum queue.
+	// Requires RabbitMQ 4.3 or later. Maps to the x-delayed-retry-type queue argument.
+	DelayedRetryType QuorumQueueDelayedRetryType
+	// DelayedRetryMin is the minimum delay before a message is redelivered.
+	// Requires RabbitMQ 4.3 or later. Maps to the x-delayed-retry-min queue argument (milliseconds).
+	DelayedRetryMin time.Duration
+	// DelayedRetryMax is the maximum delay before a message is redelivered.
+	// Requires RabbitMQ 4.3 or later. Maps to the x-delayed-retry-max queue argument (milliseconds).
+	DelayedRetryMax time.Duration
+	Arguments       map[string]any
 }
 
 func (q *QuorumQueueSpecification) name() string {
@@ -266,11 +286,28 @@ func (q *QuorumQueueSpecification) buildArguments() map[string]any {
 		result["x-quorum-initial-group-size"] = q.QuorumInitialGroupSize
 	}
 
+	if len(q.DelayedRetryType) != 0 {
+		result["x-delayed-retry-type"] = string(q.DelayedRetryType)
+	}
+
+	if q.DelayedRetryMin != 0 {
+		result["x-delayed-retry-min"] = q.DelayedRetryMin.Milliseconds()
+	}
+
+	if q.DelayedRetryMax != 0 {
+		result["x-delayed-retry-max"] = q.DelayedRetryMax.Milliseconds()
+	}
+
 	result["x-queue-type"] = string(q.queueType())
 	return result
 }
 
-func (q *QuorumQueueSpecification) validate(*featuresAvailable) error {
+func (q *QuorumQueueSpecification) validate(f *featuresAvailable) error {
+	if f != nil && (len(q.DelayedRetryType) != 0 || q.DelayedRetryMin != 0 || q.DelayedRetryMax != 0) {
+		if !f.is43rMore {
+			return fmt.Errorf("QuorumQueueSpecification delayed retry fields require RabbitMQ 4.3 or later")
+		}
+	}
 	return nil
 }
 

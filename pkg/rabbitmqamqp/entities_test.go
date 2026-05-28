@@ -282,6 +282,103 @@ var _ = Describe("Entities", func() {
 		})
 	})
 
+	Describe("QuorumQueueSpecification delayed retry", func() {
+		It("should set x-delayed-retry-type when DelayedRetryType is set", func() {
+			spec := &QuorumQueueSpecification{
+				Name:             "my-qq",
+				DelayedRetryType: QuorumQueueDelayedRetryReturned,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-delayed-retry-type"]).To(Equal("returned"))
+		})
+
+		It("should set x-delayed-retry-type to disabled", func() {
+			spec := &QuorumQueueSpecification{
+				Name:             "my-qq",
+				DelayedRetryType: QuorumQueueDelayedRetryDisabled,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-delayed-retry-type"]).To(Equal("disabled"))
+		})
+
+		It("should not set x-delayed-retry-type when DelayedRetryType is empty", func() {
+			spec := &QuorumQueueSpecification{Name: "my-qq"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-delayed-retry-type"))
+		})
+
+		It("should set x-delayed-retry-min in milliseconds when DelayedRetryMin is set", func() {
+			spec := &QuorumQueueSpecification{
+				Name:            "my-qq",
+				DelayedRetryMin: 5 * time.Second,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-delayed-retry-min"]).To(Equal(int64(5000)))
+		})
+
+		It("should not set x-delayed-retry-min when DelayedRetryMin is zero", func() {
+			spec := &QuorumQueueSpecification{Name: "my-qq"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-delayed-retry-min"))
+		})
+
+		It("should set x-delayed-retry-max in milliseconds when DelayedRetryMax is set", func() {
+			spec := &QuorumQueueSpecification{
+				Name:            "my-qq",
+				DelayedRetryMax: 30 * time.Second,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-delayed-retry-max"]).To(Equal(int64(30000)))
+		})
+
+		It("should not set x-delayed-retry-max when DelayedRetryMax is zero", func() {
+			spec := &QuorumQueueSpecification{Name: "my-qq"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-delayed-retry-max"))
+		})
+
+		It("should set all three delayed retry arguments together", func() {
+			spec := &QuorumQueueSpecification{
+				Name:             "my-qq",
+				DelayedRetryType: QuorumQueueDelayedRetryReturned,
+				DelayedRetryMin:  2 * time.Second,
+				DelayedRetryMax:  60 * time.Second,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-delayed-retry-type"]).To(Equal("returned"))
+			Expect(args["x-delayed-retry-min"]).To(Equal(int64(2000)))
+			Expect(args["x-delayed-retry-max"]).To(Equal(int64(60000)))
+			Expect(args["x-queue-type"]).To(Equal("quorum"))
+		})
+
+		It("should fail validation when delayed retry fields are set on RabbitMQ < 4.3", func() {
+			spec := &QuorumQueueSpecification{
+				Name:             "my-qq",
+				DelayedRetryType: QuorumQueueDelayedRetryReturned,
+			}
+			err := spec.validate(&featuresAvailable{is43rMore: false})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("4.3"))
+		})
+
+		It("should pass validation when delayed retry fields are set on RabbitMQ >= 4.3", func() {
+			spec := &QuorumQueueSpecification{
+				Name:             "my-qq",
+				DelayedRetryType: QuorumQueueDelayedRetryReturned,
+				DelayedRetryMin:  2 * time.Second,
+				DelayedRetryMax:  60 * time.Second,
+			}
+			Expect(spec.validate(&featuresAvailable{is43rMore: true})).To(BeNil())
+		})
+
+		It("should pass validation when no delayed retry fields are set regardless of version", func() {
+			spec := &QuorumQueueSpecification{Name: "my-qq"}
+			Expect(spec.validate(&featuresAvailable{is43rMore: false})).To(BeNil())
+			Expect(spec.validate(&featuresAvailable{is43rMore: true})).To(BeNil())
+			Expect(spec.validate(nil)).To(BeNil())
+		})
+	})
+
 	Describe("durationToMaxAge", func() {
 		DescribeTable("converts duration to RabbitMQ max-age string",
 			func(d time.Duration, expected string) {
