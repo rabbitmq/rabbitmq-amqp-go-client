@@ -45,14 +45,14 @@ func main() {
 	// - DelayedRetryType: controls which messages trigger linear back-off redelivery.
 	//   Use QuorumQueueDelayedRetryReturned so only messages returned (nacked) by
 	//   consumers are retried with a delay, rather than all redeliveries.
-	// - DelayedRetryMin: minimum back-off delay before the first retry.
+	// - DelayedRetryMin: minimum back-off delay before the first retry. (valid for Failure)
 	// - DelayedRetryMax: upper bound for the back-off delay.
 	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
-		Name:             queueName,
-		DeliveryLimit:    5,
+		Name: queueName,
+		//DeliveryLimit:    5,
 		DelayedRetryType: rmq.QuorumQueueDelayedRetryReturned,
 		DelayedRetryMin:  2 * time.Second,
-		DelayedRetryMax:  30 * time.Second,
+		//DelayedRetryMax:  30 * time.Second,
 	})
 	if err != nil {
 		rmq.Error("Error declaring queue", err)
