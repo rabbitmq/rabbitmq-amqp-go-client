@@ -147,6 +147,16 @@ type ConsumerOptions struct {
 	// updates for rabbitmq:active on this consumer link. Use with a quorum queue
 	// declared using SingleActiveConsumer. See SingleActiveConsumerStateChangedFunc.
 	SingleActiveConsumerStateChanged SingleActiveConsumerStateChangedFunc
+
+	// ConsumerTimeout sets the rabbitmq:consumer-timeout AMQP 1.0 ATTACH link property
+	// (expressed as milliseconds). Use with quorum or JMS queues to override the queue-level
+	// x-consumer-timeout on a per-consumer basis. Requires RabbitMQ 4.3 or later.
+	// Cannot be used with DirectReplyTo settle strategy.
+	ConsumerTimeout time.Duration
+
+	// OnDeliveryRelease is called when the broker releases a delivery due to consumer timeout.
+	// See DeliveryReleaseFunc for details. Requires RabbitMQ 4.3 or later.
+	OnDeliveryRelease DeliveryReleaseFunc
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -178,6 +188,14 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 		if !available.is43rMore {
 			return fmt.Errorf("single active consumer state notification requires RabbitMQ 4.3 or later")
 		}
+	}
+
+	if aco.ConsumerTimeout > 0 && aco.SettleStrategy == DirectReplyTo {
+		return fmt.Errorf("consumer timeout is not supported with DirectReplyTo settle strategy")
+	}
+
+	if aco.OnDeliveryRelease != nil && !available.is43rMore {
+		return fmt.Errorf("OnDeliveryRelease callback requires RabbitMQ 4.3 or later")
 	}
 
 	return nil
@@ -217,6 +235,19 @@ const rabbitmqActiveLinkStateProperty = "rabbitmq:active"
 // Requires RabbitMQ 4.3+, a quorum queue declared with x-single-active-consumer,
 // and cannot be used together with DirectReplyTo.
 type SingleActiveConsumerStateChangedFunc func(consumer *Consumer, isActive bool)
+
+// DeliveryReleaseFunc is called when the broker releases a delivery because the consumer
+// did not settle it within the configured consumer timeout (x-consumer-timeout on the queue
+// or rabbitmq:consumer-timeout on the AMQP attach frame).
+//
+// The provided deliveryCtx is a restricted IDeliveryContext: only Accept() is valid.
+// Calling Discard, Requeue, or any other method returns ErrDeliveryReleaseInvalidOperation.
+//
+// Calling Accept() inside this callback sends an AMQP Accepted disposition back to the
+// broker, which unlocks the consumer so it can receive further messages.
+//
+// Requires RabbitMQ 4.3 or later.
+type DeliveryReleaseFunc func(deliveryCtx IDeliveryContext, message *amqp.Message)
 
 const offsetFirst = "first"
 const offsetNext = "next"
