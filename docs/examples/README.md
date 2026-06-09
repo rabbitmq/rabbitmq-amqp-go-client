@@ -20,3 +20,6 @@
 - [Reject a message with a Reason](rejected_by_reason) - An example of reject with rejected-by and rejection reason (RabbitMQ 4.3+) 
 - [Quorum Queue Delayed Retry](qq_delayed_retry) - An example of redelivery on quorum queues (RabbitMQ 4.3+)
 - [Quorum Queue Delayed Retry - per-message delivery time](qq_delayed_retry_delivery_time) - An example of how to override the redelivery time per message using the `x-opt-delivery-time` annotation (RabbitMQ 4.3+)
+- [Quorum Queue Consumer Timeout](qq_consumer_timeout) - An example of quorum queue consumer timeouts (`x-consumer-timeout`) and how to handle the `OnDeliveryRelease` callback (RabbitMQ 4.3+)
+- [Publish Async](publish_async) - An example of how to use `PublishAsync` to send messages without blocking the caller while waiting for broker confirmation.
+- [OpenTelemetry Metrics](otel_metrics) - An example of how to configure OpenTelemetry metrics with a stdout exporter, showing connection, publisher, consumer, and message counts.
