@@ -96,6 +96,61 @@ func createDynamicReceiverLinkOptions(options IConsumerOptions) *amqp.ReceiverOp
 	}
 }
 
+// setConsumerTimeoutProperty injects the rabbitmq:consumer-timeout attach property (milliseconds)
+// when ConsumerOptions.ConsumerTimeout is set. This is only supported on quorum and JMS queues
+// and requires RabbitMQ 4.3 or later.
+func setConsumerTimeoutProperty(opts *amqp.ReceiverOptions, options IConsumerOptions) {
+	if opts == nil || options == nil {
+		return
+	}
+	co, ok := options.(*ConsumerOptions)
+	if !ok || co.ConsumerTimeout <= 0 {
+		return
+	}
+	if opts.Properties == nil {
+		opts.Properties = make(map[string]any)
+	}
+	opts.Properties[rabbitmqConsumerTimeoutProperty] = uint64(co.ConsumerTimeout.Milliseconds())
+}
+
+// setDeliveryReleaseHandler wires up ReceiverOptions.OnDeliveryStateChanged when
+// ConsumerOptions.OnDeliveryRelease is set. The callback is dispatched to a new
+// goroutine so the caller can safely call blocking operations such as Accept().
+func setDeliveryReleaseHandler(opts *amqp.ReceiverOptions, options IConsumerOptions, c *Consumer) {
+	if opts == nil || c == nil || options == nil {
+		return
+	}
+	co, ok := options.(*ConsumerOptions)
+	if !ok || co.OnDeliveryRelease == nil {
+		return
+	}
+	handler := co.OnDeliveryRelease
+	opts.OnDeliveryStateChanged = func(msg *amqp.Message, state amqp.DeliveryState) {
+		if _, released := state.(*amqp.StateReleased); !released {
+			return
+		}
+		receiver := c.receiver.Load()
+		if receiver == nil {
+			return
+		}
+		consumeCtx := c.buildConsumeContext(msg)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					Error("OnDeliveryRelease handler panicked", "recover", r)
+				}
+			}()
+			timedOutCtx := &TimedOutDeliveryContext{
+				receiver:         receiver,
+				message:          msg,
+				metricsCollector: c.connection.metricsCollector,
+				consumeCtx:       consumeCtx,
+			}
+			handler(timedOutCtx, msg)
+		}()
+	}
+}
+
 func random(max int) int {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	return r.Intn(max)

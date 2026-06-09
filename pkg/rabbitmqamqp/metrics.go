@@ -22,6 +22,9 @@ const (
 	ConsumeDiscarded
 	// ConsumeRequeued indicates the consumer requeued the message for redelivery.
 	ConsumeRequeued
+	// ConsumeUnlocked indicates the consumer accepted a broker-released delivery to unlock
+	// itself from the consumer-timeout state (quorum/JMS queues, RabbitMQ 4.3+).
+	ConsumeUnlocked
 )
 
 // PublishContext contains contextual information for publish metrics,

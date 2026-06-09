@@ -30,6 +30,7 @@ type OTELMetricsCollector struct {
 	consumedAccepted  metric.Int64Counter
 	consumedDiscarded metric.Int64Counter
 	consumedRequeued  metric.Int64Counter
+	consumedUnlocked  metric.Int64Counter
 }
 
 // Ensure OTELMetricsCollector implements MetricsCollector
@@ -144,6 +145,15 @@ func NewOTELMetricsCollector(meterProvider metric.MeterProvider, prefix string) 
 	collector.consumedRequeued, err = meter.Int64Counter(
 		prefix+".consumed_requeued",
 		metric.WithDescription("Total number of messages requeued by consumer"),
+		metric.WithUnit("{message}"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	collector.consumedUnlocked, err = meter.Int64Counter(
+		prefix+".consumed_unlocked",
+		metric.WithDescription("Total number of broker-released deliveries accepted to unlock the consumer (consumer timeout)"),
 		metric.WithUnit("{message}"),
 	)
 	if err != nil {
@@ -276,5 +286,8 @@ func (o *OTELMetricsCollector) ConsumeDisposition(disposition ConsumeDisposition
 	case ConsumeRequeued:
 		attrs = append(attrs, MessagingOperationNameKey.String(OperationNameRequeue))
 		o.consumedRequeued.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+	case ConsumeUnlocked:
+		attrs = append(attrs, MessagingOperationNameKey.String(OperationNameAck))
+		o.consumedUnlocked.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 	}
 }

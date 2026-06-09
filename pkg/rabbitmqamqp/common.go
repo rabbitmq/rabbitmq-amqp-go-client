@@ -34,6 +34,11 @@ const (
 	queues                = "queues"
 	bindings              = "bindings"
 	authTokens            = "/auth/tokens"
+
+	// rabbitmqConsumerTimeoutProperty is the AMQP 1.0 ATTACH link property key used to set
+	// a per-consumer message-lock timeout (milliseconds) for quorum and JMS queues.
+	// Requires RabbitMQ 4.3 or later.
+	rabbitmqConsumerTimeoutProperty = "rabbitmq:consumer-timeout"
 )
 
 func validatePositive(label string, value int64) error {
