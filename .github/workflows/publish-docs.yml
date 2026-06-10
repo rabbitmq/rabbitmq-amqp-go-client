@@ -1,0 +1,55 @@
+name: Publish docs to pkg.go.dev
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  publish-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            TAG=$(git describe --tags --abbrev=0 --match="v*" 2>/dev/null || true)
+            echo "value=${TAG}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Resolved version: $(grep value $GITHUB_OUTPUT | cut -d= -f2)"
+
+      - uses: actions/setup-go@v5
+        if: steps.version.outputs.value != ''
+        with:
+          go-version: stable
+
+      - name: Warm up module proxy
+        if: steps.version.outputs.value != ''
+        env:
+          MODULE: github.com/rabbitmq/rabbitmq-amqp-go-client
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          GOPROXY=https://proxy.golang.org GONOSUMCHECK='*' \
+            go list -m "${MODULE}@${VERSION}"
+
+      - name: Notify pkg.go.dev
+        if: steps.version.outputs.value != ''
+        env:
+          MODULE: github.com/rabbitmq/rabbitmq-amqp-go-client
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          STATUS=$(curl -sSL -o /dev/null -w "%{http_code}" \
+            "https://pkg.go.dev/fetch/${MODULE}@${VERSION}")
+          echo "pkg.go.dev fetch status for ${MODULE}@${VERSION}: ${STATUS}"
+          # 200 = already indexed, 302/303 = fetch triggered, anything else is unexpected
+          if [[ "$STATUS" != "200" && "$STATUS" != "302" && "$STATUS" != "303" ]]; then
+            echo "Unexpected HTTP status ${STATUS} — documentation may be queued for indexing"
+          fi

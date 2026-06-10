@@ -180,9 +180,35 @@ func (a *AmqpConnection) Properties() map[string]any {
 }
 
 // NewPublisher creates a new Publisher that sends messages to the provided destination.
-// The destination is a ITargetAddress that can be a Queue or an Exchange with a routing key.
-// options is an IPublisherOptions that can be used to configure the publisher.
-// See QueueAddress and ExchangeAddress for more information.
+//
+// The destination parameter is an [ITargetAddress] — either a [QueueAddress], an
+// [ExchangeAddress], or nil.
+//
+// When destination is non-nil, the Publisher has a fixed target and all messages are
+// sent to that address:
+//
+//	target := &rabbitmqamqp.ExchangeAddress{Exchange: "my-exchange", Key: "my-key"}
+//	publisher, err := conn.NewPublisher(ctx, target, nil)
+//
+// When destination is nil, an Anonymous Sender is created. The target address must be
+// set per-message via [NewMessageWithAddress] or [MessagePropertyToAddress], allowing
+// different messages to be routed to different targets:
+//
+//	anonymousPublisher, err := conn.NewPublisher(ctx, nil, nil)
+//
+//	msg1, err := rabbitmqamqp.NewMessageWithAddress([]byte("pizza"), &rabbitmqamqp.ExchangeAddress{Exchange: "my-exchange", Key: "test"})
+//	anonymousPublisher.Publish(ctx, msg1)
+//
+//	msg2, err := rabbitmqamqp.NewMessageWithAddress([]byte("pasta"), &rabbitmqamqp.ExchangeAddress{Exchange: "another-exchange", Key: "another-key"})
+//	anonymousPublisher.Publish(ctx, msg2)
+//
+// Note: when the publisher has a fixed target, the message's To property
+// (message.Properties.To) is ignored.
+// [NewMessageWithAddress] or [MessagePropertyToAddress] are just helper functions to set message.Properties.To
+//
+// The options parameter configures the publisher (link name, max in-flight messages,
+// publish timeout, etc.). Pass nil to use the defaults. See [PublisherOptions].
+
 func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAddress, options IPublisherOptions) (*Publisher, error) {
 	destinationAdd := ""
 	err := error(nil)
