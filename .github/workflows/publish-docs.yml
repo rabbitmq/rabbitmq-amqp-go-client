@@ -11,7 +11,7 @@ jobs:
   publish-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -26,7 +26,7 @@ jobs:
           fi
           echo "Resolved version: $(grep value $GITHUB_OUTPUT | cut -d= -f2)"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         if: steps.version.outputs.value != ''
         with:
           go-version: stable
