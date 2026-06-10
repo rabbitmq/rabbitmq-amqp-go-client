@@ -387,4 +387,38 @@ var _ = Describe("Management tests", func() {
 			})
 		})
 	})
+
+	Context("validateResponseCode", func() {
+		var management *AmqpManagement
+
+		BeforeEach(func() {
+			management = newAmqpManagement(TopologyRecoveryAllEnabled, newFeaturesAvailable())
+		})
+
+		It("returns nil when the response code is in the expected list", func() {
+			Expect(management.validateResponseCode(200, []int{200, 201})).To(BeNil())
+			Expect(management.validateResponseCode(201, []int{200, 201})).To(BeNil())
+			Expect(management.validateResponseCode(204, []int{204})).To(BeNil())
+		})
+
+		It("returns ErrPreconditionFailed for a 409 response regardless of expected codes", func() {
+			Expect(management.validateResponseCode(409, []int{200})).To(Equal(ErrPreconditionFailed))
+			Expect(management.validateResponseCode(409, []int{409})).To(Equal(ErrPreconditionFailed))
+		})
+
+		It("returns an error when the response code is not in the expected list", func() {
+			err := management.validateResponseCode(500, []int{200, 201})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("500"))
+		})
+
+		It("returns an error for a 404 when it is not in the expected list", func() {
+			err := management.validateResponseCode(404, []int{200})
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("returns nil for a 404 when it is in the expected list", func() {
+			Expect(management.validateResponseCode(404, []int{200, 404})).To(BeNil())
+		})
+	})
 })
