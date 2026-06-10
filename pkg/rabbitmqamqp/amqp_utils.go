@@ -116,7 +116,7 @@ func validateMessageAnnotations(annotations amqp.Annotations) error {
 }
 
 func validateMessageAnnotationKey(key string) error {
-	if key[:2] != "x-" {
+	if len(key) < 2 || key[:2] != "x-" {
 		return fmt.Errorf("message annotation key must start with 'x-': %s", key)
 	}
 	return nil
