@@ -152,11 +152,6 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 		return make(map[string]any), err
 	}
 
-	err = a.receiver.AcceptMessage(ctx, msg)
-	if err != nil {
-		return nil, err
-	}
-
 	if msg.Properties == nil {
 		return make(map[string]any), fmt.Errorf("expected properties in the message")
 	}
@@ -167,6 +162,11 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 
 	if msg.Properties.CorrelationID != id {
 		return make(map[string]any), fmt.Errorf("expected correlation id %s got %s", id, msg.Properties.CorrelationID)
+	}
+
+	err = a.receiver.AcceptMessage(ctx, msg)
+	if err != nil {
+		return nil, err
 	}
 
 	switch msg.Value.(type) {
