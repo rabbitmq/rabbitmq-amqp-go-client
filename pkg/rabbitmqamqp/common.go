@@ -50,9 +50,9 @@ func generateNameWithDefaultPrefix() string {
 // generateName generates a unique name with the given prefix
 func generateName(prefix string) string {
 	uid := uuid.New()
-	uuidBytes := []byte(uid.String())
 	md5obj := md5.New()
-	digest := md5obj.Sum(uuidBytes)
+	md5obj.Write(uid[:]) // hash the 16 raw UUID bytes
+	digest := md5obj.Sum(nil)
 	result := base64.StdEncoding.EncodeToString(digest)
 	result = strings.ReplaceAll(result, "+", "-")
 	result = strings.ReplaceAll(result, "/", "_")
