@@ -22,6 +22,9 @@ type IDeliveryContext interface {
 	RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error
 }
 
+// DeliveryContext holds the receiver and message for a single AMQP delivery.
+// It implements IDeliveryContext and is used when the consumer operates in
+// at-least-once (explicit settle) mode.
 type DeliveryContext struct {
 	receiver         *amqp.Receiver
 	message          *amqp.Message
@@ -29,10 +32,14 @@ type DeliveryContext struct {
 	consumeCtx       ConsumeContext // For OTEL semantic convention attributes
 }
 
+// Message returns the received AMQP message.
 func (dc *DeliveryContext) Message() *amqp.Message {
 	return dc.message
 }
 
+// Accept the message (AMQP 1.0 <code>accepted</code> outcome).
+//
+// This means the message has been processed and the broker can delete it.
 func (dc *DeliveryContext) Accept(ctx context.Context) error {
 	err := dc.receiver.AcceptMessage(ctx, dc.message)
 	if err == nil {
@@ -41,6 +48,10 @@ func (dc *DeliveryContext) Accept(ctx context.Context) error {
 	return err
 }
 
+// Discard the message (AMQP 1.0 <code>rejected</code> outcome).
+//
+// This means the message cannot be processed because it is invalid, the broker can drop it
+// or dead-letter it if it is configured.
 func (dc *DeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
 	err := dc.receiver.RejectMessage(ctx, dc.message, e)
 	if err == nil {
@@ -93,6 +104,27 @@ func streamOffsetFromAnnotation(v any) (int64, bool) {
 	}
 }
 
+// DiscardWithAnnotations the message with annotations to combine with the existing message annotations.
+// <p>This means the message cannot be processed because it is invalid, the broker can drop it
+// or dead-letter it if it is configured.
+//
+// <p>Application-specific annotation keys must start with the <code>x-opt-</code> prefix.
+// Annotation keys the broker understands start with <code>x-</code>, but not with <code>x-opt-
+// </code>.
+//
+// <p>This maps to the AMQP 1.0 <code>
+// modified{delivery-failed = true, undeliverable-here = true}</code> outcome.
+//
+// <p><b>Only quorum queues support the modification of message annotations with the <code>
+// modified</code> outcome.</b>
+//
+// annotations message annotations to combine with existing ones
+// @see <a
+//
+//	href="https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-messaging-v1.0-os.html#type-modified">AMQP
+//	1.0 <code>modified</code> outcome</a>
+//
+// @see <a href="https://www.rabbitmq.com/docs/amqp#modified-outcome">Modified Outcome Support in RabbitMQ</a>
 func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
@@ -109,6 +141,10 @@ func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotatio
 	return err
 }
 
+// Requeue the message (AMQP 1.0 <code>released</code> outcome).
+//
+// This means the message has not been processed and the broker can requeue it and deliver it
+// to the same or a different consumer.
 func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 	err := dc.receiver.ReleaseMessage(ctx, dc.message)
 	if err == nil {
@@ -117,6 +153,28 @@ func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 	return err
 }
 
+// RequeueWithAnnotations the message with annotations to combine with the existing message annotations.
+//
+// This means the message has not been processed and the broker can requeue it and deliver it
+// to the same or a different consumer.
+//
+// Application-specific annotation keys must start with the <code>x-opt-</code> prefix.
+// Annotation keys the broker understands start with <code>x-</code>, but not with <code>x-opt-
+// </code>.
+//
+// This maps to the AMQP 1.0 <code>
+// modified{delivery-failed = false, undeliverable-here = false}</code> outcome.
+//
+// Only quorum queues support the modification of message annotations with the <code>
+// modified</code> outcome.
+//
+// annotations message annotations to combine with existing ones
+// see <a
+//
+//	href="https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-messaging-v1.0-os.html#type-modified">AMQP
+//	1.0 <code>modified</code> outcome</a>
+//
+// see <a href="https://www.rabbitmq.com/docs/amqp#modified-outcome">Modified Outcome Support in RabbitMQ</a>
 func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
@@ -143,27 +201,33 @@ type PreSettledDeliveryContext struct {
 	message *amqp.Message
 }
 
+// Message returns the received AMQP message.
 func (dc *PreSettledDeliveryContext) Message() *amqp.Message {
 	return dc.message
 }
 
+// Accept the message is already settled, so this method returns an error.
 func (dc *PreSettledDeliveryContext) Accept(ctx context.Context) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
+// Discard the message is already settled, so this method returns an error.
+func (dc *PreSettledDeliveryContext) Discard(_ context.Context, _ *amqp.Error) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+// DiscardWithAnnotations the message is already settled, so this method returns an error.
+func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(_ context.Context, annotations amqp.Annotations) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) Requeue(ctx context.Context) error {
+// Requeue the message is already settled, so this method returns an error.
+func (dc *PreSettledDeliveryContext) Requeue(_ context.Context) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+// RequeueWithAnnotations the message is already settled, so this method returns an error.
+func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(_ context.Context, _ amqp.Annotations) error {
 	return ErrPreSettledMessageDisposed
 }
 
@@ -175,6 +239,12 @@ const (
 	consumerStatePaused
 )
 
+// Consumer represents an active AMQP 1.0 message consumer attached to a queue or stream.
+// It wraps the underlying go-amqp Receiver and provides settlement helpers (Accept, Discard,
+// Requeue) via the IDeliveryContext returned from Receive.
+//
+// Use AmqpConnection.NewConsumer to create a Consumer. Call Receive in a loop to process
+// messages and Close when the consumer is no longer needed.
 type Consumer struct {
 	receiver       atomic.Pointer[amqp.Receiver]
 	connection     *AmqpConnection
@@ -198,6 +268,8 @@ type Consumer struct {
 	queue string
 }
 
+// Id returns the unique identifier of this consumer.
+// If no custom ID was provided via ConsumerOptions, a random UUID prefixed with "consumer-" is used.
 func (c *Consumer) Id() string {
 	return c.id
 }
@@ -341,6 +413,10 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 	return nil
 }
 
+// Receive blocks until a message is available on the link or the context is cancelled.
+// It returns an IDeliveryContext that must be settled by the caller (Accept, Discard, or Requeue)
+// unless the consumer was created with PreSettled settle strategy, in which case the broker
+// has already settled the delivery and calling any settlement method returns ErrPreSettledMessageDisposed.
 func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 	msg, err := c.receiver.Load().Receive(ctx, nil)
 	if err != nil {
@@ -380,6 +456,8 @@ func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 	}, nil
 }
 
+// Close detaches the consumer link and removes the consumer from the connection's
+// entity tracker. After Close returns, no further calls to Receive should be made.
 func (c *Consumer) Close(ctx context.Context) error {
 	c.connection.entitiesTracker.removeConsumer(c)
 	err := c.receiver.Load().Close(ctx)

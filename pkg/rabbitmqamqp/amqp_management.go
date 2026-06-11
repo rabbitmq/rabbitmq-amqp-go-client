@@ -13,13 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// ErrPreconditionFailed is returned when the broker responds with HTTP 409 Precondition Failed.
+// This typically occurs when a queue or exchange already exists with incompatible settings.
 var ErrPreconditionFailed = errors.New("precondition Failed")
+
+// ErrDoesNotExist is returned when the requested resource (queue, exchange, or binding) does not exist on the broker.
 var ErrDoesNotExist = errors.New("does not exist")
 
-/*
-AmqpManagement is the interface to the RabbitMQ /management endpoint
-The management interface is used to declare/delete exchanges, queues, and bindings
-*/
+// AmqpManagement provides access to the RabbitMQ management API over AMQP 1.0.
+// It is used to declare and delete queues, exchanges, and bindings, as well as
+// query queue metadata and purge queue contents.
+// An AmqpManagement instance is obtained from an AmqpConnection via the Management() method.
 type AmqpManagement struct {
 	session   *amqp.Session
 	sender    *amqp.Sender
@@ -67,6 +71,8 @@ func (a *AmqpManagement) ensureSenderLink(ctx context.Context) error {
 	return nil
 }
 
+// Open establishes the AMQP session and the management sender/receiver links.
+// It is called automatically by the connection; callers do not need to invoke this directly.
 func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) error {
 	session, err := connection.azureConnection.NewSession(ctx, nil)
 	if err != nil {
@@ -94,6 +100,8 @@ func (a *AmqpManagement) Open(ctx context.Context, connection *AmqpConnection) e
 	return ctx.Err()
 }
 
+// Close shuts down the management sender, receiver, and underlying AMQP session.
+// After Close returns, no further management operations can be performed on this instance.
 func (a *AmqpManagement) Close(ctx context.Context) error {
 	_ = a.sender.Close(ctx)
 	_ = a.receiver.Close(ctx)
@@ -102,11 +110,9 @@ func (a *AmqpManagement) Close(ctx context.Context) error {
 	return err
 }
 
-/*
-Request sends a request to the /management endpoint.
-It is a generic method that can be used to send any request to the management endpoint.
-In most of the cases you don't need to use this method directly, instead use the standard methods
-*/
+// Request sends a raw request to the RabbitMQ management endpoint and returns the response body.
+// It is a low-level method for sending arbitrary management commands; in most cases the higher-level
+// methods (DeclareQueue, DeclareExchange, Bind, etc.) should be preferred.
 func (a *AmqpManagement) Request(ctx context.Context, body any, path string, method string,
 	expectedResponseCodes []int) (map[string]any, error) {
 	return a.request(ctx, uuid.New().String(), body, path, method, expectedResponseCodes)
@@ -188,6 +194,10 @@ func (a *AmqpManagement) request(ctx context.Context, id string, body any, path 
 	return make(map[string]any), nil
 }
 
+// DeclareQueue declares a queue on the broker using the provided specification.
+// It returns an AmqpQueueInfo describing the declared queue.
+// If a queue with the same name already exists but with incompatible settings,
+// ErrPreconditionFailed is returned.
 func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueSpecification) (*AmqpQueueInfo, error) {
 	if specification == nil {
 		return nil, fmt.Errorf("queue specification cannot be nil. You need to provide a valid IQueueSpecification")
@@ -226,6 +236,8 @@ func (a *AmqpManagement) DeclareQueue(ctx context.Context, specification IQueueS
 	return info, nil
 }
 
+// DeleteQueue deletes the queue with the given name from the broker.
+// It also removes any associated topology recovery records for the queue and its bindings.
 func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	q := newAmqpQueue(a, name)
 	err := q.Delete(ctx)
@@ -237,6 +249,10 @@ func (a *AmqpManagement) DeleteQueue(ctx context.Context, name string) error {
 	return nil
 }
 
+// DeclareExchange declares an exchange on the broker using the provided specification.
+// It returns an AmqpExchangeInfo describing the declared exchange.
+// If an exchange with the same name already exists but with incompatible settings,
+// ErrPreconditionFailed is returned.
 func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecification IExchangeSpecification) (*AmqpExchangeInfo, error) {
 	if exchangeSpecification == nil {
 		return nil, errors.New("exchange specification cannot be nil. You need to provide a valid IExchangeSpecification")
@@ -263,6 +279,8 @@ func (a *AmqpManagement) DeclareExchange(ctx context.Context, exchangeSpecificat
 	return r, nil
 }
 
+// DeleteExchange deletes the exchange with the given name from the broker.
+// It also removes any associated topology recovery records for the exchange and its bindings.
 func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error {
 	e := newAmqpExchange(a, name)
 	err := e.Delete(ctx)
@@ -274,6 +292,9 @@ func (a *AmqpManagement) DeleteExchange(ctx context.Context, name string) error 
 	return nil
 }
 
+// Bind creates a binding between a source exchange and a destination (queue or exchange)
+// using the provided binding specification.
+// It returns the binding path, which can be passed to Unbind to remove the binding later.
 func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBindingSpecification) (string, error) {
 	if bindingSpecification == nil {
 		return "", fmt.Errorf("binding specification cannot be nil. You need to provide a valid IBindingSpecification")
@@ -303,6 +324,8 @@ func (a *AmqpManagement) Bind(ctx context.Context, bindingSpecification IBinding
 	return r, nil
 }
 
+// Unbind removes the binding identified by the given path.
+// The path is the string returned by a previous call to Bind.
 func (a *AmqpManagement) Unbind(ctx context.Context, path string) error {
 	bind := newAMQPBinding(a)
 	err := bind.Unbind(ctx, path)
@@ -313,6 +336,8 @@ func (a *AmqpManagement) Unbind(ctx context.Context, path string) error {
 	return nil
 }
 
+// QueueInfo retrieves metadata about the queue with the given name.
+// Returns ErrDoesNotExist if the queue is not found on the broker.
 func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*AmqpQueueInfo, error) {
 	path, err := queueAddress(&queueName)
 	if err != nil {
@@ -325,8 +350,8 @@ func (a *AmqpManagement) QueueInfo(ctx context.Context, queueName string) (*Amqp
 	return newAmqpQueueInfo(result), nil
 }
 
-// PurgeQueue purges the queue
-// returns the number of messages purged
+// PurgeQueue removes all messages from the queue with the given name.
+// Returns the number of messages that were purged.
 func (a *AmqpManagement) PurgeQueue(ctx context.Context, name string) (int, error) {
 	purge := newAmqpQueue(a, name)
 	return purge.Purge(ctx)
@@ -337,10 +362,13 @@ func (a *AmqpManagement) refreshToken(ctx context.Context, token string) error {
 	return err
 }
 
+// NotifyStatusChange registers a channel that receives a StateChanged notification
+// whenever the management connection transitions to a new lifecycle state (e.g. open → closed).
 func (a *AmqpManagement) NotifyStatusChange(channel chan *StateChanged) {
 	a.lifeCycle.chStatusChanged = channel
 }
 
+// State returns the current lifecycle state of the management connection.
 func (a *AmqpManagement) State() ILifeCycleState {
 	return a.lifeCycle.State()
 }
