@@ -229,7 +229,9 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAd
 // NewConsumer creates a new Consumer that listens to the provided Queue
 // options is an IConsumerOptions that can be used to configure the consumer.
 // it can be nil, and the consumer will be created with default options.
-// see
+// To consume messages:
+// deliveryContext, err := consumer.Receive(ctx)
+// with deliveryContext you can access the message and the delivery, see [IDeliveryContext] for more details.
 func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options IConsumerOptions) (*Consumer, error) {
 
 	if options != nil {
@@ -267,7 +269,10 @@ func (a *AmqpConnection) NewResponder(ctx context.Context, options ResponderOpti
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consumer: %w", err)
 	}
-	consumer.issueCredits(1)
+	err = consumer.issueCredits(1)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create publisher for sending replies
 	publisher, err := a.NewPublisher(ctx, nil, nil)
