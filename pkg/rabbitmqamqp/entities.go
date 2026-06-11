@@ -20,13 +20,19 @@ type iEntityIdentifier interface {
 	Id() string
 }
 
+// TQueueType identifies the RabbitMQ queue type sent in the x-queue-type argument.
 type TQueueType string
 
 const (
-	Quorum  TQueueType = "quorum"
+	// Quorum is the quorum queue type: a durable, replicated queue backed by the Raft consensus algorithm.
+	Quorum TQueueType = "quorum"
+	// Classic is the traditional RabbitMQ queue type.
 	Classic TQueueType = "classic"
-	Stream  TQueueType = "stream"
-	Jms     TQueueType = "jms"
+	// Stream is the append-only log queue type, suited for high-throughput and replay scenarios.
+	Stream TQueueType = "stream"
+	// Jms is the JMS queue type available on Tanzu RabbitMQ.
+	Jms TQueueType = "jms"
+	// Delayed is the delayed-delivery queue type available on Tanzu RabbitMQ 4.3 or later.
 	Delayed TQueueType = "delayed"
 )
 
@@ -48,10 +54,14 @@ type IQueueSpecification interface {
 	validate(featuresAvailable *featuresAvailable) error
 }
 
+// IOverflowStrategy defines the behaviour RabbitMQ applies when a queue reaches its maximum length.
+// Set via the x-overflow queue argument.
 type IOverflowStrategy interface {
 	overflowStrategy() string
 }
 
+// DropHeadOverflowStrategy drops the oldest (head) messages to make room for new ones.
+// Corresponds to the x-overflow value "drop-head".
 type DropHeadOverflowStrategy struct {
 }
 
@@ -59,6 +69,8 @@ func (d *DropHeadOverflowStrategy) overflowStrategy() string {
 	return "drop-head"
 }
 
+// RejectPublishOverflowStrategy rejects newly published messages when the queue is full.
+// Corresponds to the x-overflow value "reject-publish".
 type RejectPublishOverflowStrategy struct {
 }
 
@@ -66,6 +78,9 @@ func (r *RejectPublishOverflowStrategy) overflowStrategy() string {
 	return "reject-publish"
 }
 
+// RejectPublishDlxOverflowStrategy rejects newly published messages and routes them to the
+// configured dead-letter exchange (DLX) when the queue is full.
+// Corresponds to the x-overflow value "reject-publish-dlx".
 type RejectPublishDlxOverflowStrategy struct {
 }
 
@@ -73,10 +88,15 @@ func (r *RejectPublishDlxOverflowStrategy) overflowStrategy() string {
 	return "reject-publish-dlx"
 }
 
+// ILeaderLocator controls which cluster node is selected as the queue leader.
+// Set via the x-queue-leader-locator queue argument.
 type ILeaderLocator interface {
 	leaderLocator() string
 }
 
+// BalancedLeaderLocator places the queue leader on a randomly chosen cluster node,
+// distributing leaders evenly across the cluster.
+// Corresponds to the x-queue-leader-locator value "random".
 type BalancedLeaderLocator struct {
 }
 
@@ -84,6 +104,9 @@ func (r *BalancedLeaderLocator) leaderLocator() string {
 	return "random"
 }
 
+// ClientLocalLeaderLocator places the queue leader on the node to which the declaring
+// client is connected, minimising cross-node traffic for that client.
+// Corresponds to the x-queue-leader-locator value "client-local".
 type ClientLocalLeaderLocator struct {
 }
 
@@ -95,21 +118,36 @@ func (r *ClientLocalLeaderLocator) leaderLocator() string {
 // It is used when the queue type is not specified.
 // The queue type is determined by the server based on the arguments provided per virtual host configuration.
 type DefaultQueueSpecification struct {
-	Name                   string
-	IsAutoDelete           bool
-	IsExclusive            bool
-	AutoExpire             int64
-	MessageTTL             int64
-	OverflowStrategy       IOverflowStrategy
-	SingleActiveConsumer   bool
-	DeadLetterExchange     string
-	DeadLetterRoutingKey   string
-	MaxLength              int64
-	MaxLengthBytes         int64
-	MaxPriority            int64
-	LeaderLocator          ILeaderLocator
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the queue to be deleted automatically when the last consumer disconnects.
+	IsAutoDelete bool
+	// IsExclusive restricts the queue to the connection that declared it and deletes it on disconnection.
+	IsExclusive bool
+	// AutoExpire is the time in milliseconds after which the queue is deleted if unused (x-expires).
+	AutoExpire int64
+	// MessageTTL is the default time in milliseconds a message is retained before being discarded (x-message-ttl).
+	MessageTTL int64
+	// OverflowStrategy controls what happens when the queue reaches MaxLength or MaxLengthBytes (x-overflow).
+	OverflowStrategy IOverflowStrategy
+	// SingleActiveConsumer ensures only one consumer receives messages at a time (x-single-active-consumer).
+	SingleActiveConsumer bool
+	// DeadLetterExchange is the exchange to which dead-lettered messages are routed (x-dead-letter-exchange).
+	DeadLetterExchange string
+	// DeadLetterRoutingKey overrides the routing key used when dead-lettering messages (x-dead-letter-routing-key).
+	DeadLetterRoutingKey string
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
+	MaxLengthBytes int64
+	// MaxPriority enables priority queuing with the given number of priority levels (x-max-priority).
+	MaxPriority int64
+	// LeaderLocator controls which cluster node is chosen as the queue leader (x-queue-leader-locator).
+	LeaderLocator ILeaderLocator
+	// QuorumInitialGroupSize is the initial replication factor for quorum queues (x-quorum-initial-group-size).
 	QuorumInitialGroupSize int
-	Arguments              map[string]any
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (q *DefaultQueueSpecification) name() string {
@@ -186,23 +224,35 @@ func (q *DefaultQueueSpecification) validate(*featuresAvailable) error {
 	return nil
 }
 
-/*
-	QuorumQueueSpecification represents the specification of the quorum queue
-*/
-
+// QuorumQueueSpecification represents the specification of a quorum queue.
+// Quorum queues are durable, replicated queues backed by the Raft consensus algorithm.
+// Auto-delete and exclusive options are not supported and are always false.
 type QuorumQueueSpecification struct {
-	Name                   string
-	AutoExpire             int64
-	MessageTTL             int64
-	OverflowStrategy       IOverflowStrategy
-	SingleActiveConsumer   bool
-	DeadLetterExchange     string
-	DeadLetterRoutingKey   string
-	MaxLength              int64
-	MaxLengthBytes         int64
-	DeliveryLimit          int64
-	TargetClusterSize      int64
-	LeaderLocator          ILeaderLocator
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// AutoExpire is the time in milliseconds after which the queue is deleted if unused (x-expires).
+	AutoExpire int64
+	// MessageTTL is the default time in milliseconds a message is retained before being discarded (x-message-ttl).
+	MessageTTL int64
+	// OverflowStrategy controls what happens when the queue reaches MaxLength or MaxLengthBytes (x-overflow).
+	OverflowStrategy IOverflowStrategy
+	// SingleActiveConsumer ensures only one consumer receives messages at a time (x-single-active-consumer).
+	SingleActiveConsumer bool
+	// DeadLetterExchange is the exchange to which dead-lettered messages are routed (x-dead-letter-exchange).
+	DeadLetterExchange string
+	// DeadLetterRoutingKey overrides the routing key used when dead-lettering messages (x-dead-letter-routing-key).
+	DeadLetterRoutingKey string
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
+	MaxLengthBytes int64
+	// DeliveryLimit is the maximum number of times a message is delivered before it is dead-lettered (x-delivery-limit).
+	DeliveryLimit int64
+	// TargetClusterSize is the desired number of replicas for the queue (x-quorum-target-group-size).
+	TargetClusterSize int64
+	// LeaderLocator controls which cluster node is chosen as the queue leader (x-queue-leader-locator).
+	LeaderLocator ILeaderLocator
+	// QuorumInitialGroupSize is the initial replication factor when the queue is first declared (x-quorum-initial-group-size).
 	QuorumInitialGroupSize int
 	// DelayedRetryType enables linear back-off redelivery on the quorum queue.
 	// Requires RabbitMQ 4.3 or later. Maps to the x-delayed-retry-type queue argument.
@@ -213,7 +263,8 @@ type QuorumQueueSpecification struct {
 	// DelayedRetryMax is the maximum delay before a message is redelivered.
 	// Requires RabbitMQ 4.3 or later. Maps to the x-delayed-retry-max queue argument (milliseconds).
 	DelayedRetryMax time.Duration
-	Arguments       map[string]any
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (q *QuorumQueueSpecification) name() string {
@@ -311,24 +362,37 @@ func (q *QuorumQueueSpecification) validate(f *featuresAvailable) error {
 	return nil
 }
 
-/*
-ClassicQueueSpecification represents the specification of the classic queue
-*/
+// ClassicQueueSpecification represents the specification of a classic queue.
+// Classic queues are the traditional RabbitMQ queue type.
 type ClassicQueueSpecification struct {
-	Name                 string
-	IsAutoDelete         bool
-	IsExclusive          bool
-	AutoExpire           int64
-	MessageTTL           int64
-	OverflowStrategy     IOverflowStrategy
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the queue to be deleted automatically when the last consumer disconnects.
+	IsAutoDelete bool
+	// IsExclusive restricts the queue to the connection that declared it and deletes it on disconnection.
+	IsExclusive bool
+	// AutoExpire is the time in milliseconds after which the queue is deleted if unused (x-expires).
+	AutoExpire int64
+	// MessageTTL is the default time in milliseconds a message is retained before being discarded (x-message-ttl).
+	MessageTTL int64
+	// OverflowStrategy controls what happens when the queue reaches MaxLength or MaxLengthBytes (x-overflow).
+	OverflowStrategy IOverflowStrategy
+	// SingleActiveConsumer ensures only one consumer receives messages at a time (x-single-active-consumer).
 	SingleActiveConsumer bool
-	DeadLetterExchange   string
+	// DeadLetterExchange is the exchange to which dead-lettered messages are routed (x-dead-letter-exchange).
+	DeadLetterExchange string
+	// DeadLetterRoutingKey overrides the routing key used when dead-lettering messages (x-dead-letter-routing-key).
 	DeadLetterRoutingKey string
-	MaxLength            int64
-	MaxLengthBytes       int64
-	MaxPriority          int64
-	LeaderLocator        ILeaderLocator
-	Arguments            map[string]any
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
+	MaxLengthBytes int64
+	// MaxPriority enables priority queuing with the given number of priority levels (x-max-priority).
+	MaxPriority int64
+	// LeaderLocator controls which cluster node is chosen as the queue leader (x-queue-leader-locator).
+	LeaderLocator ILeaderLocator
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (q *ClassicQueueSpecification) name() string {
@@ -402,18 +466,21 @@ func (q *ClassicQueueSpecification) validate(*featuresAvailable) error {
 	return nil
 }
 
-/*
-AutoGeneratedQueueSpecification represents the specification of the auto-generated queue.
-It is a classic queue with auto-generated name.
-It is useful in context like RPC or when you need a temporary queue.
-*/
+// AutoGeneratedQueueSpecification represents a classic queue with a client-generated name.
+// It is useful in contexts like RPC or any scenario that requires a temporary, anonymous queue.
+// If you need temporary queues, have a look to [DirectReplyTo] feature
 type AutoGeneratedQueueSpecification struct {
-	genName        string
-	IsAutoDelete   bool
-	IsExclusive    bool
-	MaxLength      int64
+	genName string
+	// IsAutoDelete causes the queue to be deleted automatically when the last consumer disconnects.
+	IsAutoDelete bool
+	// IsExclusive restricts the queue to the connection that declared it and deletes it on disconnection.
+	IsExclusive bool
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
 	MaxLengthBytes int64
-	Arguments      map[string]any
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (a *AutoGeneratedQueueSpecification) name() string {
@@ -458,14 +525,24 @@ func (a *AutoGeneratedQueueSpecification) validate(*featuresAvailable) error {
 	return nil
 }
 
+// StreamQueueSpecification represents the specification of a stream queue.
+// Stream queues are append-only logs suited for high-throughput and message-replay scenarios.
+// Auto-delete and exclusive options are not supported and are always false.
 type StreamQueueSpecification struct {
-	Name               string
-	MaxLengthBytes     int64
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// MaxLengthBytes is the maximum total size of the stream in bytes. Older segments are deleted when exceeded (x-max-length-bytes).
+	MaxLengthBytes int64
+	// InitialClusterSize is the number of replicas created when the stream is first declared (x-stream-initial-cluster-size).
 	InitialClusterSize int
-	MaxAge             time.Duration
-	SegmentSize        int64
-	FilterSizeBytes    int64
-	Arguments          map[string]any
+	// MaxAge is the maximum retention period for stream messages. Older messages are deleted (x-max-age).
+	MaxAge time.Duration
+	// SegmentSize is the maximum size in bytes of each stream segment file (x-stream-max-segment-size-bytes).
+	SegmentSize int64
+	// FilterSizeBytes is the size in bytes of the Bloom filter used for stream filtering (x-stream-filter-size-bytes).
+	FilterSizeBytes int64
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (s *StreamQueueSpecification) name() string {
@@ -519,23 +596,36 @@ func (s *StreamQueueSpecification) validate(*featuresAvailable) error {
 	return nil
 }
 
-/*
-JMSQueueSpecification represents the specification of a JMS queue (RabbitMQ queue type "jms").
-*/
+// JMSQueueSpecification represents the specification of a JMS queue (x-queue-type: jms).
+// JMS queues are only available on Tanzu RabbitMQ 4.3 or later.
+// Auto-delete and exclusive options are not supported and are always false.
 type JMSQueueSpecification struct {
-	Name                 string
-	Arguments            map[string]any
-	AutoExpire           int64
-	MessageTTL           int64
-	OverflowStrategy     IOverflowStrategy
-	DeadLetterExchange   string
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
+	// AutoExpire is the time in milliseconds after which the queue is deleted if unused (x-expires).
+	AutoExpire int64
+	// MessageTTL is the default time in milliseconds a message is retained before being discarded (x-message-ttl).
+	MessageTTL int64
+	// OverflowStrategy controls what happens when the queue reaches MaxLength or MaxLengthBytes (x-overflow).
+	OverflowStrategy IOverflowStrategy
+	// DeadLetterExchange is the exchange to which dead-lettered messages are routed (x-dead-letter-exchange).
+	DeadLetterExchange string
+	// DeadLetterRoutingKey overrides the routing key used when dead-lettering messages (x-dead-letter-routing-key).
 	DeadLetterRoutingKey string
-	MaxLength            int64
-	MaxLengthBytes       int64
-	DeliveryLimit        int64
-	LeaderLocator        ILeaderLocator
-	InitialClusterSize   int
-	SelectorFields       []string
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
+	MaxLengthBytes int64
+	// DeliveryLimit is the maximum number of times a message is delivered before it is dead-lettered (x-delivery-limit).
+	DeliveryLimit int64
+	// LeaderLocator controls which cluster node is chosen as the queue leader (x-queue-leader-locator).
+	LeaderLocator ILeaderLocator
+	// InitialClusterSize is the initial replication factor when the queue is first declared (x-quorum-initial-group-size).
+	InitialClusterSize int
+	// SelectorFields lists the JMS message property names used for server-side selector evaluation.
+	SelectorFields []string
 }
 
 func (j *JMSQueueSpecification) name() string {
@@ -600,43 +690,76 @@ func (j *JMSQueueSpecification) validate(f *featuresAvailable) error {
 
 }
 
-// Defaults for optional automatic-shovel arguments when ShovelDestination is set (see Tanzu RabbitMQ delayed queue docs).
+// Default values applied to the automatic-shovel arguments of a DelayedQueueSpecification
+// when ShovelDestination is set but the individual shovel fields are left at their zero values.
+// See the Tanzu RabbitMQ delayed queue documentation for details.
 const (
-	DefaultDelayedShovelDestinationURI  = "amqp://"
-	DefaultDelayedShovelProtocol        = "amqp091"
-	DefaultDelayedShovelPrefetch        = 50
+	// DefaultDelayedShovelDestinationURI is the AMQP URI of the shovel destination broker (x-shovel-destination-uri).
+	DefaultDelayedShovelDestinationURI = "amqp://"
+	// DefaultDelayedShovelProtocol is the messaging protocol used by the shovel (x-shovel-protocol).
+	DefaultDelayedShovelProtocol = "amqp091"
+	// DefaultDelayedShovelPrefetch is the number of messages the shovel fetches per round-trip (x-shovel-prefetch-count).
+	DefaultDelayedShovelPrefetch = 50
+	// DefaultDelayedShovelAcknowledgement is the acknowledgement mode used by the shovel (x-shovel-ack-mode).
 	DefaultDelayedShovelAcknowledgement = "on-confirm"
 )
 
-/*
-DelayedQueueSpecification represents the specification of a delayed queue (x-queue-type: delayed).
-The management API declares queues as durable; auto-delete defaults to false unless IsAutoDelete is set.
-*/
+// DelayedQueueSpecification represents the specification of a delayed queue (x-queue-type: delayed).
+// Delayed queues are only available on Tanzu RabbitMQ 4.x or later.
+// Queues are declared as durable; auto-delete defaults to false unless IsAutoDelete is set.
 type DelayedQueueSpecification struct {
-	Name                 string
-	IsAutoDelete         bool
-	IsExclusive          bool
-	Arguments            map[string]any
-	AutoExpire           int64
-	MessageTTL           int64
-	OverflowStrategy     IOverflowStrategy
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the queue to be deleted automatically when the last consumer disconnects.
+	IsAutoDelete bool
+	// IsExclusive restricts the queue to the connection that declared it and deletes it on disconnection.
+	IsExclusive bool
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
+	// AutoExpire is the time in milliseconds after which the queue is deleted if unused (x-expires).
+	AutoExpire int64
+	// MessageTTL is the default time in milliseconds a message is retained before being discarded (x-message-ttl).
+	MessageTTL int64
+	// OverflowStrategy controls what happens when the queue reaches MaxLength or MaxLengthBytes (x-overflow).
+	OverflowStrategy IOverflowStrategy
+	// SingleActiveConsumer ensures only one consumer receives messages at a time (x-single-active-consumer).
 	SingleActiveConsumer bool
-	DeadLetterExchange   string
+	// DeadLetterExchange is the exchange to which dead-lettered messages are routed (x-dead-letter-exchange).
+	DeadLetterExchange string
+	// DeadLetterRoutingKey overrides the routing key used when dead-lettering messages (x-dead-letter-routing-key).
 	DeadLetterRoutingKey string
-	MaxLength            int64
-	MaxLengthBytes       int64
-	DeliveryLimit        int64
-	InitialClusterSize   int
-	TargetClusterSize    int64
-	DeadLetterStrategy   string
-	LeaderLocator        ILeaderLocator
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
+	MaxLengthBytes int64
+	// DeliveryLimit is the maximum number of times a message is delivered before it is dead-lettered (x-delivery-limit).
+	DeliveryLimit int64
+	// InitialClusterSize is the initial replication factor when the queue is first declared (x-quorum-initial-group-size).
+	InitialClusterSize int
+	// TargetClusterSize is the desired number of replicas for the queue (x-quorum-target-group-size).
+	TargetClusterSize int64
+	// DeadLetterStrategy controls how dead-lettered messages are handled (x-dead-letter-strategy).
+	DeadLetterStrategy string
+	// LeaderLocator controls which cluster node is chosen as the queue leader (x-queue-leader-locator).
+	LeaderLocator ILeaderLocator
 
-	ShovelDestination           string
+	// ShovelDestination is the name of the destination queue used by the automatic shovel (x-shovel-destination).
+	// When set, the remaining Shovel* fields configure the shovel. Defaults are applied for any zero-value field.
+	ShovelDestination string
+	// ShovelDestinationRoutingKey is the routing key used by the shovel when forwarding messages (x-shovel-destination-key).
 	ShovelDestinationRoutingKey string
-	ShovelDestinationURI        string
-	ShovelProtocol              string
-	ShovelPrefetch              int
-	ShovelAcknowledgement       string
+	// ShovelDestinationURI is the AMQP URI of the broker the shovel forwards messages to (x-shovel-destination-uri).
+	// Defaults to DefaultDelayedShovelDestinationURI when empty.
+	ShovelDestinationURI string
+	// ShovelProtocol is the messaging protocol used by the shovel (x-shovel-protocol).
+	// Defaults to DefaultDelayedShovelProtocol when empty.
+	ShovelProtocol string
+	// ShovelPrefetch is the number of messages the shovel fetches per round-trip (x-shovel-prefetch-count).
+	// Defaults to DefaultDelayedShovelPrefetch when zero.
+	ShovelPrefetch int
+	// ShovelAcknowledgement is the acknowledgement mode used by the shovel (x-shovel-ack-mode).
+	// Defaults to DefaultDelayedShovelAcknowledgement when empty.
+	ShovelAcknowledgement string
 }
 
 func (d *DelayedQueueSpecification) name() string {
@@ -792,31 +915,45 @@ func durationToMaxAge(d time.Duration) string {
 	return fmt.Sprintf("%ds", int64(d.Seconds()))
 }
 
-/*
-CustomQueueSpecification represents the specification of a queue with a user-defined queue type.
-It is similar to DefaultQueueSpecification but exposes a QueueTypeName field that is sent to the
-broker as the x-queue-type argument. This allows using any queue type string, including the
-built-in ones ("quorum", "classic", "stream") or custom plugin-provided types ("myQueueType").
-When QueueTypeName is empty the x-queue-type argument is omitted and the broker decides the type,
-matching the behaviour of DefaultQueueSpecification.
-*/
+// CustomQueueSpecification represents the specification of a queue with a user-defined queue type.
+// It is similar to DefaultQueueSpecification but exposes a QueueTypeName field that is sent to the
+// broker as the x-queue-type argument. This allows using any queue type string, including the
+// built-in ones ("quorum", "classic", "stream") or custom plugin-provided types.
+// When QueueTypeName is empty the x-queue-type argument is omitted and the broker decides the type,
+// matching the behaviour of DefaultQueueSpecification.
 type CustomQueueSpecification struct {
-	Name                   string
-	IsAutoDelete           bool
-	IsExclusive            bool
-	QueueTypeName          string
-	AutoExpire             int64
-	MessageTTL             int64
-	OverflowStrategy       IOverflowStrategy
-	SingleActiveConsumer   bool
-	DeadLetterExchange     string
-	DeadLetterRoutingKey   string
-	MaxLength              int64
-	MaxLengthBytes         int64
-	MaxPriority            int64
-	LeaderLocator          ILeaderLocator
+	// Name is the queue name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the queue to be deleted automatically when the last consumer disconnects.
+	IsAutoDelete bool
+	// IsExclusive restricts the queue to the connection that declared it and deletes it on disconnection.
+	IsExclusive bool
+	// QueueTypeName is the value sent as the x-queue-type argument. When empty, the argument is omitted.
+	QueueTypeName string
+	// AutoExpire is the time in milliseconds after which the queue is deleted if unused (x-expires).
+	AutoExpire int64
+	// MessageTTL is the default time in milliseconds a message is retained before being discarded (x-message-ttl).
+	MessageTTL int64
+	// OverflowStrategy controls what happens when the queue reaches MaxLength or MaxLengthBytes (x-overflow).
+	OverflowStrategy IOverflowStrategy
+	// SingleActiveConsumer ensures only one consumer receives messages at a time (x-single-active-consumer).
+	SingleActiveConsumer bool
+	// DeadLetterExchange is the exchange to which dead-lettered messages are routed (x-dead-letter-exchange).
+	DeadLetterExchange string
+	// DeadLetterRoutingKey overrides the routing key used when dead-lettering messages (x-dead-letter-routing-key).
+	DeadLetterRoutingKey string
+	// MaxLength is the maximum number of messages the queue holds before the overflow strategy is applied (x-max-length).
+	MaxLength int64
+	// MaxLengthBytes is the maximum total size in bytes of messages in the queue (x-max-length-bytes).
+	MaxLengthBytes int64
+	// MaxPriority enables priority queuing with the given number of priority levels (x-max-priority).
+	MaxPriority int64
+	// LeaderLocator controls which cluster node is chosen as the queue leader (x-queue-leader-locator).
+	LeaderLocator ILeaderLocator
+	// QuorumInitialGroupSize is the initial replication factor for quorum queues (x-quorum-initial-group-size).
 	QuorumInitialGroupSize int
-	Arguments              map[string]any
+	// Arguments holds additional queue arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (c *CustomQueueSpecification) name() string {
@@ -896,19 +1033,23 @@ func (c *CustomQueueSpecification) validate(*featuresAvailable) error {
 	return nil
 }
 
-// / **** Exchange ****
-
-// TExchangeType represents the type of exchange
+// TExchangeType identifies the routing algorithm used by an exchange.
 type TExchangeType string
 
 const (
-	Direct  TExchangeType = "direct"
-	Topic   TExchangeType = "topic"
-	FanOut  TExchangeType = "fanout"
+	// Direct routes messages to queues whose binding key exactly matches the message routing key.
+	Direct TExchangeType = "direct"
+	// Topic routes messages to queues whose binding pattern matches the message routing key using wildcards (* and #).
+	Topic TExchangeType = "topic"
+	// FanOut routes messages to all queues bound to the exchange, ignoring the routing key.
+	FanOut TExchangeType = "fanout"
+	// Headers routes messages based on message header attributes rather than the routing key.
 	Headers TExchangeType = "headers"
 )
 
-// IExchangeSpecification represents the specification of an exchange
+// IExchangeSpecification represents the specification used to declare an exchange.
+// The client provides concrete implementations for each standard exchange type as well as
+// CustomExchangeSpecification for plugin-provided types.
 type IExchangeSpecification interface {
 	name() string
 	isAutoDelete() bool
@@ -916,10 +1057,15 @@ type IExchangeSpecification interface {
 	arguments() map[string]any
 }
 
+// DirectExchangeSpecification represents the specification for a direct exchange.
+// Direct exchanges route messages to queues whose binding key exactly matches the routing key.
 type DirectExchangeSpecification struct {
-	Name         string
+	// Name is the exchange name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the exchange to be deleted when the last queue or exchange is unbound from it.
 	IsAutoDelete bool
-	Arguments    map[string]any
+	// Arguments holds additional exchange arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (d *DirectExchangeSpecification) name() string {
@@ -938,10 +1084,15 @@ func (d *DirectExchangeSpecification) arguments() map[string]any {
 	return d.Arguments
 }
 
+// TopicExchangeSpecification represents the specification for a topic exchange.
+// Topic exchanges route messages to queues whose binding pattern matches the routing key using wildcards (* and #).
 type TopicExchangeSpecification struct {
-	Name         string
+	// Name is the exchange name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the exchange to be deleted when the last queue or exchange is unbound from it.
 	IsAutoDelete bool
-	Arguments    map[string]any
+	// Arguments holds additional exchange arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (t *TopicExchangeSpecification) name() string {
@@ -960,10 +1111,15 @@ func (t *TopicExchangeSpecification) arguments() map[string]any {
 	return t.Arguments
 }
 
+// FanOutExchangeSpecification represents the specification for a fanout exchange.
+// Fanout exchanges broadcast every message to all queues bound to the exchange, ignoring the routing key.
 type FanOutExchangeSpecification struct {
-	Name         string
+	// Name is the exchange name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the exchange to be deleted when the last queue or exchange is unbound from it.
 	IsAutoDelete bool
-	Arguments    map[string]any
+	// Arguments holds additional exchange arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (f *FanOutExchangeSpecification) name() string {
@@ -982,10 +1138,15 @@ func (f *FanOutExchangeSpecification) arguments() map[string]any {
 	return f.Arguments
 }
 
+// HeadersExchangeSpecification represents the specification for a headers exchange.
+// Headers exchanges route messages based on header attributes rather than the routing key.
 type HeadersExchangeSpecification struct {
-	Name         string
+	// Name is the exchange name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the exchange to be deleted when the last queue or exchange is unbound from it.
 	IsAutoDelete bool
-	Arguments    map[string]any
+	// Arguments holds additional exchange arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (h *HeadersExchangeSpecification) name() string {
@@ -1004,11 +1165,18 @@ func (h *HeadersExchangeSpecification) arguments() map[string]any {
 	return h.Arguments
 }
 
+// CustomExchangeSpecification represents the specification for an exchange with a user-defined type.
+// Use this when declaring exchanges provided by plugins or when the type string is not one of the
+// built-in Direct, Topic, FanOut, or Headers values.
 type CustomExchangeSpecification struct {
-	Name             string
-	IsAutoDelete     bool
+	// Name is the exchange name. Must be unique within the virtual host.
+	Name string
+	// IsAutoDelete causes the exchange to be deleted when the last queue or exchange is unbound from it.
+	IsAutoDelete bool
+	// ExchangeTypeName is the exchange type string sent to the broker (e.g. "x-delayed-message").
 	ExchangeTypeName string
-	Arguments        map[string]any
+	// Arguments holds additional exchange arguments passed directly to the broker.
+	Arguments map[string]any
 }
 
 func (c *CustomExchangeSpecification) name() string {
@@ -1027,8 +1195,8 @@ func (c *CustomExchangeSpecification) arguments() map[string]any {
 	return c.Arguments
 }
 
-// / **** Binding ****
-
+// IBindingSpecification represents the specification used to create or delete a binding
+// between a source exchange and a destination (queue or exchange).
 type IBindingSpecification interface {
 	sourceExchange() string
 	destination() string
@@ -1037,11 +1205,16 @@ type IBindingSpecification interface {
 	arguments() map[string]any
 }
 
+// ExchangeToQueueBindingSpecification represents the specification for binding an exchange to a queue.
 type ExchangeToQueueBindingSpecification struct {
-	SourceExchange   string
+	// SourceExchange is the name of the exchange that is the source of the binding.
+	SourceExchange string
+	// DestinationQueue is the name of the queue that receives messages from the source exchange.
 	DestinationQueue string
-	BindingKey       string
-	Arguments        map[string]any
+	// BindingKey is the routing key or pattern used to match messages (semantics depend on the exchange type).
+	BindingKey string
+	// Arguments holds additional binding arguments, such as header-matching criteria for headers exchanges.
+	Arguments map[string]any
 }
 
 func (e *ExchangeToQueueBindingSpecification) sourceExchange() string {
@@ -1064,11 +1237,17 @@ func (e *ExchangeToQueueBindingSpecification) arguments() map[string]any {
 	return e.Arguments
 }
 
+// ExchangeToExchangeBindingSpecification represents the specification for binding one exchange to another.
+// This enables exchange-to-exchange routing (E2E bindings).
 type ExchangeToExchangeBindingSpecification struct {
-	SourceExchange      string
+	// SourceExchange is the name of the exchange that is the source of the binding.
+	SourceExchange string
+	// DestinationExchange is the name of the exchange that receives messages from the source exchange.
 	DestinationExchange string
-	BindingKey          string
-	Arguments           map[string]any
+	// BindingKey is the routing key or pattern used to match messages (semantics depend on the exchange type).
+	BindingKey string
+	// Arguments holds additional binding arguments, such as header-matching criteria for headers exchanges.
+	Arguments map[string]any
 }
 
 func (e *ExchangeToExchangeBindingSpecification) sourceExchange() string {
