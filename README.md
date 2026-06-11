@@ -23,7 +23,8 @@ This client supports two ways to publish messages:
 
 ## Documentation
 
-- [Client Guide](https://www.rabbitmq.com/client-libraries/amqp-client-libraries)
+- [Client Guide RabbitMQ WebSite](https://www.rabbitmq.com/client-libraries/amqp-client-libraries)
+- [Golang Package Doc](https://pkg.go.dev/github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp)
 
 
 
