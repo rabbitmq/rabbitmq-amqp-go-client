@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [[1.2.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.2.0)]
+
+## 1.2.0 - 2026-06-15
+- [Release 1.2.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.2.0)
+
+### Added
+- feat(queue): add `CustomQueueSpecification` with user-defined queue type by @Gsantomaggio in [#104](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/104)
+- feat(queue): support quorum queue delayed retry (RabbitMQ 4.3+) by @Gsantomaggio in [#105](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/105)
+- feat(example): add quorum queue delayed retry with per-message delivery time override by @Gsantomaggio in [#107](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/107)
+- Add `doc.go` by @Gsantomaggio in [#117](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/117)
+
+### Fixed
+- fix: guard against short annotation key panic by @MirahImage in [#113](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/113)
+- fix: check type assertions for AMQP connection properties by @MirahImage in [#114](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/114)
+- Correct MD5 usage in `generateName` by @MirahImage in [#115](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/115)
+- Validate message before accepting by @MirahImage in [#116](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/116)
+
+### Changed
+- Update Azure go-amqp to 1.7.0 by @Gsantomaggio in [#109](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/109)
+- Update GitHub Actions to latest major versions by @Gsantomaggio in [#112](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/112)
+- Update code documentation by @Gsantomaggio in [#118](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/118)
+- Add GitHub Actions workflow to publish docs to pkg.go.dev by @Gsantomaggio in [#111](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/111)
+
 ## [[1.1.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.1.0)]
 
 ## 1.1.0 - 2026-05-18
