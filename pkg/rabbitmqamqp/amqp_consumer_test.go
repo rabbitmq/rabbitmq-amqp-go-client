@@ -440,6 +440,191 @@ var _ = Describe("Quorum single-active-consumer link state", func() {
 	})
 })
 
+var _ = Describe("PreSettledDeliveryContext new settlement methods", func() {
+	It("RequeueWithAnnotationsAndFailed returns ErrPreSettledMessageDisposed for deliveryFailed=true", func() {
+		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
+		err := dc.RequeueWithAnnotationsAndFailed(context.Background(), nil, true)
+		Expect(err).To(MatchError(ErrPreSettledMessageDisposed))
+	})
+
+	It("RequeueWithAnnotationsAndFailed returns ErrPreSettledMessageDisposed for deliveryFailed=false", func() {
+		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
+		err := dc.RequeueWithAnnotationsAndFailed(context.Background(), nil, false)
+		Expect(err).To(MatchError(ErrPreSettledMessageDisposed))
+	})
+
+	It("RequeueWithAnnotationsAndFailed returns ErrPreSettledMessageDisposed when annotations are provided", func() {
+		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
+		err := dc.RequeueWithAnnotationsAndFailed(context.Background(), amqp.Annotations{"x-key": "val"}, true)
+		Expect(err).To(MatchError(ErrPreSettledMessageDisposed))
+	})
+
+	It("DelayRetry does not panic for deliveryFailed=true", func() {
+		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
+		Expect(func() { dc.DelayRetry(5*time.Second, true) }).NotTo(Panic())
+	})
+
+	It("DelayRetry does not panic for deliveryFailed=false", func() {
+		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
+		Expect(func() { dc.DelayRetry(5*time.Second, false) }).NotTo(Panic())
+	})
+})
+
+var _ = Describe("DeliveryContext RequeueWithAnnotationsAndFailed", func() {
+	It("should requeue the message with annotations and deliveryFailed=false", func() {
+		qName := generateNameWithDateTime("requeue with annotations deliveryFailed false")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		publishMessages(qName, 1)
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = consumer.Close(context.Background()) })
+
+		dc, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(dc.RequeueWithAnnotationsAndFailed(context.Background(),
+			amqp.Annotations{"x-opt-my-key": "my-value"}, false)).To(BeNil())
+
+		redelivered, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(redelivered.Message().Annotations["x-opt-my-key"]).To(Equal("my-value"))
+		Expect(redelivered.Accept(context.Background())).To(BeNil())
+	})
+
+	It("should requeue the message with annotations and deliveryFailed=true", func() {
+		qName := generateNameWithDateTime("requeue with annotations deliveryFailed true")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		publishMessages(qName, 1)
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = consumer.Close(context.Background()) })
+
+		dc, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(dc.RequeueWithAnnotationsAndFailed(context.Background(),
+			amqp.Annotations{"x-opt-my-key": "my-value-failed"}, true)).To(BeNil())
+
+		redelivered, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(redelivered.Message().Annotations["x-opt-my-key"]).To(Equal("my-value-failed"))
+		Expect(redelivered.Accept(context.Background())).To(BeNil())
+	})
+
+	It("should requeue the message with nil annotations", func() {
+		qName := generateNameWithDateTime("requeue with nil annotations")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		publishMessages(qName, 1)
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = consumer.Close(context.Background()) })
+
+		dc, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(dc.RequeueWithAnnotationsAndFailed(context.Background(), nil, false)).To(BeNil())
+
+		redelivered, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(redelivered.Accept(context.Background())).To(BeNil())
+
+		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
+		Expect(err).To(BeNil())
+		Expect(nMessages).To(Equal(0))
+	})
+})
+
+var _ = Describe("DeliveryContext DelayRetry", func() {
+	It("should requeue the message and make it available for redelivery", func() {
+		qName := generateNameWithDateTime("DelayRetry requeues message")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		publishMessages(qName, 1)
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = consumer.Close(context.Background()) })
+
+		dc, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		dc.DelayRetry(500*time.Millisecond, false)
+
+		// The message must be redelivered after the delay elapses.
+		receiveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		DeferCleanup(cancel)
+		redelivered, err := consumer.Receive(receiveCtx)
+		Expect(err).To(BeNil())
+		Expect(redelivered.Accept(context.Background())).To(BeNil())
+
+		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
+		Expect(err).To(BeNil())
+		Expect(nMessages).To(Equal(0))
+	})
+
+	It("should requeue the message with deliveryFailed=true", func() {
+		qName := generateNameWithDateTime("DelayRetry deliveryFailed true")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() {
+			_ = connection.Management().DeleteQueue(context.Background(), qName)
+			_ = connection.Close(context.Background())
+		})
+
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		publishMessages(qName, 1)
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = consumer.Close(context.Background()) })
+
+		dc, err := consumer.Receive(context.Background())
+		Expect(err).To(BeNil())
+		dc.DelayRetry(500*time.Millisecond, true)
+
+		receiveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		DeferCleanup(cancel)
+		redelivered, err := consumer.Receive(receiveCtx)
+		Expect(err).To(BeNil())
+		Expect(redelivered.Accept(context.Background())).To(BeNil())
+
+		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
+		Expect(err).To(BeNil())
+		Expect(nMessages).To(Equal(0))
+	})
+})
+
 var _ = Describe("streamOffsetFromAnnotation", func() {
 	DescribeTable("decodes stream offset annotations",
 		func(v any, want int64, wantOK bool) {

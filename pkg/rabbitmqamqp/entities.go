@@ -10,9 +10,21 @@ import (
 type QuorumQueueDelayedRetryType string
 
 const (
-	// QuorumQueueDelayedRetryDisabled disables delayed retry redelivery.
+	// QuorumQueueDelayedRetryDisabled disables delayed retry redelivery (default).
 	QuorumQueueDelayedRetryDisabled QuorumQueueDelayedRetryType = "disabled"
-	// QuorumQueueDelayedRetryReturned enables delayed retry only for messages returned by consumers.
+
+	// QuorumQueueDelayedRetryAll delays all returned messages, regardless of whether the
+	// delivery-count was incremented.
+	QuorumQueueDelayedRetryAll QuorumQueueDelayedRetryType = "all"
+
+	// QuorumQueueDelayedRetryFailed delays only messages whose delivery-count was incremented.
+	// This is triggered by RequeueWithAnnotationsAndFailed(ctx, annotations, true)
+	// or DelayRetry(delay, true).
+	QuorumQueueDelayedRetryFailed QuorumQueueDelayedRetryType = "failed"
+
+	// QuorumQueueDelayedRetryReturned delays only messages whose xacquired-count was incremented.
+	// This is triggered by Requeue(), RequeueWithAnnotations(), or
+	// RequeueWithAnnotationsAndFailed(ctx, annotations, false) / DelayRetry(delay, false).
 	QuorumQueueDelayedRetryReturned QuorumQueueDelayedRetryType = "returned"
 )
 

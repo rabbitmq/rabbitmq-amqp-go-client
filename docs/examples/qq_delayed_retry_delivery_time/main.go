@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/go-amqp"
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
@@ -59,7 +58,7 @@ func main() {
 	// annotation used below overrides this on a per-message basis.
 	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 		Name:             queueName,
-		DelayedRetryType: rmq.QuorumQueueDelayedRetryReturned,
+		DelayedRetryType: rmq.QuorumQueueDelayedRetryFailed,
 		DelayedRetryMin:  30 * time.Second,
 	})
 	if err != nil {
@@ -96,22 +95,23 @@ func main() {
 
 			if retryCount.Add(1) < 10 {
 				// The API returned HTTP 429 with a Retry-After for this tenant.
-				// Override the queue's default delayed retry behavior by setting x-opt-delivery-time to now + 5 seconds.
+				// Override the queue's default delayed retry behavior with a per-message delay.
 
-				// random value between 5 and 10 seconds:
 				random := time.Duration(5+rand.Intn(5)) * time.Second
-				deliveryTime := time.Now().Add(random).UnixMilli()
 				retryCount.Add(1)
-				rmq.Warn("[Consumer] Rate-limited, overriding delivery time via x-opt-delivery-time",
+				rmq.Warn("[Consumer] Rate-limited, overriding delivery time via DelayRetry",
 					"retry_after_s", random.Seconds(),
-					"delivery_time_ms", deliveryTime,
 					"message", body,
 				)
-				requeueErr := deliveryContext.RequeueWithAnnotations(ctx, amqp.Annotations{
-					"x-opt-delivery-time": deliveryTime,
-				})
-				if requeueErr != nil {
-					rmq.Error("[Consumer] Error requeuing message with delivery time", "error", requeueErr)
+				// DelayRetry sets x-opt-delivery-time = now+random and sends
+				// modified{delivery-failed=false, undeliverable-here=true}.
+				err := deliveryContext.DelayRetry(random, true)
+				if err != nil {
+					return
+				}
+
+				err = deliveryContext.RequeueWithAnnotationsAndFailed(ctx, msg.Annotations, false)
+				if err != nil {
 					return
 				}
 			} else {
