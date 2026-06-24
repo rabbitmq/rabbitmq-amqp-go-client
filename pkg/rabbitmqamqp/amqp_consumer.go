@@ -203,7 +203,7 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 	return err
 }
 
-// RequeueWithAnnotationsAndFailed requeues the message with annotations and controls the
+// RequeueWithAnnotationsAndFailed requeue the message with annotations and controls the
 // delivery-failed flag on the AMQP 1.0 modified outcome.
 //
 // When deliveryFailed is true the broker increments the message's delivery-count and, if the
@@ -232,7 +232,7 @@ func (dc *DeliveryContext) RequeueWithAnnotationsAndFailed(ctx context.Context, 
 	return err
 }
 
-// DelayRetry requeues the message with a per-message delivery delay.
+// DelayRetry requeue the message with a per-message delivery delay.
 // It sets the x-opt-delivery-time annotation to the absolute Unix timestamp (milliseconds)
 // of time.Now()+delay, triggering per-message delivery-time override on the broker side.
 // The deliveryFailed flag maps directly to modified{delivery-failed}.
@@ -245,15 +245,7 @@ func (dc *DeliveryContext) DelayRetry(delay time.Duration, deliveryFailed bool) 
 	annotations := amqp.Annotations{
 		"x-opt-delivery-time": time.Now().Add(delay).UnixMilli(),
 	}
-	err := dc.receiver.ModifyMessage(context.Background(), dc.message, &amqp.ModifyMessageOptions{
-		DeliveryFailed:    deliveryFailed,
-		UndeliverableHere: false,
-		Annotations:       annotations,
-	})
-	if err == nil {
-		dc.metricsCollector.ConsumeDisposition(ConsumeRequeued, dc.consumeCtx)
-	}
-	return err
+	return dc.RequeueWithAnnotationsAndFailed(context.Background(), annotations, deliveryFailed)
 }
 
 // ErrPreSettledMessageDisposed is returned by PreSettledDeliveryContext settlement methods:

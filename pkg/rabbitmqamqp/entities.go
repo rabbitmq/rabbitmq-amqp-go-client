@@ -22,7 +22,7 @@ const (
 	// or DelayRetry(delay, true).
 	QuorumQueueDelayedRetryFailed QuorumQueueDelayedRetryType = "failed"
 
-	// QuorumQueueDelayedRetryReturned delays only messages whose xacquired-count was incremented.
+	// QuorumQueueDelayedRetryReturned delays only messages whose x-acquired-count was incremented.
 	// This is triggered by Requeue(), RequeueWithAnnotations(), or
 	// RequeueWithAnnotationsAndFailed(ctx, annotations, false) / DelayRetry(delay, false).
 	QuorumQueueDelayedRetryReturned QuorumQueueDelayedRetryType = "returned"

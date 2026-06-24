@@ -109,11 +109,6 @@ func main() {
 				if err != nil {
 					return
 				}
-
-				err = deliveryContext.RequeueWithAnnotationsAndFailed(ctx, msg.Annotations, false)
-				if err != nil {
-					return
-				}
 			} else {
 				rmq.Info("[Consumer] Message processed successfully",
 					"message", body, "annotations", msg.Annotations,

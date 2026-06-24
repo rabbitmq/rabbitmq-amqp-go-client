@@ -86,7 +86,7 @@ func main() {
 				rmq.Warn("[Consumer] Simulating processing failure, message will be retried with delay 2s", "message",
 					fmt.Sprintf("%s", deliveryContext.Message().Data))
 				// RequeueWithAnnotationsAndFailed with deliveryFailed=false triggers the
-				// queue-level linear back-off configured via QuorumQueueDelayedRetryReturned
+				// queue-level back-off configured via QuorumQueueDelayedRetryReturned
 				// (modified{delivery-failed=false, undeliverable-here=false}).
 				err = deliveryContext.RequeueWithAnnotationsAndFailed(context.TODO(), nil, false)
 				if err != nil {
