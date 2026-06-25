@@ -189,34 +189,13 @@ func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 //
 // see <a href="https://www.rabbitmq.com/docs/amqp#modified-outcome">Modified Outcome Support in RabbitMQ</a>
 func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
-	destination, err := copyAnnotations(annotations)
-	if err != nil {
-		return err
-	}
-	err = dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
-		DeliveryFailed:    false,
-		UndeliverableHere: false,
-		Annotations:       destination,
-	})
-	if err == nil {
-		dc.metricsCollector.ConsumeDisposition(ConsumeRequeued, dc.consumeCtx)
-	}
-	return err
+	return dc.RequeueWithAnnotationsAndDeliveryFailed(ctx, annotations, false)
 }
 
 // RequeueWithAnnotationsAndDeliveryFailed requeue the message with annotations and controls the
 // delivery-failed flag on the AMQP 1.0 modified outcome.
 //
-// When deliveryFailed is true the broker increments the message's delivery-count and, if the
-// queue is configured with x-delayed-retry-type=failed, applies the configured linear back-off
-// before redelivering the message.
-//
-// Application-specific annotation keys must start with the x-opt- prefix.
-// Annotation keys the broker understands start with x-, but not with x-opt-.
-//
 // This maps to modified{delivery-failed = <deliveryFailed>, undeliverable-here = false}.
-//
-// Only quorum queues support the modification of message annotations with the modified outcome.
 func (dc *DeliveryContext) RequeueWithAnnotationsAndDeliveryFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
