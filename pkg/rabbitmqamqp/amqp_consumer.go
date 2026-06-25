@@ -22,16 +22,17 @@ type IDeliveryContext interface {
 	Requeue(ctx context.Context) error
 	//RequeueWithAnnotations requeue the message with annotations. DeliveryFailed is implicit set to
 	// false.
-	// The API is provided for convenience and for compatibility, but it is recommended to use RequeueWithAnnotationsAndFailed instead.
+	// The API is provided for convenience and for compatibility, but it is recommended to use RequeueWithAnnotationsAndDeliveryFailed instead.
 	// It will be deprecated and removed in the future.
 	RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error
-	// RequeueWithAnnotationsAndFailed requeue the message with annotations and deliveryFailed flag. DeliveryFailed is implicit set to
+	// RequeueWithAnnotationsAndDeliveryFailed requeue the message with annotations and deliveryFailed flag. DeliveryFailed is implicit set to
 	// true if deliveryFailed is true, false otherwise.
-	RequeueWithAnnotationsAndFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error // default true
+	RequeueWithAnnotationsAndDeliveryFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error // default true
 	// DelayRetry is a helper function to requeue the message with a delay.
 	// for delayed retries feature. https://www.rabbitmq.com/blog/2026/04/23/rabbitmq-4.3-release#delayed-retries
-	// It is RequeueWithAnnotationsAndFailed with the x-opt-delivery-time annotation set to the current time + delay.
-	DelayRetry(delay time.Duration, deliveryFailed bool) error
+	// It is RequeueWithAnnotationsAndDeliveryFailed with the x-opt-delivery-time annotation set to the current time + delay.
+	// DelayRetry is per message, and it is not needed to configure any DelayRetry policy in the queue
+	DelayRetry(ctx context.Context, delay time.Duration, deliveryFailed bool) error
 }
 
 // DeliveryContext holds the receiver and message for a single AMQP delivery.
@@ -203,7 +204,7 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 	return err
 }
 
-// RequeueWithAnnotationsAndFailed requeue the message with annotations and controls the
+// RequeueWithAnnotationsAndDeliveryFailed requeue the message with annotations and controls the
 // delivery-failed flag on the AMQP 1.0 modified outcome.
 //
 // When deliveryFailed is true the broker increments the message's delivery-count and, if the
@@ -216,7 +217,7 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 // This maps to modified{delivery-failed = <deliveryFailed>, undeliverable-here = false}.
 //
 // Only quorum queues support the modification of message annotations with the modified outcome.
-func (dc *DeliveryContext) RequeueWithAnnotationsAndFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error {
+func (dc *DeliveryContext) RequeueWithAnnotationsAndDeliveryFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
 		return err
@@ -237,15 +238,15 @@ func (dc *DeliveryContext) RequeueWithAnnotationsAndFailed(ctx context.Context, 
 // of time.Now()+delay, triggering per-message delivery-time override on the broker side.
 // The deliveryFailed flag maps directly to modified{delivery-failed}.
 //
-// This is equivalent to calling RequeueWithAnnotationsAndFailed with
+// This is equivalent to calling RequeueWithAnnotationsAndDeliveryFailed with
 // {"x-opt-delivery-time": <now+delay in ms>}.
 //
 // See https://www.rabbitmq.com/blog/2026/04/23/rabbitmq-4.3-release#delayed-retries
-func (dc *DeliveryContext) DelayRetry(delay time.Duration, deliveryFailed bool) error {
+func (dc *DeliveryContext) DelayRetry(ctx context.Context, delay time.Duration, deliveryFailed bool) error {
 	annotations := amqp.Annotations{
 		"x-opt-delivery-time": time.Now().Add(delay).UnixMilli(),
 	}
-	return dc.RequeueWithAnnotationsAndFailed(context.Background(), annotations, deliveryFailed)
+	return dc.RequeueWithAnnotationsAndDeliveryFailed(ctx, annotations, deliveryFailed)
 }
 
 // ErrPreSettledMessageDisposed is returned by PreSettledDeliveryContext settlement methods:
@@ -264,7 +265,7 @@ func (dc *PreSettledDeliveryContext) Message() *amqp.Message {
 }
 
 // Accept the message is already settled, so this method returns an error.
-func (dc *PreSettledDeliveryContext) Accept(ctx context.Context) error {
+func (dc *PreSettledDeliveryContext) Accept(_ context.Context) error {
 	return ErrPreSettledMessageDisposed
 }
 
@@ -274,7 +275,7 @@ func (dc *PreSettledDeliveryContext) Discard(_ context.Context, _ *amqp.Error) e
 }
 
 // DiscardWithAnnotations the message is already settled, so this method returns an error.
-func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(_ context.Context, annotations amqp.Annotations) error {
+func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(_ context.Context, _ amqp.Annotations) error {
 	return ErrPreSettledMessageDisposed
 }
 
@@ -288,13 +289,13 @@ func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(_ context.Context, _
 	return ErrPreSettledMessageDisposed
 }
 
-// RequeueWithAnnotationsAndFailed the message is already settled, so this method returns an error.
-func (dc *PreSettledDeliveryContext) RequeueWithAnnotationsAndFailed(_ context.Context, _ amqp.Annotations, _ bool) error {
+// RequeueWithAnnotationsAndDeliveryFailed the message is already settled, so this method returns an error.
+func (dc *PreSettledDeliveryContext) RequeueWithAnnotationsAndDeliveryFailed(_ context.Context, _ amqp.Annotations, _ bool) error {
 	return ErrPreSettledMessageDisposed
 }
 
 // DelayRetry the message is already settled, so this method logs the error and is a no-op.
-func (dc *PreSettledDeliveryContext) DelayRetry(_ time.Duration, _ bool) error {
+func (dc *PreSettledDeliveryContext) DelayRetry(_ context.Context, _ time.Duration, _ bool) error {
 	return ErrPreSettledMessageDisposed
 }
 

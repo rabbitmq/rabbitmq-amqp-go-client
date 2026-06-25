@@ -85,10 +85,10 @@ func main() {
 			if atomic.AddInt32(&counter, 1) < 10 {
 				rmq.Warn("[Consumer] Simulating processing failure, message will be retried with delay 2s", "message",
 					fmt.Sprintf("%s", deliveryContext.Message().Data))
-				// RequeueWithAnnotationsAndFailed with deliveryFailed=false triggers the
-				// queue-level back-off configured via QuorumQueueDelayedRetryReturned
+				// RequeueWithAnnotationsAndDeliveryFailed with deliveryFailed=false triggers the
+				// queue-level configured via QuorumQueueDelayedRetryReturned
 				// (modified{delivery-failed=false, undeliverable-here=false}).
-				err = deliveryContext.RequeueWithAnnotationsAndFailed(context.TODO(), nil, false)
+				err = deliveryContext.RequeueWithAnnotationsAndDeliveryFailed(context.TODO(), nil, false)
 				if err != nil {
 					rmq.Error("[Consumer] Error requeuing message", "error", err)
 					return

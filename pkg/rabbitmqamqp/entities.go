@@ -18,13 +18,13 @@ const (
 	QuorumQueueDelayedRetryAll QuorumQueueDelayedRetryType = "all"
 
 	// QuorumQueueDelayedRetryFailed delays only messages whose delivery-count was incremented.
-	// This is triggered by RequeueWithAnnotationsAndFailed(ctx, annotations, true)
+	// This is triggered by RequeueWithAnnotationsAndDeliveryFailed(ctx, annotations, true)
 	// or DelayRetry(delay, true).
 	QuorumQueueDelayedRetryFailed QuorumQueueDelayedRetryType = "failed"
 
 	// QuorumQueueDelayedRetryReturned delays only messages whose x-acquired-count was incremented.
 	// This is triggered by Requeue(), RequeueWithAnnotations(), or
-	// RequeueWithAnnotationsAndFailed(ctx, annotations, false) / DelayRetry(delay, false).
+	// RequeueWithAnnotationsAndDeliveryFailed(ctx, annotations, false) / DelayRetry(delay, false).
 	QuorumQueueDelayedRetryReturned QuorumQueueDelayedRetryType = "returned"
 )
 

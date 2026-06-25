@@ -441,36 +441,36 @@ var _ = Describe("Quorum single-active-consumer link state", func() {
 })
 
 var _ = Describe("PreSettledDeliveryContext new settlement methods", func() {
-	It("RequeueWithAnnotationsAndFailed returns ErrPreSettledMessageDisposed for deliveryFailed=true", func() {
+	It("RequeueWithAnnotationsAndDeliveryFailed returns ErrPreSettledMessageDisposed for deliveryFailed=true", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		err := dc.RequeueWithAnnotationsAndFailed(context.Background(), nil, true)
+		err := dc.RequeueWithAnnotationsAndDeliveryFailed(context.Background(), nil, true)
 		Expect(err).To(MatchError(ErrPreSettledMessageDisposed))
 	})
 
-	It("RequeueWithAnnotationsAndFailed returns ErrPreSettledMessageDisposed for deliveryFailed=false", func() {
+	It("RequeueWithAnnotationsAndDeliveryFailed returns ErrPreSettledMessageDisposed for deliveryFailed=false", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		err := dc.RequeueWithAnnotationsAndFailed(context.Background(), nil, false)
+		err := dc.RequeueWithAnnotationsAndDeliveryFailed(context.Background(), nil, false)
 		Expect(err).To(MatchError(ErrPreSettledMessageDisposed))
 	})
 
-	It("RequeueWithAnnotationsAndFailed returns ErrPreSettledMessageDisposed when annotations are provided", func() {
+	It("RequeueWithAnnotationsAndDeliveryFailed returns ErrPreSettledMessageDisposed when annotations are provided", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		err := dc.RequeueWithAnnotationsAndFailed(context.Background(), amqp.Annotations{"x-key": "val"}, true)
+		err := dc.RequeueWithAnnotationsAndDeliveryFailed(context.Background(), amqp.Annotations{"x-key": "val"}, true)
 		Expect(err).To(MatchError(ErrPreSettledMessageDisposed))
 	})
 
 	It("DelayRetry does not panic for deliveryFailed=true", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		Expect(func() { dc.DelayRetry(5*time.Second, true) }).NotTo(Panic())
+		Expect(func() { Expect(dc.DelayRetry(context.Background(), 5*time.Second, true)).To(BeNil()) }).NotTo(Panic())
 	})
 
 	It("DelayRetry does not panic for deliveryFailed=false", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		Expect(func() { dc.DelayRetry(5*time.Second, false) }).NotTo(Panic())
+		Expect(func() { Expect(dc.DelayRetry(context.Background(), 5*time.Second, false)).To(BeNil()) }).NotTo(Panic())
 	})
 })
 
-var _ = Describe("DeliveryContext RequeueWithAnnotationsAndFailed", func() {
+var _ = Describe("DeliveryContext RequeueWithAnnotationsAndDeliveryFailed", func() {
 	It("should requeue the message with annotations and deliveryFailed=false", func() {
 		qName := generateNameWithDateTime("requeue with annotations deliveryFailed false")
 		connection, err := Dial(context.Background(), "amqp://", nil)
@@ -490,7 +490,7 @@ var _ = Describe("DeliveryContext RequeueWithAnnotationsAndFailed", func() {
 
 		dc, err := consumer.Receive(context.Background())
 		Expect(err).To(BeNil())
-		Expect(dc.RequeueWithAnnotationsAndFailed(context.Background(),
+		Expect(dc.RequeueWithAnnotationsAndDeliveryFailed(context.Background(),
 			amqp.Annotations{"x-opt-my-key": "my-value"}, false)).To(BeNil())
 
 		redelivered, err := consumer.Receive(context.Background())
@@ -518,7 +518,7 @@ var _ = Describe("DeliveryContext RequeueWithAnnotationsAndFailed", func() {
 
 		dc, err := consumer.Receive(context.Background())
 		Expect(err).To(BeNil())
-		Expect(dc.RequeueWithAnnotationsAndFailed(context.Background(),
+		Expect(dc.RequeueWithAnnotationsAndDeliveryFailed(context.Background(),
 			amqp.Annotations{"x-opt-my-key": "my-value-failed"}, true)).To(BeNil())
 
 		redelivered, err := consumer.Receive(context.Background())
@@ -546,7 +546,7 @@ var _ = Describe("DeliveryContext RequeueWithAnnotationsAndFailed", func() {
 
 		dc, err := consumer.Receive(context.Background())
 		Expect(err).To(BeNil())
-		Expect(dc.RequeueWithAnnotationsAndFailed(context.Background(), nil, false)).To(BeNil())
+		Expect(dc.RequeueWithAnnotationsAndDeliveryFailed(context.Background(), nil, false)).To(BeNil())
 
 		redelivered, err := consumer.Receive(context.Background())
 		Expect(err).To(BeNil())
@@ -568,7 +568,9 @@ var _ = Describe("DeliveryContext DelayRetry", func() {
 			_ = connection.Close(context.Background())
 		})
 
-		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
+		})
 		Expect(err).To(BeNil())
 		publishMessages(qName, 1)
 
@@ -578,13 +580,15 @@ var _ = Describe("DeliveryContext DelayRetry", func() {
 
 		dc, err := consumer.Receive(context.Background())
 		Expect(err).To(BeNil())
-		dc.DelayRetry(500*time.Millisecond, false)
-
+		startTime := time.Now()
+		Expect(dc.DelayRetry(context.Background(), 500*time.Millisecond, true)).To(BeNil())
+		// the message should expect to be received after 500 ms
 		// The message must be redelivered after the delay elapses.
 		receiveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		DeferCleanup(cancel)
 		redelivered, err := consumer.Receive(receiveCtx)
 		Expect(err).To(BeNil())
+		Expect(time.Since(startTime)).To(BeNumerically(">=", 480*time.Millisecond))
 		Expect(redelivered.Accept(context.Background())).To(BeNil())
 
 		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
@@ -611,13 +615,15 @@ var _ = Describe("DeliveryContext DelayRetry", func() {
 
 		dc, err := consumer.Receive(context.Background())
 		Expect(err).To(BeNil())
-		dc.DelayRetry(500*time.Millisecond, true)
+		startTime := time.Now()
+		Expect(dc.DelayRetry(context.Background(), 500*time.Millisecond, true)).To(BeNil())
 
 		receiveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		DeferCleanup(cancel)
 		redelivered, err := consumer.Receive(receiveCtx)
 		Expect(err).To(BeNil())
 		Expect(redelivered.Accept(context.Background())).To(BeNil())
+		Expect(time.Since(startTime)).To(BeNumerically(">=", 480*time.Millisecond))
 
 		nMessages, err := connection.Management().PurgeQueue(context.Background(), qName)
 		Expect(err).To(BeNil())
