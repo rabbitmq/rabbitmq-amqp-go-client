@@ -461,12 +461,16 @@ var _ = Describe("PreSettledDeliveryContext new settlement methods", func() {
 
 	It("DelayRetry does not panic for deliveryFailed=true", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		Expect(func() { Expect(dc.DelayRetry(context.Background(), 5*time.Second, true)).To(BeNil()) }).NotTo(Panic())
+		Expect(func() {
+			Expect(dc.DelayRetry(context.Background(), 5*time.Second, true)).To(BeAssignableToTypeOf(ErrPreSettledMessageDisposed))
+		}).NotTo(Panic())
 	})
 
 	It("DelayRetry does not panic for deliveryFailed=false", func() {
 		dc := &PreSettledDeliveryContext{message: &amqp.Message{}}
-		Expect(func() { Expect(dc.DelayRetry(context.Background(), 5*time.Second, false)).To(BeNil()) }).NotTo(Panic())
+		Expect(func() {
+			Expect(dc.DelayRetry(context.Background(), 5*time.Second, false)).To(BeAssignableToTypeOf(ErrPreSettledMessageDisposed))
+		}).NotTo(Panic())
 	})
 })
 
