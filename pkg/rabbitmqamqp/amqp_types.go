@@ -27,7 +27,7 @@ func getLinkName(l iLinkerName) string {
 	return l.linkName()
 }
 
-/// IConsumerOptions interface for the AMQP and Stream consumer///
+// IConsumerOptions is the interface for configuring AMQP and stream consumers.
 
 type IConsumerOptions interface {
 	// linkName returns the name of the link
@@ -132,9 +132,9 @@ const (
 
 // ConsumerOptions represents the options for quorum and classic queues
 type ConsumerOptions struct {
-	//ReceiverLinkName: see the IConsumerOptions interface
+	// ReceiverLinkName is the name of the AMQP receiver link. See IConsumerOptions.linkName.
 	ReceiverLinkName string
-	//InitialCredits: see the IConsumerOptions interface
+	// InitialCredits is the number of credits issued to the receiver link. See IConsumerOptions.initialCredits.
 	InitialCredits int32
 	// The id of the consumer
 	Id string
@@ -295,9 +295,9 @@ StreamConsumerOptions represents the options for stream queues
 It is mandatory in case of creating a stream consumer.
 */
 type StreamConsumerOptions struct {
-	//ReceiverLinkName: see the IConsumerOptions interface
+	// ReceiverLinkName is the name of the AMQP receiver link. See IConsumerOptions.linkName.
 	ReceiverLinkName string
-	//InitialCredits: see the IConsumerOptions interface
+	// InitialCredits is the number of credits issued to the receiver link. See IConsumerOptions.initialCredits.
 	InitialCredits int32
 	// The offset specification for the stream consumer
 	// see the interface implementations

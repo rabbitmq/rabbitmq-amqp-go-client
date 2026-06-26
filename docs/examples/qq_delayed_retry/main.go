@@ -1,6 +1,6 @@
 // RabbitMQ AMQP 1.0 Go Client: https://github.com/rabbitmq/rabbitmq-amqp-go-client
 // RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
-// This example demonstrates quorum queue delayed retry (linear back-off redelivery),
+// This example demonstrates quorum queue delayed retry
 // available as of RabbitMQ 4.3. The three queue arguments x-delayed-retry-type,
 // x-delayed-retry-min, and x-delayed-retry-max are set via QuorumQueueSpecification.
 // example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/qq_delayed_retry/main.go
@@ -42,17 +42,15 @@ func main() {
 	management := amqpConnection.Management()
 
 	// Declare a quorum queue with delayed retry (requires RabbitMQ 4.3+).
-	// - DelayedRetryType: controls which messages trigger linear back-off redelivery.
+	// - DelayedRetryType: controls which messages trigger the redelivery.
 	//   Use QuorumQueueDelayedRetryReturned so only messages returned (nacked) by
 	//   consumers are retried with a delay, rather than all redeliveries.
 	// - DelayedRetryMin: minimum back-off delay before the first retry. (valid for Failure)
 	// - DelayedRetryMax: upper bound for the back-off delay.
 	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
-		Name: queueName,
-		//DeliveryLimit:    5,
+		Name:             queueName,
 		DelayedRetryType: rmq.QuorumQueueDelayedRetryReturned,
 		DelayedRetryMin:  2 * time.Second,
-		//DelayedRetryMax:  30 * time.Second,
 	})
 	if err != nil {
 		rmq.Error("Error declaring queue", err)
