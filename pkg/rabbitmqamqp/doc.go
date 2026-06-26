@@ -2,7 +2,7 @@
 //
 // This package wraps the [Azure go-amqp] client and offers high-level abstractions
 // for common RabbitMQ operations: publishing and consuming messages, managing connections and sessions, and handling errors.
-// This package provides ean easy way to use the RabbitMQ 4.x features, like stream filtering, single active consumer,
+// This package provides an easy way to use the RabbitMQ 4.x features, like stream filtering, single active consumer,
 // websockets, reject with reason, and many more.
 // It also provides the auto-reconnection feature, which allows the client to automatically
 // reconnect to the server in case of a connection failure.
