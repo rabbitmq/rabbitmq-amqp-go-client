@@ -643,12 +643,9 @@ func (a *AmqpConnection) maybeReconnect() {
 		///wait for before reconnecting
 		// add some random milliseconds to the wait time to avoid thundering herd
 		// the random time is between 0 and 500 milliseconds
-		// Calculate delay with exponential backoff and jitter
+		// Calculate delay with exponential backoff and jitter, capped at maxDelay
 		jitter := time.Duration(rand.Intn(500)) * time.Millisecond
-		delay := baseDelay + jitter
-		if delay > maxDelay {
-			delay = maxDelay
-		}
+		delay := min(baseDelay+jitter, maxDelay)
 
 		Info("Attempting reconnection", "attempt", attempt, "delay", delay, "ID", a.Id())
 		time.Sleep(delay)
@@ -670,7 +667,7 @@ func (a *AmqpConnection) maybeReconnect() {
 			return
 		}
 
-		baseDelay *= 2
+		baseDelay = min(baseDelay*2, maxDelay)
 		Error("Reconnection attempt failed", "attempt", attempt, "error", err, "ID", a.Id())
 	}
 
