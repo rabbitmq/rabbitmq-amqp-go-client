@@ -42,17 +42,31 @@ func (f *featuresAvailable) ParseProperties(properties map[string]any) error {
 		return fmt.Errorf("missing version property")
 	}
 
-	version := extractVersion(properties["version"].(string))
+	versionStr, ok := properties["version"].(string)
+	if !ok {
+		return fmt.Errorf("version property must be a string, got %T", properties["version"])
+	}
+
+	version := extractVersion(versionStr)
 	if version == "" {
-		return fmt.Errorf("invalid version format: %s", version)
+		return fmt.Errorf("invalid version format: %s", versionStr)
 	}
 
 	f.is4OrMore = isVersionGreaterOrEqual(version, "4.0.0")
 	f.is41OrMore = isVersionGreaterOrEqual(version, "4.1.0")
 	f.is42rMore = isVersionGreaterOrEqual(version, "4.2.0")
 	f.is43rMore = isVersionGreaterOrEqual(version, "4.3.0")
-	f.isRabbitMQ = strings.EqualFold(properties["product"].(string), "RabbitMQ")
-	f.isTanzu = isTanzu(properties["version"].(string))
+
+	productStr, ok := properties["product"].(string)
+	if !ok {
+		// Non-standard AMQP server: degrade gracefully instead of panicking.
+		f.isRabbitMQ = false
+		f.isTanzu = false
+		return nil
+	}
+
+	f.isRabbitMQ = strings.EqualFold(productStr, "RabbitMQ")
+	f.isTanzu = isTanzu(versionStr)
 	return nil
 }
 

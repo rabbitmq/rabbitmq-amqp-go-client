@@ -2,16 +2,11 @@
 // RabbitMQ AMQP 1.0 documentation: https://www.rabbitmq.com/docs/amqp
 // This example demonstrates per-message delivery time override using the x-opt-delivery-time
 // annotation on a quorum queue with delayed retries (RabbitMQ 4.3+).
-//
-// Instead of relying  on  x-delayed-retry-min,
-// a consumer can return a message with RequeueWithAnnotations and set the x-opt-delivery-time
-// annotation to a Unix timestamp in milliseconds, instructing RabbitMQ to redeliver the
-// message at that exact time.
+// and linear backoff strategy using DeliveryMin and DeliveryMax time
+// with RequeueWithAnnotationsAndDeliveryFailed(..,true/false).
 //
 // This is useful for entity-specific rate limits. For example, if an API rejects a request
-// for Tenant A with an HTTP 429 and a Retry-After header, you can parse that header and
-// set x-opt-delivery-time only for Tenant A's message, while Tenant B's messages continue
-// to be processed normally.
+// for Tenant A with an HTTP 429 and a Retry-After header.
 //
 // See: https://www.rabbitmq.com/blog/2026/04/23/rabbitmq-4.3-release#delayed-retries
 // example path: https://github.com/rabbitmq/rabbitmq-amqp-go-client/tree/main/docs/examples/qq_delayed_retry_delivery_time/main.go
@@ -22,18 +17,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math"
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/go-amqp"
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func main() {
 	queueName := "qq-delayed-retry-delivery-time-go-queue"
 
-	rmq.Info("Quorum queue delayed retry with x-opt-delivery-time override example")
+	rmq.Info("Quorum queue delayed retry with linear backoff pattern and x-opt-delivery-time override example")
 
 	stateChanged := make(chan *rmq.StateChanged, 1)
 	go func(ch chan *rmq.StateChanged) {
@@ -55,12 +49,16 @@ func main() {
 	management := amqpConnection.Management()
 
 	// Declare a quorum queue with delayed retry enabled (requires RabbitMQ 4.3+).
-	// DelayedRetryMin sets the default linear back-off base delay. The x-opt-delivery-time
+	// DelayedRetryMin sets the default linear back-off base delay.
+	// The x-opt-delivery-time
 	// annotation used below overrides this on a per-message basis.
+	const timeMin time.Duration = 1 * time.Second
+	const timeMax time.Duration = 10 * time.Second
 	queueInfo, err := management.DeclareQueue(context.TODO(), &rmq.QuorumQueueSpecification{
 		Name:             queueName,
-		DelayedRetryType: rmq.QuorumQueueDelayedRetryReturned,
-		DelayedRetryMin:  30 * time.Second,
+		DelayedRetryType: rmq.QuorumQueueDelayedRetryFailed,
+		DelayedRetryMin:  timeMin,
+		DelayedRetryMax:  timeMax,
 	})
 	if err != nil {
 		rmq.Error("Error declaring queue", err)
@@ -94,24 +92,33 @@ func main() {
 			msg := deliveryContext.Message()
 			body := fmt.Sprintf("%s", msg.Data)
 
-			if retryCount.Add(1) < 10 {
-				// The API returned HTTP 429 with a Retry-After for this tenant.
-				// Override the queue's default delayed retry behavior by setting x-opt-delivery-time to now + 5 seconds.
+			if retryCount.Add(1) == 1 {
+				/// first time we use DelayRetry to override the queue's parameters delay configuration
+				err := deliveryContext.DelayRetry(ctx, 2*time.Second, true)
+				if err != nil {
+					rmq.Error("[Consumer] Error delaying retry", "error", err)
+					return
+				}
+				rmq.Warn("[Consumer] Simulating processing failure, message will be retried with delay 2s", "message", body)
+				continue
+			}
 
-				// random value between 5 and 10 seconds:
-				random := time.Duration(5+rand.Intn(5)) * time.Second
-				deliveryTime := time.Now().Add(random).UnixMilli()
-				retryCount.Add(1)
-				rmq.Warn("[Consumer] Rate-limited, overriding delivery time via x-opt-delivery-time",
-					"retry_after_s", random.Seconds(),
-					"delivery_time_ms", deliveryTime,
+			if retryCount.Load() < 5 {
+				// The API returned HTTP 429 with a Retry-After for this tenant.
+				// Here we use the linear backoff patter with  delayed-retry-min/max
+				// server side it is calculated with:
+				// delay time is min(delayed-retry-min * delivery-count, delayed-retry-max)
+				// see: https://www.rabbitmq.com/blog/2026/04/23/rabbitmq-4.3-release#delayed-retries
+				x := float64(timeMin.Milliseconds() * int64(msg.Header.DeliveryCount+1))
+				nextDelivery := math.Min(x, float64(timeMax.Milliseconds()))
+				rmq.Warn("[Consumer] Rate-limited,",
+					"delivery count", msg.Header.DeliveryCount,
+					"retry_after_s", nextDelivery/1000,
 					"message", body,
 				)
-				requeueErr := deliveryContext.RequeueWithAnnotations(ctx, amqp.Annotations{
-					"x-opt-delivery-time": deliveryTime,
-				})
-				if requeueErr != nil {
-					rmq.Error("[Consumer] Error requeuing message with delivery time", "error", requeueErr)
+				// modified{delivery-failed=false, undeliverable-here=true}.
+				err := deliveryContext.RequeueWithAnnotationsAndDeliveryFailed(ctx, nil, true)
+				if err != nil {
 					return
 				}
 			} else {
@@ -134,7 +141,7 @@ func main() {
 		return
 	}
 
-	for i := range 10 {
+	for i := range 1 {
 		msg := rmq.NewMessage([]byte(fmt.Sprintf("my_message nr:%d", i)))
 		publishResult, err := publisher.Publish(context.TODO(), msg)
 		if err != nil {
@@ -152,15 +159,10 @@ func main() {
 	}
 
 	// Wait until the two non-rate-limited messages are accepted.
-
-	for i := 0; i < 10; i++ {
-		<-accepted
-	}
+	<-accepted
 
 	rmq.Info("Normal messages processed. Rate-limited message is set aside by the broker.",
-		"retries_triggered", retryCount.Load(),
-		"note", "The rate-limited message will be redelivered after the x-opt-delivery-time elapses (from 5s to 10s from retry)")
-
+		"retries_triggered", retryCount.Load())
 	cancel()
 	err = consumer.Close(context.TODO())
 	if err != nil {

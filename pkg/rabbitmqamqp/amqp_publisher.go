@@ -158,8 +158,8 @@ RabbitMQ supports the following DeliveryState types:
   - StateRejected
     See: https://www.rabbitmq.com/docs/next/amqp#outcomes for more information.
 
-If the destination address is not defined during the creation, the message must have a TO property set.
-You can use the helper "MessagePropertyToAddress" to create the destination address.
+If the destination address is not defined during the creation, the message must have a message.properties.To property set.
+You can use the helper [MessagePropertyToAddress] to create the destination address.
 See the examples:
 Create a new publisher that sends messages to a specific destination address:
 <code>

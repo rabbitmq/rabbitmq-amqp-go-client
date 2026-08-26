@@ -158,6 +158,16 @@ var _ = Describe("TimedOutDeliveryContext", func() {
 		Expect(err).To(MatchError(ErrDeliveryReleaseInvalidOperation))
 	})
 
+	It("RequeueWithAnnotationsAndDeliveryFailed returns ErrDeliveryReleaseInvalidOperation", func() {
+		err := ctx.RequeueWithAnnotationsAndDeliveryFailed(context.Background(), amqp.Annotations{"x-reason": "retry"}, true)
+		Expect(err).To(MatchError(ErrDeliveryReleaseInvalidOperation))
+	})
+
+	It("DelayRetry returns ErrDeliveryReleaseInvalidOperation", func() {
+		err := ctx.DelayRetry(context.Background(), time.Second, true)
+		Expect(err).To(MatchError(ErrDeliveryReleaseInvalidOperation))
+	})
+
 	It("Message returns the stored message", func() {
 		msg := &amqp.Message{}
 		ctx.message = msg

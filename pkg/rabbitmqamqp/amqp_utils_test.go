@@ -5,6 +5,31 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("validateMessageAnnotationKey", func() {
+	It("returns an error for an empty key without panicking", func() {
+		err := validateMessageAnnotationKey("")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("x-"))
+	})
+
+	It("returns an error for a single-character key without panicking", func() {
+		err := validateMessageAnnotationKey("x")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("x-"))
+	})
+
+	It("returns an error for a key that does not start with x-", func() {
+		err := validateMessageAnnotationKey("invalid-key")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("x-"))
+	})
+
+	It("returns nil for a valid key starting with x-", func() {
+		err := validateMessageAnnotationKey("x-something")
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
 var _ = Describe("Encode and decode address", func() {
 	It("To address from address", func() {
 		type ExpectedQueuesAndDestination struct {

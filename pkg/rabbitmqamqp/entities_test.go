@@ -377,6 +377,50 @@ var _ = Describe("Entities", func() {
 			Expect(spec.validate(&featuresAvailable{is43rMore: true})).To(BeNil())
 			Expect(spec.validate(nil)).To(BeNil())
 		})
+
+		DescribeTable("should map each QuorumQueueDelayedRetryType to the correct wire value",
+			func(retryType QuorumQueueDelayedRetryType, expected string) {
+				spec := &QuorumQueueSpecification{
+					Name:             "my-qq",
+					DelayedRetryType: retryType,
+				}
+				Expect(spec.buildArguments()["x-delayed-retry-type"]).To(Equal(expected))
+			},
+			Entry("Disabled", QuorumQueueDelayedRetryDisabled, "disabled"),
+			Entry("All", QuorumQueueDelayedRetryAll, "all"),
+			Entry("Failed", QuorumQueueDelayedRetryFailed, "failed"),
+			Entry("Returned", QuorumQueueDelayedRetryReturned, "returned"),
+		)
+
+		DescribeTable("should fail validation when any DelayedRetryType is set on RabbitMQ < 4.3",
+			func(retryType QuorumQueueDelayedRetryType) {
+				spec := &QuorumQueueSpecification{
+					Name:             "my-qq",
+					DelayedRetryType: retryType,
+				}
+				err := spec.validate(&featuresAvailable{is43rMore: false})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("4.3"))
+			},
+			Entry("Disabled", QuorumQueueDelayedRetryDisabled),
+			Entry("All", QuorumQueueDelayedRetryAll),
+			Entry("Failed", QuorumQueueDelayedRetryFailed),
+			Entry("Returned", QuorumQueueDelayedRetryReturned),
+		)
+
+		DescribeTable("should pass validation when any DelayedRetryType is set on RabbitMQ >= 4.3",
+			func(retryType QuorumQueueDelayedRetryType) {
+				spec := &QuorumQueueSpecification{
+					Name:             "my-qq",
+					DelayedRetryType: retryType,
+				}
+				Expect(spec.validate(&featuresAvailable{is43rMore: true})).To(BeNil())
+			},
+			Entry("Disabled", QuorumQueueDelayedRetryDisabled),
+			Entry("All", QuorumQueueDelayedRetryAll),
+			Entry("Failed", QuorumQueueDelayedRetryFailed),
+			Entry("Returned", QuorumQueueDelayedRetryReturned),
+		)
 	})
 
 	Describe("durationToMaxAge", func() {

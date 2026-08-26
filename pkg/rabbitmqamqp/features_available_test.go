@@ -186,4 +186,52 @@ var _ = Describe("Available Features", func() {
 		Expect(result.Error()).To(ContainSubstring("queue unavailable"))
 	})
 
+	// Security: unchecked type assertions on server-supplied connection properties.
+	// A rogue or MITM broker can send non-string values for "version"/"product",
+	// which previously caused a runtime panic at dial time (Vuln 2, SECURITY_REPORT.md).
+
+	It("ParseProperties returns error when 'product' key is absent", func() {
+		fa := newFeaturesAvailable()
+		err := fa.ParseProperties(map[string]any{
+			"version": "4.0.0",
+			// "product" intentionally absent
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fa.isRabbitMQ).To(BeFalse())
+		Expect(fa.isTanzu).To(BeFalse())
+		Expect(fa.is4OrMore).To(BeTrue())
+	})
+
+	It("ParseProperties returns error when 'version' is not a string", func() {
+		fa := newFeaturesAvailable()
+		err := fa.ParseProperties(map[string]any{
+			"version": 400,
+			"product": "RabbitMQ",
+		})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("string"))
+	})
+
+	It("ParseProperties returns error when 'product' is not a string", func() {
+		fa := newFeaturesAvailable()
+		err := fa.ParseProperties(map[string]any{
+			"version": "4.0.0",
+			"product": 99,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fa.isRabbitMQ).To(BeFalse())
+		Expect(fa.is4OrMore).To(BeTrue())
+	})
+
+	It("ParseProperties succeeds and marks isRabbitMQ false for a non-standard server", func() {
+		fa := newFeaturesAvailable()
+		err := fa.ParseProperties(map[string]any{
+			"version": "4.1.0",
+			"product": "SomeOtherBroker",
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fa.isRabbitMQ).To(BeFalse())
+		Expect(fa.is41OrMore).To(BeTrue())
+	})
+
 })

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/Azure/go-amqp"
 	"github.com/google/uuid"
@@ -20,8 +21,13 @@ type IDeliveryContext interface {
 	DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error
 	Requeue(ctx context.Context) error
 	RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error
+	RequeueWithAnnotationsAndDeliveryFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error // default true
+	DelayRetry(ctx context.Context, delay time.Duration, deliveryFailed bool) error
 }
 
+// DeliveryContext holds the receiver and message for a single AMQP delivery.
+// It implements IDeliveryContext and is used when the consumer operates in
+// at-least-once (explicit settle) mode.
 type DeliveryContext struct {
 	receiver         *amqp.Receiver
 	message          *amqp.Message
@@ -29,10 +35,14 @@ type DeliveryContext struct {
 	consumeCtx       ConsumeContext // For OTEL semantic convention attributes
 }
 
+// Message returns the received AMQP message.
 func (dc *DeliveryContext) Message() *amqp.Message {
 	return dc.message
 }
 
+// Accept the message (AMQP 1.0 `accepted` outcome).
+//
+// This means the message has been processed and the broker can delete it.
 func (dc *DeliveryContext) Accept(ctx context.Context) error {
 	err := dc.receiver.AcceptMessage(ctx, dc.message)
 	if err == nil {
@@ -41,6 +51,10 @@ func (dc *DeliveryContext) Accept(ctx context.Context) error {
 	return err
 }
 
+// Discard the message (AMQP 1.0 `rejected` outcome).
+//
+// This means the message cannot be processed because it is invalid, the broker can drop it
+// or dead-letter it if it is configured.
 func (dc *DeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
 	err := dc.receiver.RejectMessage(ctx, dc.message, e)
 	if err == nil {
@@ -93,6 +107,14 @@ func streamOffsetFromAnnotation(v any) (int64, bool) {
 	}
 }
 
+// DiscardWithAnnotations discards the message with annotations merged into the existing message annotations.
+// This means the message cannot be processed because it is invalid; the broker can drop it
+// or dead-letter it if configured.
+//
+// This maps to the AMQP 1.0 modified{delivery-failed = true, undeliverable-here = true} outcome.
+//
+// See https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-messaging-v1.0-os.html#type-modified
+// and https://www.rabbitmq.com/docs/amqp#modified-outcome
 func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
@@ -109,6 +131,10 @@ func (dc *DeliveryContext) DiscardWithAnnotations(ctx context.Context, annotatio
 	return err
 }
 
+// Requeue the message (AMQP 1.0 `released` outcome).
+//
+// This means the message has not been processed and the broker can requeue it and deliver it
+// to the same or a different consumer.
 func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 	err := dc.receiver.ReleaseMessage(ctx, dc.message)
 	if err == nil {
@@ -117,13 +143,32 @@ func (dc *DeliveryContext) Requeue(ctx context.Context) error {
 	return err
 }
 
+// RequeueWithAnnotations requeue the message with annotations. DeliveryFailed is implicitly set to
+// false.It is RequeueWithAnnotationsAndDeliveryFailed(ctx,annotation,false)
+// This means the message has not been processed and the broker can requeue it and deliver it
+// to the same or a different consumer.
+// See https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-messaging-v1.0-os.html#type-modified
+// and https://www.rabbitmq.com/docs/amqp#modified-outcome
+// This API is provided for convenience and for compatibility, but it is recommended to use RequeueWithAnnotationsAndDeliveryFailed instead.
+// It will be deprecated and removed in the future.
 func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+	return dc.RequeueWithAnnotationsAndDeliveryFailed(ctx, annotations, false)
+}
+
+// RequeueWithAnnotationsAndDeliveryFailed requeue the message with annotations and controls the
+// delivery-failed flag on the AMQP 1.0 modified outcome.
+// This maps to modified{delivery-failed = <deliveryFailed>, undeliverable-here = false}.
+// RequeueWithAnnotationsAndDeliveryFailed requeue the message with annotations and controls the
+// delivery-failed flag on the AMQP 1.0 modified outcome.
+// This maps to modified{delivery-failed = <deliveryFailed>, undeliverable-here = false}.
+
+func (dc *DeliveryContext) RequeueWithAnnotationsAndDeliveryFailed(ctx context.Context, annotations amqp.Annotations, deliveryFailed bool) error {
 	destination, err := copyAnnotations(annotations)
 	if err != nil {
 		return err
 	}
 	err = dc.receiver.ModifyMessage(ctx, dc.message, &amqp.ModifyMessageOptions{
-		DeliveryFailed:    false,
+		DeliveryFailed:    deliveryFailed,
 		UndeliverableHere: false,
 		Annotations:       destination,
 	})
@@ -131,6 +176,26 @@ func (dc *DeliveryContext) RequeueWithAnnotations(ctx context.Context, annotatio
 		dc.metricsCollector.ConsumeDisposition(ConsumeRequeued, dc.consumeCtx)
 	}
 	return err
+}
+
+// DelayRetry requeue the message with a per-message delivery delay.
+// It sets the x-opt-delivery-time annotation to the absolute Unix timestamp (milliseconds)
+// of time.Now()+delay, triggering per-message delivery-time override on the broker side
+// (if there is a delay configuration).
+// The deliveryFailed flag maps directly to modified{delivery-failed}.
+//
+// This is equivalent to calling RequeueWithAnnotationsAndDeliveryFailed with
+// {"x-opt-delivery-time": <now+delay in ms>}.
+//
+// DelayRetry is a helper function to requeue the message with a delay.
+// for delayed retries feature. https://www.rabbitmq.com/blog/2026/04/23/rabbitmq-4.3-release#delayed-retries
+// It is RequeueWithAnnotationsAndDeliveryFailed with the x-opt-delivery-time annotation set to the current time + delay.
+// DelayRetry is per message, and it is not mandatory to configure any DelayRetry policy in the queue.
+func (dc *DeliveryContext) DelayRetry(ctx context.Context, delay time.Duration, deliveryFailed bool) error {
+	annotations := amqp.Annotations{
+		"x-opt-delivery-time": time.Now().Add(delay).UnixMilli(),
+	}
+	return dc.RequeueWithAnnotationsAndDeliveryFailed(ctx, annotations, deliveryFailed)
 }
 
 // ErrPreSettledMessageDisposed is returned by PreSettledDeliveryContext settlement methods:
@@ -142,32 +207,48 @@ var ErrPreSettledMessageDisposed = errors.New("auto-settle on, message is alread
 var ErrDeliveryReleaseInvalidOperation = errors.New("only Accept is valid for a timed-out delivery context")
 
 // PreSettledDeliveryContext represents a delivery context for pre-settled messages.
-// All settlement methods throw errors since the message is already settled.
+// All settlement methods return ErrPreSettledMessageDisposed since the message is already settled by the broker.
 type PreSettledDeliveryContext struct {
 	message *amqp.Message
 }
 
+// Message returns the received AMQP message.
 func (dc *PreSettledDeliveryContext) Message() *amqp.Message {
 	return dc.message
 }
 
-func (dc *PreSettledDeliveryContext) Accept(ctx context.Context) error {
+// Accept always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) Accept(_ context.Context) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) Discard(ctx context.Context, e *amqp.Error) error {
+// Discard always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) Discard(_ context.Context, _ *amqp.Error) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+// DiscardWithAnnotations always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) DiscardWithAnnotations(_ context.Context, _ amqp.Annotations) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) Requeue(ctx context.Context) error {
+// Requeue always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) Requeue(_ context.Context) error {
 	return ErrPreSettledMessageDisposed
 }
 
-func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(ctx context.Context, annotations amqp.Annotations) error {
+// RequeueWithAnnotations always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) RequeueWithAnnotations(_ context.Context, _ amqp.Annotations) error {
+	return ErrPreSettledMessageDisposed
+}
+
+// RequeueWithAnnotationsAndDeliveryFailed always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) RequeueWithAnnotationsAndDeliveryFailed(_ context.Context, _ amqp.Annotations, _ bool) error {
+	return ErrPreSettledMessageDisposed
+}
+
+// DelayRetry always returns ErrPreSettledMessageDisposed because the message is already settled by the broker.
+func (dc *PreSettledDeliveryContext) DelayRetry(_ context.Context, _ time.Duration, _ bool) error {
 	return ErrPreSettledMessageDisposed
 }
 
@@ -210,6 +291,14 @@ func (t *TimedOutDeliveryContext) RequeueWithAnnotations(_ context.Context, _ am
 	return ErrDeliveryReleaseInvalidOperation
 }
 
+func (t *TimedOutDeliveryContext) RequeueWithAnnotationsAndDeliveryFailed(_ context.Context, _ amqp.Annotations, _ bool) error {
+	return ErrDeliveryReleaseInvalidOperation
+}
+
+func (t *TimedOutDeliveryContext) DelayRetry(_ context.Context, _ time.Duration, _ bool) error {
+	return ErrDeliveryReleaseInvalidOperation
+}
+
 type consumerState byte
 
 const (
@@ -218,6 +307,12 @@ const (
 	consumerStatePaused
 )
 
+// Consumer represents an active AMQP 1.0 message consumer attached to a queue or stream.
+// It wraps the underlying go-amqp Receiver and provides settlement helpers (Accept, Discard,
+// Requeue) via the IDeliveryContext returned from Receive.
+//
+// Use AmqpConnection.NewConsumer to create a Consumer. Call Receive in a loop to process
+// messages and Close when the consumer is no longer needed.
 type Consumer struct {
 	receiver       atomic.Pointer[amqp.Receiver]
 	connection     *AmqpConnection
@@ -241,6 +336,8 @@ type Consumer struct {
 	queue string
 }
 
+// Id returns the unique identifier of this consumer.
+// If no custom ID was provided via ConsumerOptions, a random UUID prefixed with "consumer-" is used.
 func (c *Consumer) Id() string {
 	return c.id
 }
@@ -386,6 +483,11 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 	return nil
 }
 
+// Receive blocks until a message is available on the link or the context is cancelled.
+// It returns an IDeliveryContext that must be settled by the caller, see IDeliveryContext.
+// unless the consumer was created with PreSettled settle strategy, in which case the broker
+// has already settled the delivery and calling any settlement method returns ErrPreSettledMessageDisposed.
+// It returns also an error in case of problem during the receiving.
 func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 	msg, err := c.receiver.Load().Receive(ctx, nil)
 	if err != nil {
@@ -425,6 +527,8 @@ func (c *Consumer) Receive(ctx context.Context) (IDeliveryContext, error) {
 	}, nil
 }
 
+// Close detaches the consumer link and removes the consumer from the connection's
+// entity tracker. After Close returns, no further calls to Receive should be made.
 func (c *Consumer) Close(ctx context.Context) error {
 	c.connection.entitiesTracker.removeConsumer(c)
 	err := c.receiver.Load().Close(ctx)

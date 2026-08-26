@@ -180,9 +180,35 @@ func (a *AmqpConnection) Properties() map[string]any {
 }
 
 // NewPublisher creates a new Publisher that sends messages to the provided destination.
-// The destination is a ITargetAddress that can be a Queue or an Exchange with a routing key.
-// options is an IPublisherOptions that can be used to configure the publisher.
-// See QueueAddress and ExchangeAddress for more information.
+//
+// The destination parameter is an [ITargetAddress] — either a [QueueAddress], an
+// [ExchangeAddress], or nil.
+//
+// When destination is non-nil, the Publisher has a fixed target and all messages are
+// sent to that address:
+//
+//	target := &rabbitmqamqp.ExchangeAddress{Exchange: "my-exchange", Key: "my-key"}
+//	publisher, err := conn.NewPublisher(ctx, target, nil)
+//
+// When destination is nil, an Anonymous Sender is created. The target address must be
+// set per-message via [NewMessageWithAddress] or [MessagePropertyToAddress], allowing
+// different messages to be routed to different targets:
+//
+//	anonymousPublisher, err := conn.NewPublisher(ctx, nil, nil)
+//
+//	msg1, err := rabbitmqamqp.NewMessageWithAddress([]byte("pizza"), &rabbitmqamqp.ExchangeAddress{Exchange: "my-exchange", Key: "test"})
+//	anonymousPublisher.Publish(ctx, msg1)
+//
+//	msg2, err := rabbitmqamqp.NewMessageWithAddress([]byte("pasta"), &rabbitmqamqp.ExchangeAddress{Exchange: "another-exchange", Key: "another-key"})
+//	anonymousPublisher.Publish(ctx, msg2)
+//
+// Note: when the publisher has a fixed target, the message's To property
+// (message.Properties.To) is ignored.
+// [NewMessageWithAddress] or [MessagePropertyToAddress] are just helper functions to set message.Properties.To
+//
+// The options parameter configures the publisher (link name, max in-flight messages,
+// publish timeout, etc.). Pass nil to use the defaults. See [PublisherOptions].
+
 func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAddress, options IPublisherOptions) (*Publisher, error) {
 	destinationAdd := ""
 	err := error(nil)
@@ -203,7 +229,9 @@ func (a *AmqpConnection) NewPublisher(ctx context.Context, destination ITargetAd
 // NewConsumer creates a new Consumer that listens to the provided Queue
 // options is an IConsumerOptions that can be used to configure the consumer.
 // it can be nil, and the consumer will be created with default options.
-// see
+// To consume messages:
+// deliveryContext, err := consumer.Receive(ctx)
+// with deliveryContext you can access the message and the delivery, see [IDeliveryContext] for more details.
 func (a *AmqpConnection) NewConsumer(ctx context.Context, queueName string, options IConsumerOptions) (*Consumer, error) {
 
 	if options != nil {
@@ -241,7 +269,10 @@ func (a *AmqpConnection) NewResponder(ctx context.Context, options ResponderOpti
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consumer: %w", err)
 	}
-	consumer.issueCredits(1)
+	err = consumer.issueCredits(1)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create publisher for sending replies
 	publisher, err := a.NewPublisher(ctx, nil, nil)
@@ -612,12 +643,9 @@ func (a *AmqpConnection) maybeReconnect() {
 		///wait for before reconnecting
 		// add some random milliseconds to the wait time to avoid thundering herd
 		// the random time is between 0 and 500 milliseconds
-		// Calculate delay with exponential backoff and jitter
+		// Calculate delay with exponential backoff and jitter, capped at maxDelay
 		jitter := time.Duration(rand.Intn(500)) * time.Millisecond
-		delay := baseDelay + jitter
-		if delay > maxDelay {
-			delay = maxDelay
-		}
+		delay := min(baseDelay+jitter, maxDelay)
 
 		Info("Attempting reconnection", "attempt", attempt, "delay", delay, "ID", a.Id())
 		time.Sleep(delay)
@@ -639,7 +667,7 @@ func (a *AmqpConnection) maybeReconnect() {
 			return
 		}
 
-		baseDelay *= 2
+		baseDelay = min(baseDelay*2, maxDelay)
 		Error("Reconnection attempt failed", "attempt", attempt, "error", err, "ID", a.Id())
 	}
 
