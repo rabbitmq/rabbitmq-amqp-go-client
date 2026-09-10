@@ -16,6 +16,10 @@ import (
 const AMQPS = "amqps"
 const StreamFilterValue = "x-stream-filter-value"
 
+// ClientVersion is the current version of this client library.
+// It is bumped on every release, see CHANGELOG.md.
+const ClientVersion = "1.4.0"
+
 const (
 	responseCode200       = 200
 	responseCode201       = 201

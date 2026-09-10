@@ -42,3 +42,6 @@ rabbitmq-server-start:
 
 rabbitmq-server-stop:
 	 ./.ci/ubuntu/gha-setup.sh stop
+
+docker-build-reliable-example:
+	docker build -t go-amqp1.0-client -f ./docs/examples/reliable/Dockerfile .

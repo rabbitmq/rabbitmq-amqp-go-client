@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 version=$1
 gpg_key=$2
@@ -15,16 +15,23 @@ if [[ ! $version =~ $regex ]]; then
     exit 1
 fi
 
-# echo "Updating version and constants to $version"
-# echo $version > VERSION
-# sed -i -e "s/.*ClientVersion = \"*.*/ClientVersion = \"$version\"/" pkg/stream/constants.go
-# go fmt ./...
+echo "Updating ClientVersion to $version"
+sed -i -e "s/ClientVersion = \".*\"/ClientVersion = \"$version\"/" pkg/rabbitmqamqp/common.go
+go fmt ./...
 
-# echo ""
-# echo "Committing changes"
-# git add VERSION pkg/stream/constants.go README.md
-# git commit -m "rabbitmq-stream-go-client $tag"
+echo ""
+echo "Committing changes"
+git add pkg/rabbitmqamqp/common.go
+git commit -m "rabbitmq-amqp-go-client $tag"
+
+read -p "Push the last commit to the main branch now? [y/N] " push_answer
+if [[ "$push_answer" =~ ^[Yy]$ ]]; then
+    echo "Pushing to main"
+    git push
+else
+    echo "Skipping push of the commit."
+fi
 
 echo ""
 echo "Creating and pushing tag $tag"
-git tag -a -s -u $gpg_key -m "rabbitmq-amqp-go-client $tag" $tag && git push && git push --tags
+git tag -a -s -u $gpg_key -m "rabbitmq-amqp-go-client $tag" $tag && git push --tags
