@@ -82,13 +82,6 @@ func getPreSettled(co IConsumerOptions) bool {
 	return co.preSettled()
 }
 
-func getPriority(co IConsumerOptions) *Priority {
-	if co == nil {
-		return nil
-	}
-	return co.priority()
-}
-
 type managementOptions struct {
 }
 

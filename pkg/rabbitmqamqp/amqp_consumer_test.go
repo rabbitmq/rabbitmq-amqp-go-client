@@ -143,7 +143,7 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(queue).NotTo(BeNil())
 
 		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
-			Priority: 10,
+			Priority: &Priority{Value: 10},
 		})
 
 		Expect(err).To(BeNil())
