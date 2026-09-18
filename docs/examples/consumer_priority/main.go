@@ -52,7 +52,7 @@ func main() {
 
 	// Create a High Priority Consumer
 	highPriorityConsumer, err := amqpConnection.NewConsumer(context.TODO(), queueName, &rmq.ConsumerOptions{
-		Priority: 10,
+		Priority: &rmq.Priority{Value: 88},
 	})
 	if err != nil {
 		rmq.Error("Error creating high priority consumer", err)
@@ -62,7 +62,7 @@ func main() {
 
 	// Create a Low Priority Consumer
 	lowPriorityConsumer, err := amqpConnection.NewConsumer(context.TODO(), queueName, &rmq.ConsumerOptions{
-		Priority: 1,
+		Priority: &rmq.Priority{Value: 77},
 	})
 	if err != nil {
 		rmq.Error("Error creating low priority consumer", err)

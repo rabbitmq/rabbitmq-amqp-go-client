@@ -58,7 +58,7 @@ type IConsumerOptions interface {
 	// This is the "fire-and-forget" or "at-most-once" mode.
 	preSettled() bool
 
-	priority() int
+	priority() *Priority
 }
 
 func getInitialCredits(co IConsumerOptions) int32 {
@@ -82,9 +82,9 @@ func getPreSettled(co IConsumerOptions) bool {
 	return co.preSettled()
 }
 
-func getPriority(co IConsumerOptions) int {
+func getPriority(co IConsumerOptions) *Priority {
 	if co == nil {
-		return 0
+		return nil
 	}
 	return co.priority()
 }
@@ -121,8 +121,8 @@ func (mo *managementOptions) preSettled() bool {
 	return false
 }
 
-func (mo *managementOptions) priority() int {
-	return 0
+func (mo *managementOptions) priority() *Priority {
+	return nil
 }
 
 // ConsumerSettleStrategy configures how the consumer receives and settles messages.
@@ -142,6 +142,13 @@ const (
 	// so no acknowledgment is needed from the consumer side.
 	PreSettled
 )
+
+type Priority struct {
+	// The priority of the consumer. Higher values indicate higher priority.
+	// Consumers with higher priority will receive messages before those with lower priority.
+	// If multiple consumers have the same priority, messages are distributed in a round-robin fashion.
+	Value int32
+}
 
 // ConsumerOptions represents the options for quorum and classic queues
 type ConsumerOptions struct {
@@ -171,7 +178,7 @@ type ConsumerOptions struct {
 	// See DeliveryReleaseFunc for details. Requires RabbitMQ 4.3 or later.
 	OnDeliveryRelease DeliveryReleaseFunc
 
-	Priority int
+	Priority *Priority
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -213,7 +220,7 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 		return fmt.Errorf("OnDeliveryRelease callback requires RabbitMQ 4.3 or later")
 	}
 
-	if aco.Priority != 0 {
+	if aco.Priority != nil {
 		if available != nil && !available.is43rMore {
 			return fmt.Errorf("consumer priority is not supported. You need RabbitMQ 4.3 or later")
 		}
@@ -230,7 +237,7 @@ func (aco *ConsumerOptions) preSettled() bool {
 	return aco.SettleStrategy == PreSettled
 }
 
-func (aco *ConsumerOptions) priority() int {
+func (aco *ConsumerOptions) priority() *Priority {
 	return aco.Priority
 }
 
@@ -495,8 +502,8 @@ func (sco *StreamConsumerOptions) preSettled() bool {
 	return false
 }
 
-func (sco *StreamConsumerOptions) priority() int {
-	return 0
+func (sco *StreamConsumerOptions) priority() *Priority {
+	return nil
 }
 
 ///// PublisherOptions /////
