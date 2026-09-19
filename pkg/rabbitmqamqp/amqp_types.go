@@ -171,6 +171,11 @@ type ConsumerOptions struct {
 	// See DeliveryReleaseFunc for details. Requires RabbitMQ 4.3 or later.
 	OnDeliveryRelease DeliveryReleaseFunc
 
+	// Priority sets the consumer priority (rabbitmq:priority AMQP 1.0 ATTACH link property). Higher values indicate higher priority.
+	// Consumers with higher priority will receive messages before those with lower priority.
+	// If multiple consumers have the same priority, messages are distributed in a round-robin fashion.
+	// Requires RabbitMQ 4.3 or later.
+	// if nil the consumer will have the default priority of 0.
 	Priority *Priority
 }
 
