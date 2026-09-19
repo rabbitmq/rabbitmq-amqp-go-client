@@ -437,4 +437,47 @@ var _ = Describe("Entities", func() {
 			Entry("zero", time.Duration(0), "0s"),
 		)
 	})
+
+	Describe("ConsumerOptions Validation", func() {
+
+		It("should return error when priority is set on RabbitMQ < 4.3", func() {
+			options := &ConsumerOptions{Priority: &Priority{Value: 10}}
+			err := options.validate(&featuresAvailable{is43rMore: false})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("4.3"))
+		})
+
+		It("should pass validation when priority is set on RabbitMQ >= 4.3", func() {
+			options := &ConsumerOptions{Priority: &Priority{Value: 10}}
+			err := options.validate(&featuresAvailable{is43rMore: true})
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Describe("createReceiverLinkOptions", func() {
+		It("should map consumer priority to link properties when set", func() {
+			options := &ConsumerOptions{
+				ReceiverLinkName: "test-link",
+				Priority:         &Priority{Value: 5},
+			}
+			opts := createReceiverLinkOptions("/queues/test-queue", options, AtLeastOnce)
+			setConsumerPriorityProperty(opts, options)
+
+			Expect(opts.Properties).ToNot(BeNil())
+			Expect(opts.Properties["rabbitmq:priority"]).To(Equal(int32(5)))
+		})
+
+		It("should not map consumer priority to link properties when 0", func() {
+			options := &ConsumerOptions{
+				ReceiverLinkName: "test-link",
+				Priority:         &Priority{Value: 0},
+			}
+			opts := createReceiverLinkOptions("/queues/test-queue", options, AtLeastOnce)
+			setConsumerPriorityProperty(opts, options)
+
+			Expect(opts.Properties).ToNot(BeNil())
+			_, hasPriority := opts.Properties["rabbitmq:priority"]
+			Expect(hasPriority).To(BeTrue())
+		})
+	})
 })
