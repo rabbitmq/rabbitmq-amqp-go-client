@@ -50,9 +50,11 @@ func main() {
 	}
 	rmq.Info("Queue declared", "name", queueInfo.Name())
 
-	// Create a High Priority Consumer
+	// Create a High Priority Consumer. In this example, the high priority consumer has a priority of 10,
+	// while the low priority consumer has a priority of 1.
+	// and it has to receive all the messages before the low priority consumer can receive any messages.
 	highPriorityConsumer, err := amqpConnection.NewConsumer(context.TODO(), queueName, &rmq.ConsumerOptions{
-		Priority: &rmq.Priority{Value: 88},
+		Priority: &rmq.Priority{Value: 10},
 	})
 	if err != nil {
 		rmq.Error("Error creating high priority consumer", err)
@@ -62,7 +64,7 @@ func main() {
 
 	// Create a Low Priority Consumer
 	lowPriorityConsumer, err := amqpConnection.NewConsumer(context.TODO(), queueName, &rmq.ConsumerOptions{
-		Priority: &rmq.Priority{Value: 77},
+		Priority: &rmq.Priority{Value: 1},
 	})
 	if err != nil {
 		rmq.Error("Error creating low priority consumer", err)
