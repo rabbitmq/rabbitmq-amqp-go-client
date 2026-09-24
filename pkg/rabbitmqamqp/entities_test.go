@@ -84,6 +84,60 @@ var _ = Describe("Entities", func() {
 			args := spec.buildArguments()
 			Expect(args["x-queue-type"]).To(Equal("stream"))
 		})
+
+		It("sets x-stream-initial-offset when InitialOffset is non-zero", func() {
+			spec := &StreamQueueSpecification{
+				Name:          "my-stream",
+				InitialOffset: 1000,
+			}
+			args := spec.buildArguments()
+			Expect(args["x-stream-initial-offset"]).To(Equal(int64(1000)))
+			Expect(args["x-queue-type"]).To(Equal("stream"))
+		})
+
+		It("does not set x-stream-initial-offset when InitialOffset is zero", func() {
+			spec := &StreamQueueSpecification{Name: "my-stream"}
+			args := spec.buildArguments()
+			Expect(args).ToNot(HaveKey("x-stream-initial-offset"))
+		})
+
+		It("fails validate when InitialOffset is set on RabbitMQ < 4.4", func() {
+			spec := &StreamQueueSpecification{
+				Name:          "my-stream",
+				InitialOffset: 500,
+			}
+			err := spec.validate(&featuresAvailable{is44rMore: false})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("4.4"))
+		})
+
+		It("passes validate when InitialOffset is set on RabbitMQ >= 4.4", func() {
+			spec := &StreamQueueSpecification{
+				Name:          "my-stream",
+				InitialOffset: 500,
+			}
+			Expect(spec.validate(&featuresAvailable{is44rMore: true})).To(BeNil())
+		})
+
+		It("fails validate when InitialOffset is negative", func() {
+			spec := &StreamQueueSpecification{
+				Name:          "my-stream",
+				InitialOffset: -1,
+			}
+			err := spec.validate(&featuresAvailable{is44rMore: true})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("between 0 and"))
+		})
+
+		It("fails validate when InitialOffset exceeds MaxStreamInitialOffset", func() {
+			spec := &StreamQueueSpecification{
+				Name:          "my-stream",
+				InitialOffset: MaxStreamInitialOffset + 1,
+			}
+			err := spec.validate(&featuresAvailable{is44rMore: true})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("between 0 and"))
+		})
 	})
 
 	Describe("JMSQueueSpecification", func() {

@@ -566,6 +566,8 @@ type StreamQueueSpecification struct {
 	SegmentSize int64
 	// FilterSizeBytes is the size in bytes of the Bloom filter used for stream filtering (x-stream-filter-size-bytes).
 	FilterSizeBytes int64
+	// InitialOffset is the offset from which the stream should start reading messages (x-stream-initial-offset).
+	InitialOffset int64
 	// Arguments holds additional queue arguments passed directly to the broker.
 	Arguments map[string]any
 }
@@ -612,12 +614,27 @@ func (s *StreamQueueSpecification) buildArguments() map[string]any {
 		result["x-stream-filter-size-bytes"] = s.FilterSizeBytes
 	}
 
+	if s.InitialOffset != 0 {
+		result["x-stream-initial-offset"] = s.InitialOffset
+	}
+
 	result["x-queue-type"] = string(s.queueType())
 
 	return result
 }
 
-func (s *StreamQueueSpecification) validate(*featuresAvailable) error {
+const MaxStreamInitialOffset = (1 << 62) - 1
+
+func (s *StreamQueueSpecification) validate(f *featuresAvailable) error {
+	if s.InitialOffset != 0 {
+		if s.InitialOffset < 0 || s.InitialOffset > MaxStreamInitialOffset {
+			return fmt.Errorf("initial offset must be between 0 and %d", MaxStreamInitialOffset)
+		}
+
+		if f != nil && !f.is44rMore {
+			return fmt.Errorf("stream initial offset is not supported. You need to use RabbitMQ 4.4 or later")
+		}
+	}
 	return nil
 }
 
