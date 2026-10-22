@@ -469,6 +469,7 @@ func (c *Consumer) createReceiver(ctx context.Context) error {
 		receiverOptions = createReceiverLinkOptions(c.destinationAdd, c.options, AtLeastOnce)
 		setSingleActiveConsumerLinkStateHandler(receiverOptions, c.options, c)
 		setConsumerTimeoutProperty(receiverOptions, c.options)
+		setConsumerPriorityProperty(receiverOptions, c.options)
 		setDeliveryReleaseHandler(receiverOptions, c.options, c)
 	}
 

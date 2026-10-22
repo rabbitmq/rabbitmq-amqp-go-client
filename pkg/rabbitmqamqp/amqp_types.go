@@ -57,6 +57,8 @@ type IConsumerOptions interface {
 	// settlement from the client with a disposition frame not necessary.
 	// This is the "fire-and-forget" or "at-most-once" mode.
 	preSettled() bool
+
+	priority() *Priority
 }
 
 func getInitialCredits(co IConsumerOptions) int32 {
@@ -112,6 +114,10 @@ func (mo *managementOptions) preSettled() bool {
 	return false
 }
 
+func (mo *managementOptions) priority() *Priority {
+	return nil
+}
+
 // ConsumerSettleStrategy configures how the consumer receives and settles messages.
 // Aligns with the settle strategy concept used across AMQP 1.0 clients.
 type ConsumerSettleStrategy byte
@@ -129,6 +135,13 @@ const (
 	// so no acknowledgment is needed from the consumer side.
 	PreSettled
 )
+
+type Priority struct {
+	// The priority of the consumer. Higher values indicate higher priority.
+	// Consumers with higher priority will receive messages before those with lower priority.
+	// If multiple consumers have the same priority, messages are distributed in a round-robin fashion.
+	Value int32
+}
 
 // ConsumerOptions represents the options for quorum and classic queues
 type ConsumerOptions struct {
@@ -157,6 +170,13 @@ type ConsumerOptions struct {
 	// OnDeliveryRelease is called when the broker releases a delivery due to consumer timeout.
 	// See DeliveryReleaseFunc for details. Requires RabbitMQ 4.3 or later.
 	OnDeliveryRelease DeliveryReleaseFunc
+
+	// Priority sets the consumer priority (rabbitmq:priority AMQP 1.0 ATTACH link property). Higher values indicate higher priority.
+	// Consumers with higher priority will receive messages before those with lower priority.
+	// If multiple consumers have the same priority, messages are distributed in a round-robin fashion.
+	// Requires RabbitMQ 4.3 or later.
+	// if nil the consumer will have the default priority of 0.
+	Priority *Priority
 }
 
 func (aco *ConsumerOptions) linkName() string {
@@ -198,6 +218,12 @@ func (aco *ConsumerOptions) validate(available *featuresAvailable) error {
 		return fmt.Errorf("OnDeliveryRelease callback requires RabbitMQ 4.3 or later")
 	}
 
+	if aco.Priority != nil {
+		if available != nil && !available.is43rMore {
+			return fmt.Errorf("consumer priority is not supported. You need RabbitMQ 4.3 or later")
+		}
+	}
+
 	return nil
 }
 
@@ -207,6 +233,10 @@ func (aco *ConsumerOptions) isDirectReplyToEnable() bool {
 
 func (aco *ConsumerOptions) preSettled() bool {
 	return aco.SettleStrategy == PreSettled
+}
+
+func (aco *ConsumerOptions) priority() *Priority {
+	return aco.Priority
 }
 
 type IOffsetSpecification interface {
@@ -468,6 +498,10 @@ func (sco *StreamConsumerOptions) isDirectReplyToEnable() bool {
 // preSettled does not make sense for stream consumers.
 func (sco *StreamConsumerOptions) preSettled() bool {
 	return false
+}
+
+func (sco *StreamConsumerOptions) priority() *Priority {
+	return nil
 }
 
 ///// PublisherOptions /////

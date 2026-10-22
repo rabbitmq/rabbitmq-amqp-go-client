@@ -126,6 +126,34 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(connection.Close(context.Background())).To(BeNil())
 	})
 
+	It("AMQP NewConsumer should accept consumer priority", func() {
+		qName := generateNameWithDateTime("AMQP NewConsumer should accept consumer priority")
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+
+		ver, _ := connection.Properties()["version"].(string)
+		if !isVersionGreaterOrEqual(extractVersion(ver), "4.3.0") {
+			Skip("requires RabbitMQ 4.3+ for consumer priority")
+		}
+
+		queue, err := connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{
+			Name: qName,
+		})
+		Expect(err).To(BeNil())
+		Expect(queue).NotTo(BeNil())
+
+		consumer, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			Priority: &Priority{Value: 10},
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumer).NotTo(BeNil())
+
+		Expect(consumer.Close(context.Background())).To(BeNil())
+		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
+		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
 	It("AMQP NewConsumer should discard the message to the queue with and without annotations", func() {
 		// TODO: Implement this test with a dead letter queue to test the discard feature
 		qName := generateNameWithDateTime("AMQP NewConsumer should discard the message to the queue with and without annotations")
@@ -163,6 +191,115 @@ var _ = Describe("NewConsumer tests", func() {
 		Expect(consumer.Close(context.Background())).To(BeNil())
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
+	})
+
+})
+
+var _ = Describe("Consumer priority behavior", func() {
+	It("delivers messages to the higher priority consumer while it has credit", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = connection.Close(context.Background()) })
+
+		ver, _ := connection.Properties()["version"].(string)
+		if !isVersionGreaterOrEqual(extractVersion(ver), "4.3.0") {
+			Skip("requires RabbitMQ 4.3+ for consumer priority")
+		}
+
+		qName := generateNameWithDateTime("consumer priority delivers to higher priority first")
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = connection.Management().DeleteQueue(context.Background(), qName) })
+
+		highPriority, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			SettleStrategy: ExplicitSettle,
+			Priority:       &Priority{Value: 10},
+		})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = highPriority.Close(context.Background()) })
+
+		lowPriority, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			SettleStrategy: ExplicitSettle,
+			Priority:       &Priority{Value: 1},
+		})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = lowPriority.Close(context.Background()) })
+
+		const messageCount = 20
+		publishMessages(qName, messageCount)
+
+		// The higher priority consumer has full credit throughout, so the broker
+		// must deliver every message to it before the lower priority consumer sees any.
+		for i := 0; i < messageCount; i++ {
+			dc, err := highPriority.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		lowCtx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		DeferCleanup(cancel)
+		_, err = lowPriority.Receive(lowCtx)
+		Expect(err).To(MatchError(context.DeadlineExceeded))
+	})
+
+	It("falls back to the lower priority consumer once the higher priority consumer runs out of credit", func() {
+		connection, err := Dial(context.Background(), "amqp://", nil)
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = connection.Close(context.Background()) })
+
+		ver, _ := connection.Properties()["version"].(string)
+		if !isVersionGreaterOrEqual(extractVersion(ver), "4.3.0") {
+			Skip("requires RabbitMQ 4.3+ for consumer priority")
+		}
+
+		qName := generateNameWithDateTime("consumer priority falls back to lower priority")
+		_, err = connection.Management().DeclareQueue(context.Background(), &QuorumQueueSpecification{Name: qName})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = connection.Management().DeleteQueue(context.Background(), qName) })
+
+		// InitialCredits -1 means manual credit control, see the "Consumer pause and unpause" tests.
+		highPriority, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			SettleStrategy: ExplicitSettle,
+			InitialCredits: -1,
+			Priority:       &Priority{Value: 10},
+		})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = highPriority.Close(context.Background()) })
+
+		lowPriority, err := connection.NewConsumer(context.Background(), qName, &ConsumerOptions{
+			SettleStrategy: ExplicitSettle,
+			InitialCredits: -1,
+			Priority:       &Priority{Value: 1},
+		})
+		Expect(err).To(BeNil())
+		DeferCleanup(func() { _ = lowPriority.Close(context.Background()) })
+
+		const highShare = 5
+		const lowShare = 5
+		Expect(highPriority.receiver.Load().IssueCredit(uint32(highShare))).To(BeNil())
+		Expect(lowPriority.receiver.Load().IssueCredit(uint32(lowShare))).To(BeNil())
+
+		publishMessages(qName, highShare+lowShare)
+
+		// The higher priority consumer consumes exactly its share of credit ...
+		for i := 0; i < highShare; i++ {
+			dc, err := highPriority.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		// ... and once it has no credit left, it must not receive anything else.
+		highCtx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		DeferCleanup(cancel)
+		_, err = highPriority.Receive(highCtx)
+		Expect(err).To(MatchError(context.DeadlineExceeded))
+
+		// The broker falls back to the lower priority consumer for the remaining messages.
+		for i := 0; i < lowShare; i++ {
+			dc, err := lowPriority.Receive(context.Background())
+			Expect(err).To(BeNil())
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
 	})
 })
 

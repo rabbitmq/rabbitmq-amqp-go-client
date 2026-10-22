@@ -18,7 +18,7 @@ const StreamFilterValue = "x-stream-filter-value"
 
 // ClientVersion is the current version of this client library.
 // It is bumped on every release, see CHANGELOG.md.
-const ClientVersion = "1.4.0"
+const ClientVersion = "1.5.0"
 
 const (
 	responseCode200       = 200
@@ -42,7 +42,8 @@ const (
 	// rabbitmqConsumerTimeoutProperty is the AMQP 1.0 ATTACH link property key used to set
 	// a per-consumer message-lock timeout (milliseconds) for quorum and JMS queues.
 	// Requires RabbitMQ 4.3 or later.
-	rabbitmqConsumerTimeoutProperty = "rabbitmq:consumer-timeout"
+	rabbitmqConsumerTimeoutProperty  = "rabbitmq:consumer-timeout"
+	rabbitmqConsumerPriorityProperty = "rabbitmq:priority"
 )
 
 func validatePositive(label string, value int64) error {

@@ -151,6 +151,20 @@ func setDeliveryReleaseHandler(opts *amqp.ReceiverOptions, options IConsumerOpti
 	}
 }
 
+func setConsumerPriorityProperty(opts *amqp.ReceiverOptions, options IConsumerOptions) {
+	if opts == nil || options == nil {
+		return
+	}
+	co, ok := options.(*ConsumerOptions)
+	if !ok || co.Priority == nil {
+		return
+	}
+	if opts.Properties == nil {
+		opts.Properties = make(map[string]any)
+	}
+	opts.Properties[rabbitmqConsumerPriorityProperty] = co.Priority.Value
+}
+
 func random(max int) int {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	return r.Intn(max)

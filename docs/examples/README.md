@@ -23,3 +23,4 @@
 - [Quorum Queue Consumer Timeout](qq_consumer_timeout) - An example of quorum queue consumer timeouts (`x-consumer-timeout`) and how to handle the `OnDeliveryRelease` callback (RabbitMQ 4.3+)
 - [Publish Async](publish_async) - An example of how to use `PublishAsync` to send messages without blocking the caller while waiting for broker confirmation.
 - [OpenTelemetry Metrics](otel_metrics) - An example of how to configure OpenTelemetry metrics with a stdout exporter, showing connection, publisher, consumer, and message counts.
+- [Consumer Priority](consumer_priority) - An example of how to use consumer priority with the AMQP 1.0 client (RabbitMQ 4.3+)
