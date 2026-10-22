@@ -65,6 +65,9 @@ var _ = Describe("Available Features", func() {
 		})).To(BeNil())
 		Expect(availableFeatures.is4OrMore).To(BeFalse())
 		Expect(availableFeatures.is41OrMore).To(BeFalse())
+		Expect(availableFeatures.is42rMore).To(BeFalse())
+		Expect(availableFeatures.is43rMore).To(BeFalse())
+		Expect(availableFeatures.is44rMore).To(BeFalse())
 		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
 
 		Expect(availableFeatures.ParseProperties(map[string]any{
@@ -73,6 +76,9 @@ var _ = Describe("Available Features", func() {
 		})).To(BeNil())
 		Expect(availableFeatures.is4OrMore).To(BeFalse())
 		Expect(availableFeatures.is41OrMore).To(BeFalse())
+		Expect(availableFeatures.is42rMore).To(BeFalse())
+		Expect(availableFeatures.is43rMore).To(BeFalse())
+		Expect(availableFeatures.is44rMore).To(BeFalse())
 		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
 
 		Expect(availableFeatures.ParseProperties(map[string]any{
@@ -82,6 +88,9 @@ var _ = Describe("Available Features", func() {
 
 		Expect(availableFeatures.is4OrMore).To(BeTrue())
 		Expect(availableFeatures.is41OrMore).To(BeFalse())
+		Expect(availableFeatures.is42rMore).To(BeFalse())
+		Expect(availableFeatures.is43rMore).To(BeFalse())
+		Expect(availableFeatures.is44rMore).To(BeFalse())
 		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
 
 		Expect(availableFeatures.ParseProperties(map[string]any{
@@ -91,6 +100,9 @@ var _ = Describe("Available Features", func() {
 
 		Expect(availableFeatures.is4OrMore).To(BeTrue())
 		Expect(availableFeatures.is41OrMore).To(BeTrue())
+		Expect(availableFeatures.is42rMore).To(BeFalse())
+		Expect(availableFeatures.is43rMore).To(BeFalse())
+		Expect(availableFeatures.is44rMore).To(BeFalse())
 		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
 
 		Expect(availableFeatures.ParseProperties(map[string]any{
@@ -100,6 +112,9 @@ var _ = Describe("Available Features", func() {
 
 		Expect(availableFeatures.is4OrMore).To(BeTrue())
 		Expect(availableFeatures.is41OrMore).To(BeTrue())
+		Expect(availableFeatures.is42rMore).To(BeFalse())
+		Expect(availableFeatures.is43rMore).To(BeFalse())
+		Expect(availableFeatures.is44rMore).To(BeFalse())
 		Expect(availableFeatures.isRabbitMQ).To(BeFalse())
 
 		Expect(availableFeatures.ParseProperties(map[string]any{
@@ -109,6 +124,21 @@ var _ = Describe("Available Features", func() {
 
 		Expect(availableFeatures.is4OrMore).To(BeTrue())
 		Expect(availableFeatures.is41OrMore).To(BeTrue())
+		Expect(availableFeatures.is42rMore).To(BeFalse())
+		Expect(availableFeatures.is43rMore).To(BeFalse())
+		Expect(availableFeatures.is44rMore).To(BeFalse())
+		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
+
+		Expect(availableFeatures.ParseProperties(map[string]any{
+			"version": "4.4.0",
+			"product": "rabbitmq",
+		})).To(BeNil())
+
+		Expect(availableFeatures.is4OrMore).To(BeTrue())
+		Expect(availableFeatures.is41OrMore).To(BeTrue())
+		Expect(availableFeatures.is42rMore).To(BeTrue())
+		Expect(availableFeatures.is43rMore).To(BeTrue())
+		Expect(availableFeatures.is44rMore).To(BeTrue())
 		Expect(availableFeatures.isRabbitMQ).To(BeTrue())
 	})
 

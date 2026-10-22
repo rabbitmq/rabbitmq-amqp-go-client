@@ -29,6 +29,7 @@ type featuresAvailable struct {
 	is41OrMore bool
 	is42rMore  bool
 	is43rMore  bool
+	is44rMore  bool
 	isRabbitMQ bool
 	isTanzu    bool
 }
@@ -56,6 +57,7 @@ func (f *featuresAvailable) ParseProperties(properties map[string]any) error {
 	f.is41OrMore = isVersionGreaterOrEqual(version, "4.1.0")
 	f.is42rMore = isVersionGreaterOrEqual(version, "4.2.0")
 	f.is43rMore = isVersionGreaterOrEqual(version, "4.3.0")
+	f.is44rMore = isVersionGreaterOrEqual(version, "4.4.0")
 
 	productStr, ok := properties["product"].(string)
 	if !ok {
