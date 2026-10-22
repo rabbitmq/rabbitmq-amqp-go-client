@@ -85,26 +85,35 @@ var _ = Describe("Entities", func() {
 			Expect(args["x-queue-type"]).To(Equal("stream"))
 		})
 
-		It("sets x-stream-initial-offset when InitialOffset is non-zero", func() {
+		It("sets x-stream-initial-offset when InitialOffset is set", func() {
 			spec := &StreamQueueSpecification{
 				Name:          "my-stream",
-				InitialOffset: 1000,
+				InitialOffset: &InitialOffset{Value: 1000},
 			}
 			args := spec.buildArguments()
 			Expect(args["x-stream-initial-offset"]).To(Equal(int64(1000)))
 			Expect(args["x-queue-type"]).To(Equal("stream"))
 		})
 
-		It("does not set x-stream-initial-offset when InitialOffset is zero", func() {
+		It("does not set x-stream-initial-offset when InitialOffset is nil", func() {
 			spec := &StreamQueueSpecification{Name: "my-stream"}
 			args := spec.buildArguments()
 			Expect(args).ToNot(HaveKey("x-stream-initial-offset"))
 		})
 
+		It("sets x-stream-initial-offset when InitialOffset value is zero", func() {
+			spec := &StreamQueueSpecification{
+				Name:          "my-stream",
+				InitialOffset: &InitialOffset{Value: 0},
+			}
+			args := spec.buildArguments()
+			Expect(args["x-stream-initial-offset"]).To(Equal(int64(0)))
+		})
+
 		It("fails validate when InitialOffset is set on RabbitMQ < 4.4", func() {
 			spec := &StreamQueueSpecification{
 				Name:          "my-stream",
-				InitialOffset: 500,
+				InitialOffset: &InitialOffset{Value: 500},
 			}
 			err := spec.validate(&featuresAvailable{is44rMore: false})
 			Expect(err).To(HaveOccurred())
@@ -114,7 +123,7 @@ var _ = Describe("Entities", func() {
 		It("passes validate when InitialOffset is set on RabbitMQ >= 4.4", func() {
 			spec := &StreamQueueSpecification{
 				Name:          "my-stream",
-				InitialOffset: 500,
+				InitialOffset: &InitialOffset{Value: 500},
 			}
 			Expect(spec.validate(&featuresAvailable{is44rMore: true})).To(BeNil())
 		})
@@ -122,7 +131,7 @@ var _ = Describe("Entities", func() {
 		It("fails validate when InitialOffset is negative", func() {
 			spec := &StreamQueueSpecification{
 				Name:          "my-stream",
-				InitialOffset: -1,
+				InitialOffset: &InitialOffset{Value: -1},
 			}
 			err := spec.validate(&featuresAvailable{is44rMore: true})
 			Expect(err).To(HaveOccurred())
@@ -132,7 +141,7 @@ var _ = Describe("Entities", func() {
 		It("fails validate when InitialOffset exceeds MaxStreamInitialOffset", func() {
 			spec := &StreamQueueSpecification{
 				Name:          "my-stream",
-				InitialOffset: MaxStreamInitialOffset + 1,
+				InitialOffset: &InitialOffset{Value: MaxStreamInitialOffset + 1},
 			}
 			err := spec.validate(&featuresAvailable{is44rMore: true})
 			Expect(err).To(HaveOccurred())
