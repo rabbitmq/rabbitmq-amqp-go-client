@@ -312,6 +312,14 @@ func (on *OffsetNext) toLinkFilter() amqp.LinkFilter {
 	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, offsetNext)
 }
 
+type OffsetTimestamp struct {
+	Timestamp time.Time
+}
+
+func (ot *OffsetTimestamp) toLinkFilter() amqp.LinkFilter {
+	return amqp.NewLinkFilter(rmqStreamOffsetSpec, 0, ot.Timestamp)
+}
+
 // StreamFilterOptions represents the options that can be used to filter the stream data.
 // It is used in the StreamConsumerOptions.
 // See: https://www.rabbitmq.com/blog/2024/12/13/amqp-filter-expressions/

@@ -19,10 +19,11 @@ var _ = Describe("Consumer stream test", func() {
 			1. OffsetValue
 			2. OffsetFirst
 			3. OffsetLast
-			4. OffsetNext
+			4. OffsetTimestamp
+			5. OffsetNext
 
 			With 10 messages in the queue, the test will create a consumer with different offset types
-			the test 1, 2, 4 can be deterministic. The test 3 can't be deterministic (in this test),
+			the test 1, 2, 4, 5 can be deterministic. The test 3 can't be deterministic (in this test),
 			but we can check if there is at least one message, and it is not the first one.
 			It is enough to verify the functionality of the offset types.
 		*/
@@ -89,6 +90,47 @@ var _ = Describe("Consumer stream test", func() {
 		Expect(string(dc.Message().GetData())).NotTo(Equal(fmt.Sprintf("Message #%d", 0)))
 		Expect(dc.Accept(context.Background())).To(BeNil())
 
+		consumerTimestamp, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName: "offset_timestamp_test",
+			InitialCredits:   10,
+			Offset: &OffsetTimestamp{
+				Timestamp: time.Now().Add(-time.Hour),
+			},
+		})
+
+		Expect(err).To(BeNil())
+		Expect(consumerTimestamp).NotTo(BeNil())
+		Expect(consumerTimestamp).To(BeAssignableToTypeOf(&Consumer{}))
+		for i := 0; i < 10; i++ {
+			dc, err := consumerTimestamp.Receive(context.Background())
+			Expect(err).To(BeNil())
+
+			Expect(string(dc.Message().GetData())).To(Equal(fmt.Sprintf("Message #%d", i)))
+			Expect(dc.Accept(context.Background())).To(BeNil())
+		}
+
+		// A timestamp in the middle of the stream: messages published before it
+		// must be skipped, messages published after it must be delivered.
+		// The sleeps keep the boundary away from the chunk timestamps of the
+		// messages published before and after.
+		time.Sleep(2 * time.Second)
+		afterTimestamp := time.Now()
+		time.Sleep(2 * time.Second)
+		publishMessages(qName, 1, "after timestamp")
+
+		consumerTimestampMiddle, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
+			ReceiverLinkName: "offset_timestamp_middle_test",
+			InitialCredits:   10,
+			Offset:           &OffsetTimestamp{Timestamp: afterTimestamp},
+		})
+		Expect(err).To(BeNil())
+		Expect(consumerTimestampMiddle).NotTo(BeNil())
+		dcMiddle, err := consumerTimestampMiddle.Receive(context.Background())
+		Expect(err).To(BeNil())
+		Expect(string(dcMiddle.Message().GetData())).To(Equal("after timestamp"))
+		Expect(dcMiddle.Accept(context.Background())).To(BeNil())
+		Expect(consumerTimestampMiddle.Close(context.Background())).To(BeNil())
+
 		consumerNext, err := connection.NewConsumer(context.Background(), qName, &StreamConsumerOptions{
 			ReceiverLinkName: "consumerNext_next",
 			InitialCredits:   10,
@@ -112,6 +154,7 @@ var _ = Describe("Consumer stream test", func() {
 		<-signal
 		Expect(consumerLast.Close(context.Background())).To(BeNil())
 		Expect(consumerOffsetValue.Close(context.Background())).To(BeNil())
+		Expect(consumerTimestamp.Close(context.Background())).To(BeNil())
 		Expect(consumerFirst.Close(context.Background())).To(BeNil())
 		Expect(connection.Management().DeleteQueue(context.Background(), qName)).To(BeNil())
 		Expect(connection.Close(context.Background())).To(BeNil())
