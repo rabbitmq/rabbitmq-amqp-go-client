@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [[1.6.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.6.0)]
+
+## 1.6.0 - 2026-11-16
+- [Release 1.6.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.6.0)
+
+### Added
+- Support `stream-initial-offset` arguments for stream queues (#126) by @vedanthnyk25 in [#128](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/128)
+- Timestamp for controlling the start of the reading point by @LASTInc in [#133](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/133)
+
+### Changed
+- ci: pin runners to ubuntu-24.04 by @Gsantomaggio in [#132](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/132)
+
+## [[1.5.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.5.0)]
+
+## 1.5.0 - 2026-10-19
+- [Release 1.5.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.5.0)
+
+### Added
+- feat: implement consumer priority support (#125) by @vedanthnyk25 in [#129](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/129)
+- Create docker image for `reliable.go` by @Gsantomaggio in [#127](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/127)
+
+### Changed
+- Bump `go.opentelemetry.io/otel/sdk` from 1.43.0 to 1.45.0 in `/tests/otelmetrics` by @dependabot in [#130](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/130)
+- Bump `go.opentelemetry.io/otel/sdk` from 1.44.0 to 1.45.0 in `/docs/examples/otel_metrics` by @dependabot in [#131](https://github.com/rabbitmq/rabbitmq-amqp-go-client/pull/131)
+
 ## [[1.4.0](https://github.com/rabbitmq/rabbitmq-amqp-go-client/releases/tag/v1.4.0)]
 
 ## 1.4.0 - 2026-09-09
